@@ -122,7 +122,7 @@ runs:
             cd ${SITE_ROOT}
           fi
 
-          terminus -n build:env:create ${PANTHEON_SITE}.live ${TARGET_ENV} --yes  --message="${PANTHEON_COMMIT_MESSAGE}"  --create-before-push
+          terminus -n build:env:create ${PANTHEON_SITE}.live ${TARGET_ENV} --yes  --message="${PANTHEON_COMMIT_MESSAGE}"
 
       - name: Update deployment status
         uses: bobheadxi/deployments@v1

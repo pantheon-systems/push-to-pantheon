@@ -29,8 +29,6 @@ class EnvCreateCommand extends BuildToolsBase
      * @option message Commit message to include when committing assets to Pantheon
      * @option pr-id Post notification comment to a specific PR instead of the commit hash.
      * @option no-git-force set this flag to omit the --force flag from 'git add' and 'git push'
-     * @option create-before-push Force the environment to be created first before pushing code.
-     * @option git-ref-compare The Git commit identifier to use when checking for changes to pantheon configuraiton YAML files.
      */
     public function createBuildEnv(
         $site_env_id,
@@ -42,8 +40,6 @@ class EnvCreateCommand extends BuildToolsBase
             'message' => '',
             'pr-id' =>  '',
             'no-git-force' =>  false,
-            'create-before-push' => false,
-            'git-ref-compare' => 'HEAD',
         ])
     {
         list($site, $env) = $this->getSiteEnv($site_env_id);
@@ -70,51 +66,9 @@ class EnvCreateCommand extends BuildToolsBase
 
         // Check to see if '$multidev' already exists on Pantheon.
         $environmentExists = $site->getEnvironments()->has($multidev);
-
-        // Check to see if we should create before pushing or after
-        $createBeforePush = $options['create-before-push'] || $this->commitChangesFile($options['git-ref-compare'], 'pantheon.yml') || $this->commitChangesFile($options['git-commit-compare'], 'pantheon.upstream.yml');
-
-        if (!$environmentExists && $createBeforePush) {
-            // If pantheon.yml exists, then we need to create the environment
-            // in advance, before we push our change. It is more
-            // efficient to push the branch first, and then create
-            // the multidev, as in this instance, we do not need
-            // to call waitForCodeSync(). However, changes to pantheon.yml
-            // will not be applied unless we push our change.
-            // To allow pantheon.yml to be processed, we will
-            // create the multidev environment, and then push the code.
+        if (!$environmentExists) {
             $this->create($site_env_id, $multidev);
         }
-
-        $metadata = $this->pushCodeToPantheon($site_env_id, $multidev, '', $env_label, $options['message'], $options['no-git-force']);
-
-        // Create a new environment for this test.
-        if (!$environmentExists && !$createBeforePush) {
-            // If the environment is created after the branch is pushed,
-            // then there is never a race condition -- the new env is
-            // created with the correct files from the specified branch.
-            $this->create($site_env_id, $multidev);
-        }
-
-        // Clear the environments, so that they will be re-fetched.
-        // Otherwise, the new environment will not be found immediately
-        // after it is first created. If we set the connection mode to
-        // git mode, then Terminus will think it is still in sftp mode
-        // if we do not re-fetch.
-        // TODO: Require Terminus ^1.1 in our composer.json and simplify old code below.
-        if (method_exists($site, 'unsetEnvironments')) {
-            $site->unsetEnvironments();
-        }
-        else {
-            // In Terminus 1.0.0, Site::unsetEnvironments() did not exist,
-            // and $site->environments was public. If the line below is crashing
-            // for you, perhaps you are using a dev version of Terminus from
-            // 20 Feb - 7 Mar 2017. Use something newer or older instead.
-            $site->environments = null;
-        }
-
-        // Get (or re-fetch) a reference to our target multidev site.
-        $target = $site->getEnvironments()->get($multidev);
 
         // If we did not create our environment, then run clone-content
         // instead -- but only if requested. No point in running 'clone'
@@ -122,5 +76,7 @@ class EnvCreateCommand extends BuildToolsBase
         if ($environmentExists && $options['clone-content']) {
             $this->cloneContent($target, $env, $options['db-only']);
         }
+
+        $this->pushCodeToPantheon($site_env_id, $multidev, '', $env_label, $options['message'], $options['no-git-force']);
     }
 }

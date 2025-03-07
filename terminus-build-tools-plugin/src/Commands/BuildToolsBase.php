@@ -18,13 +18,9 @@ use Pantheon\TerminusBuildTools\Utility\UrlParsing;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Finder\Finder;
 use Robo\Common\ProcessUtils;
-use Composer\Semver\Comparator;
-use Pantheon\TerminusBuildTools\ServiceProviders\CIProviders\CIState;
-use Pantheon\TerminusBuildTools\ServiceProviders\ProviderEnvironment;
 use Pantheon\Terminus\DataStore\FileStore;
 use Pantheon\TerminusBuildTools\Credentials\CredentialManager;
 use Pantheon\TerminusBuildTools\ServiceProviders\ProviderManager;
-use Pantheon\Terminus\Helpers\LocalMachineHelper;
 use Pantheon\Terminus\Commands\WorkflowProcessingTrait;
 use Pantheon\Terminus\Models\Environment;
 
@@ -96,62 +92,6 @@ class BuildToolsBase extends TerminusCommand implements SiteAwareInterface, Buil
         return $this->provider_manager;
     }
 
-    /**
-     * Given a git provider and (optionally) a ci provider, return the
-     *
-     */
-    public function selectCIProvider($git_provider_class_or_alias, $ci_provider_class_or_alias = '')
-    {
-        // If using GitLab, override the CI choice as GitLabCI is the only option.
-        // CircleCI theoretically works with GitLab, but its API will not start
-        // up testing on new projects seamlessly, so we can't really use it here.
-        if ($git_provider_class_or_alias == 'gitlab') {
-            $ci_provider_class_or_alias = 'gitlabci';
-        }
-
-        // If using bitbucket and ci is not explicitly provided,
-        // assume bitbucket pipelines
-        if (($git_provider_class_or_alias == 'bitbucket') && (!$ci_provider_class_or_alias)) {
-            $ci_provider_class_or_alias = 'pipelines';
-        }
-
-        // If nothing was provided and no default was inferred, use Circle.
-        if (!$ci_provider_class_or_alias) {
-            $ci_provider_class_or_alias = 'circleci';
-        }
-
-        return $ci_provider_class_or_alias;
-    }
-
-    protected function createGitProvider($git_provider_class_or_alias)
-    {
-        $this->git_provider = $this->providerManager()->createProvider($git_provider_class_or_alias, \Pantheon\TerminusBuildTools\ServiceProviders\RepositoryProviders\GitProvider::class);
-    }
-
-    protected function createCIProvider($ci_provider_class_or_alias)
-    {
-        $this->ci_provider = $this->providerManager()->createProvider($ci_provider_class_or_alias, \Pantheon\TerminusBuildTools\ServiceProviders\CIProviders\CIProvider::class);
-    }
-
-    protected function createSiteProvider($site_provider_class_or_alias)
-    {
-        $this->site_provider = $this->providerManager()->createProvider($site_provider_class_or_alias, \Pantheon\TerminusBuildTools\ServiceProviders\SiteProviders\SiteProvider::class);
-        $this->site_provider->setMachineToken($this->recoverSessionMachineToken());
-        $this->site_provider->setSession($this->session());
-    }
-
-    protected function createProviders($git_provider_class_or_alias, $ci_provider_class_or_alias, $site_provider_class_or_alias = 'pantheon')
-    {
-        if (!empty($ci_provider_class_or_alias)) {
-            $this->createCIProvider($ci_provider_class_or_alias);
-        }
-        if (!empty($git_provider_class_or_alias)) {
-            $this->createGitProvider($git_provider_class_or_alias);
-        }
-        if (!empty($site_provider_class_or_alias)) {
-            $this->createSiteProvider($site_provider_class_or_alias);
-        }
-    }
 
     protected function getUrlFromBuildMetadata($site_name_and_env)
     {
@@ -182,18 +122,6 @@ class BuildToolsBase extends TerminusCommand implements SiteAwareInterface, Buil
     }
 
     /**
-     * Terminus requires php 5.5, so we know we have at least that version
-     * if we get this far.  Warn the user if they are using php 5.5, though,
-     * as we recommend php 5.6 or later (e.g. for Drupal 8.3.0.)
-     */
-    protected function warnAboutOldPhp()
-    {
-        if (Comparator::lessThan(PHP_VERSION, '5.6.0')) {
-            $this->log()->warning('You are using php {version}; it is strongly recommended that you use at least php 5.6. Note that older versions of php will not work with newer template projects (e.g. Drupal 8.3.0).', ['version' => PHP_VERSION]);
-        }
-    }
-
-    /**
      * Get the email address of the user that is logged-in to Pantheon
      */
     protected function loggedInUserEmail()
@@ -214,196 +142,11 @@ class BuildToolsBase extends TerminusCommand implements SiteAwareInterface, Buil
     }
 
     /**
-     * Recover the Pantheon session's machine token.
-     */
-    protected function recoverSessionMachineToken()
-    {
-        $email_address = $this->loggedInUserEmail();
-        if (!$email_address) {
-            return;
-        }
-
-        // Try to look up the machine token using the Terminus API.
-        $tokens = $this->session()->getTokens();
-        $token = $tokens->get($email_address);
-        $machine_token = $token->get('token');
-
-        // If we can't get the machine token through regular Terminus API,
-        // then serialize all of the tokens and see if we can find it there.
-        // This is a workaround for a Terminus bug.
-        if (empty($machine_token)) {
-            $raw_data = $tokens->serialize();
-            if (isset($raw_data[$email_address]['token'])) {
-                $machine_token = $raw_data[$email_address]['token'];
-            }
-        }
-
-        return $machine_token;
-    }
-
-    /**
-     * Determine whether or not this site can create multidev environments.
-     */
-    protected function siteHasMultidevCapability($site)
-    {
-        // Can our site create multidevs?
-        $settings = $site->get('settings');
-        if (!$settings) {
-            return false;
-        }
-        return $settings->max_num_cdes > 0;
-    }
-
-    /**
-     * Return the list of available Pantheon organizations
-     */
-    protected function availableOrgs()
-    {
-        $orgs = array_map(
-            function ($org) {
-                return $org->getLabel();
-            },
-            $this->session()->getUser()->getOrganizations()
-        );
-        return $orgs;
-    }
-
-    /**
-     * Fetch the environment variable 'CIRCLE_TOKEN', or throw an exception if it is not set.
-     * @return string
-     */
-    protected function getRequiredCircleToken()
-    {
-        $circle_token = getenv('CIRCLE_TOKEN');
-        if (empty($circle_token)) {
-            throw new TerminusException("Please generate a Circle CI personal API token token, as described in https://circleci.com/docs/api/#authentication. Then run: \n\nexport CIRCLE_TOKEN=my_personal_api_token_value");
-        }
-        return $circle_token;
-    }
-
-    /**
-     * Return the set of environment variables to save on the CI server.
-     *
-     * @param string $site_name
-     * @param array $options
-     * @return CIState
-     */
-    public function getCIEnvironment($extra_env)
-    {
-        $ci_env = new CIState();
-
-        // Add in extra environment provided on command line via
-        // --env='key=value' --env='another=v2'
-        $envState = new ProviderEnvironment();
-        foreach ($extra_env as $env) {
-            list($key, $value) = explode('=', $env, 2) + ['',''];
-            if (!empty($key) && !empty($value)) {
-                $envState[$key] = $value;
-            }
-        }
-        $ci_env->storeState('env', $envState);
-
-        return $ci_env;
-    }
-
-    /**
-     * Provide some simple aliases to reduce typing when selecting common repositories
-     */
-    protected function expandSourceAliases($source)
-    {
-        //
-        // key:   org/project of template repository
-        // value: list of aliases
-        //
-        // If the org is missing from the template repository, then
-        // pantheon-systems is assumed.
-        //
-        $aliases = [
-            'git@github.com:pantheon-upstreams/drupal-composer-managed.git' => ['d9', 'drops-9'],
-            'example-drops-8-composer' => ['d8', 'drops-8'],
-            'example-drops-7-composer' => ['d7', 'drops-7'],
-            'example-wordpress-composer' => ['wp', 'wordpress'],
-        ];
-
-        // Convert the defaults into a more straightforward mapping:
-        //   shortcut: project
-        $map = [strtolower($source) => $source];
-        foreach ($aliases as $full => $shortcuts) {
-            foreach ($shortcuts as $alias) {
-                $map[$alias] = $full;
-            }
-        }
-
-        // Add in the user shortcuts.
-        $user_shortcuts = $this->getConfig()->get('command.build.project.create.shortcuts', []);
-        $map = array_merge($map, $user_shortcuts);
-
-        return $map[strtolower($source)];
-    }
-
-    /**
      * Return the sha of the HEAD commit.
      */
     protected function getHeadCommit($repositoryDir)
     {
         return exec("git -C $repositoryDir rev-parse HEAD");
-    }
-
-    /**
-     * Reset to the specified commit (or remove the last commit)
-     */
-    protected function resetToCommit($repositoryDir, $resetToCommit = 'HEAD^')
-    {
-        $this->passthru("git -C $repositoryDir reset --hard $resetToCommit");
-    }
-
-    // TODO: if we could look up the commandfile for
-    // Pantheon\Terminus\Commands\Site\CreateCommand,
-    // then we could just call its 'create' method
-    public function siteCreate($site_name, $label, $upstream_id, $options = ['org' => null, 'region' => null,])
-    {
-        if ($this->sites()->nameIsTaken($site_name)) {
-            throw new TerminusException('The site name {site_name} is already taken.', compact('site_name'));
-        }
-
-        $workflow_options = [
-            'label' => $label,
-            'site_name' => $site_name
-        ];
-        $user = $this->session()->getUser();
-
-        // Locate upstream
-        $upstream = $user->getUpstreams()->get($upstream_id);
-
-        // Locate organization
-        if (!empty($org_id = $options['org'])) {
-            $org = $user->getOrgMemberships()->get($org_id)->getOrganization();
-            $workflow_options['organization_id'] = $org->id;
-        }
-
-        // Add the site region.
-        if (!empty($region = $options['region'])) {
-            $workflow_options['preferred_zone'] = $region;
-        }
-
-        // Create the site
-        $this->log()->notice('Creating a new Pantheon site {name}', ['name' => $site_name]);
-        $workflow = $this->sites()->create($workflow_options);
-        while (!$workflow->checkProgress()) {
-            // @TODO: Add Symfony progress bar to indicate that something is happening.
-        }
-
-        // Deploy the upstream
-        if ($site = $this->getSite($workflow->get('waiting_for_task')->site_id)) {
-            $this->log()->notice('Deploying {upstream} to Pantheon site', ['upstream' => $upstream_id]);
-            $workflow = $site->deployProduct($upstream->id);
-            while (!$workflow->checkProgress()) {
-                // @TODO: Add Symfony progress bar to indicate that something is happening.
-            }
-            $this->log()->notice('Deployed CMS');
-        }
-
-        return $this->getSite($site_name);
     }
 
     /**
@@ -447,22 +190,6 @@ class BuildToolsBase extends TerminusCommand implements SiteAwareInterface, Buil
             }
             $this->log()->notice($workflow->getMessage());
         }
-    }
-
-
-    /**
-     * Escape one command-line arg
-     *
-     * @param string $arg The argument to escape
-     * @return RowsOfFields
-     */
-    protected function escapeArgument($arg)
-    {
-        // Omit escaping for simple args.
-        if (preg_match('/^[a-zA-Z0-9_-]*$/', $arg)) {
-            return $arg;
-        }
-        return ProcessUtils::escapeArgument($arg);
     }
 
     /**
@@ -629,25 +356,6 @@ class BuildToolsBase extends TerminusCommand implements SiteAwareInterface, Buil
         $org_user = UrlParsing::orgUserFromRemoteUrl($url);
         $repository = UrlParsing::repositoryFromRemoteUrl($url);
         return "$org_user/$repository";
-    }
-
-    protected function getMatchRegex($item, $multidev_delete_pattern)
-    {
-        $match = $item;
-        // If the name is less than the maximum length, then require
-        // an exact match; otherwise, do a 'starts with' test.
-        if (strlen($item) < 11) {
-            $match .= '$';
-        }
-        // Strip the multidev delete pattern from the beginning of
-        // the match. The multidev env name was composed by prepending
-        // the delete pattern to the branch name, so this recovers
-        // the branch name.
-        $match = preg_replace("%$multidev_delete_pattern%", '', $match);
-        // Constrain match to only match from the beginning
-        $match = "^$match";
-
-        return $match;
     }
 
     protected function deleteEnv($env, $deleteBranch = false)
@@ -990,19 +698,6 @@ class BuildToolsBase extends TerminusCommand implements SiteAwareInterface, Buil
     }
 
     /**
-     * Return 'true' if the specified file was changed in the provided commit.
-     */
-    protected function commitChangesFile($commit, $file)
-    {
-        // If there are any errors, we will presume that the file in
-        // question does not exist in the repository and treat that as
-        // "file did not change" (in other words, ignore errors).
-        exec("git show --name-only $commit -- $file", $outputLines, $result);
-
-        return ($result == 0) && !empty($outputLines);
-    }
-
-    /**
      * Call passthru; throw an exception on failure.
      *
      * @param string $command
@@ -1044,47 +739,5 @@ class BuildToolsBase extends TerminusCommand implements SiteAwareInterface, Buil
             throw new TerminusException('Command `{command}` failed with exit code {status}', ['command' => $command, 'status' => $result]);
         }
         return $outputLines;
-    }
-
-    // Create a temporary directory
-    public function tempdir($prefix='php', $dir=FALSE)
-    {
-        $this->registerCleanupFunction();
-        $tempfile=tempnam($dir ? $dir : sys_get_temp_dir(), $prefix ? $prefix : '');
-        if (file_exists($tempfile)) {
-            unlink($tempfile);
-        }
-        mkdir($tempfile);
-        chmod($tempfile, 0700);
-        if (is_dir($tempfile)) {
-            $this->tmpDirs[] = $tempfile;
-            return $tempfile;
-        }
-    }
-
-    /**
-     * Register our shutdown function if it hasn't already been registered.
-     */
-    public function registerCleanupFunction()
-    {
-        static $registered = false;
-        if ($registered) {
-            return;
-        }
-
-        // Insure that $workdir will be deleted on exit.
-        register_shutdown_function([$this, 'cleanup']);
-        $registered = true;
-    }
-
-    // Delete our work directory on exit.
-    public function cleanup()
-    {
-        if (empty($this->tmpDirs)) {
-            return;
-        }
-
-        $fs = new Filesystem();
-        $fs->remove($this->tmpDirs);
     }
 }

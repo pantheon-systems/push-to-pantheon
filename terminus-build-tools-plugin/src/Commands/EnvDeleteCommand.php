@@ -9,7 +9,6 @@
 
 namespace Pantheon\TerminusBuildTools\Commands;
 
-use Pantheon\Terminus\Exceptions\TerminusException;
 use Pantheon\TerminusBuildTools\Utility\MultiDevRetention;
 
 /**
@@ -17,7 +16,6 @@ use Pantheon\TerminusBuildTools\Utility\MultiDevRetention;
  */
 class EnvDeleteCommand extends BuildToolsBase
 {
-
 
     /**
      * Delete all of the build environments matching the pattern for pull
@@ -114,29 +112,6 @@ class EnvDeleteCommand extends BuildToolsBase
         );
 
         return $retentionController;
-    }
-
-    /**
-     * @command build:env:delete
-     * @aliases build-env:delete
-     *
-     * This function had the potential to be too destructive if called from ci
-     * using --yes with an overly-inclusive delete pattern, e.g. if an
-     * environment variable for a recurring build is incorrectly altered.
-     * It was therefore removed in favor of safer options.
-     */
-    public function deleteBuildEnv(
-        $site_id,
-        $multidev_delete_pattern = self::DEFAULT_DELETE_PATTERN,
-        $options = [
-            'keep' => 0,
-            'preserve-prs' => true,
-            'preserve-if-branch' => false,
-            'delete-branch' => false,
-            'dry-run' => false,
-        ])
-    {
-        throw new TerminusException('The command build:env:delete has been removed. Please use build:env:delete:ci or build:env:delete:pr instead.');
     }
 
     protected function confirmAndDeleteEnvironments(MultiDevRetention $retentionController, $dryRun = false)

@@ -14,7 +14,7 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     - name: deploy to Pantheon
-      uses: ./github_actions/deploy_single_site
+      uses: ./
       with:
         pantheon_ssh_key: ${{ secrets.PANTHEON_SSH_KEY }}
         terminus_machine_token: ${{ secrets.TERMINUS_MACHINE_TOKEN }}
@@ -24,15 +24,4 @@ jobs:
         git_user_name: "Test Name"
         git_user_email: "test@example.com"
         git_commit_message: "This is an automated commit message from GitHub Actions."
-
-  cleanup_multidevs:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v4
-    - name: Delete old multidevs
-      uses: ./github_actions/delete-closed-pull-request-multidevs
-      with:
-        pantheon_ssh_key: ${{ secrets.PANTHEON_SSH_KEY }}
-        terminus_machine_token: ${{ secrets.TERMINUS_MACHINE_TOKEN }}
-        pantheon_site: dtp-nearly-empty-site
-        relative_site_root: ".github/testing_fixtures/dtp-nearly-empty-site"
+        delete_old_environments: true

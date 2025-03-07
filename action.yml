@@ -12,11 +12,17 @@ inputs:
     description: ' '
     required: true
 
-# todo add clone-content as argument
+  # todo add clone-content as argument
 
   target_env:
     description: ' '
     required: true
+
+  delete_old_environments:
+    description: "If set to true, Multidev environments associated with closed pull requests will be deleted after deployment completes. It is recommended to set this parameter to true for workflows that run after merges to the main branch."
+    required: false
+    default: false
+    type: boolean
 
   relative_site_root:
     description: "The root directory of the site to be deployed relative to the repository root. The vast majority of users of this action should leave this value unchanged from the default. The action will use this value to change directories after checking out the repo."
@@ -74,7 +80,7 @@ runs:
         run: |
           #!/bin/bash
           set +e
-          terminus self:plugin:install "${{ github.action_path }}/../../terminus-build-tools-plugin"
+          terminus self:plugin:install "${{ github.action_path }}/terminus-build-tools-plugin"
 
       - name: Configure Git User
         shell: bash
@@ -96,7 +102,7 @@ runs:
           set +e
           if [ -n "$SITE_ROOT" ]; then
             cd ${SITE_ROOT}
-            git init
+            git init -b main
             echo "this origin setting is a hack to get past the 'inferring' of a git provider in build tools"
             git remote add origin https://github.com/${{ github.repository }}
           else
@@ -105,6 +111,7 @@ runs:
 
       - name: Deployment Processing
         shell: bash
+        id: deploy_to_pantheon
         env:
           PANTHEON_SITE: ${{ inputs.pantheon_site }}
           TARGET_ENV: ${{ inputs.target_env }}
@@ -122,7 +129,7 @@ runs:
             cd ${SITE_ROOT}
           fi
 
-          terminus -n build:env:create ${PANTHEON_SITE}.live ${TARGET_ENV} --yes  --message="${PANTHEON_COMMIT_MESSAGE}"
+          terminus -n build:env:create ${PANTHEON_SITE}.live ${TARGET_ENV} --yes --message="${PANTHEON_COMMIT_MESSAGE}"
 
       - name: Update deployment status
         uses: bobheadxi/deployments@v1
@@ -136,3 +143,20 @@ runs:
           deployment_id: ${{ steps.deployment.outputs.deployment_id }}
           env: ${{ inputs.target_env }}-${{ inputs.pantheon_site }}
           env_url: https://${{ inputs.target_env }}-${{ inputs.pantheon_site }}.pantheonsite.io
+
+      - name: Deleting old multidevs
+        if: ${{ inputs.delete_old_environments == 'true' && steps.deploy_to_pantheon.outcome == 'success' }}
+        shell: bash
+        env:
+          PANTHEON_SITE: ${{ inputs.pantheon_site }}
+          GITHUB_TOKEN: ${{ github.token }}
+          SITE_ROOT: ${{ inputs.relative_site_root }}
+        run: |
+          #!/bin/bash
+          set +e
+
+          if [ -n "$SITE_ROOT" ]; then
+            cd ${SITE_ROOT}
+          fi
+
+          terminus build:env:delete:pr $PANTHEON_SITE --yes

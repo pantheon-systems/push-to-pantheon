@@ -1,15 +1,15 @@
 name: deploy-to-pantheon
 inputs:
-  pantheon_ssh_key:
-    description: ' '
+  ssh_key:
+    description: 'A private key that corresponds to a public key on Pantheon: https://docs.pantheon.io/ssh-keys'
     required: true
 
-  terminus_machine_token:
-    description: ' '
+  machine_token:
+    description: "A token for interacting with Pantheon's command line: https://docs.pantheon.io/machine-tokens"
     required: true
 
-  pantheon_site:
-    description: ' '
+  site:
+    description: 'The machine name of your Pantheon site'
     required: true
 
   # todo add clone-content as argument
@@ -92,7 +92,7 @@ runs:
 
       - uses: webfactory/ssh-agent@v0.9.0
         with:
-            ssh-private-key: ${{ inputs.pantheon_ssh_key }}
+            ssh-private-key: ${{ inputs.ssh_key }}
 
       # todo, make checkout conditional.
       # Consumers might have checked out before calling this
@@ -103,7 +103,7 @@ runs:
       - name: Install Terminus
         uses: pantheon-systems/terminus-github-actions@main
         with:
-          pantheon-machine-token: ${{ inputs.terminus_machine_token }}
+          pantheon-machine-token: ${{ inputs.machine_token }}
 
       - name: Install Terminus Plugin
         shell: bash
@@ -143,7 +143,7 @@ runs:
         shell: bash
         id: deploy_to_pantheon
         env:
-          PANTHEON_SITE: ${{ inputs.pantheon_site }}
+          PANTHEON_SITE: ${{ inputs.site }}
           PANTHEON_SOURCE_ENV: ${{ inputs.source_env }}
           SITE_ROOT: ${{ inputs.relative_site_root }}
           PANTHEON_COMMIT_MESSAGE: ${{ inputs.git_commit_message }}
@@ -171,14 +171,13 @@ runs:
           ref: ${{ github.head_ref }}
           # todo, how does this work when there is a step above with the id of "deployment" not "deployment_id"
           deployment_id: ${{ steps.deployment.outputs.deployment_id }}
-          env: ${{ env.PANTHEON_TARGET_ENV }}-${{ inputs.pantheon_site }}
-          env_url: https://${{ env.PANTHEON_TARGET_ENV }}-${{ inputs.pantheon_site }}.pantheonsite.io
-
+          env: ${{ env.PANTHEON_TARGET_ENV }}-${{ inputs.site }}
+          env_url: https://${{ env.PANTHEON_TARGET_ENV }}-${{ inputs.site }}.pantheonsite.io
       - name: Deleting old multidevs
         if: ${{ inputs.delete_old_environments == 'true' && steps.deploy_to_pantheon.outcome == 'success' }}
         shell: bash
         env:
-          PANTHEON_SITE: ${{ inputs.pantheon_site }}
+          PANTHEON_SITE: ${{ inputs.site }}
           GITHUB_TOKEN: ${{ github.token }}
           SITE_ROOT: ${{ inputs.relative_site_root }}
         run: |

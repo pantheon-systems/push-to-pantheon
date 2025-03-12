@@ -16,11 +16,10 @@ jobs:
     - name: deploy to Pantheon
       uses: ./
       with:
-        pantheon_ssh_key: ${{ secrets.PANTHEON_SSH_KEY }}
-        terminus_machine_token: ${{ secrets.TERMINUS_MACHINE_TOKEN }}
-        pantheon_site: dtp-nearly-empty-site
-        # This argument is optional. This value gets inferred from the PR number.
-        # target_env: "pr-${{ github.event.pull_request.number }}"
+        ssh_key: ${{ secrets.PANTHEON_SSH_KEY }}
+        machine_token: ${{ secrets.TERMINUS_MACHINE_TOKEN }}
+        site: dtp-nearly-empty-site
+        target_env: "pr-${{ github.event.pull_request.number }}"
         relative_site_root: ".github/testing_fixtures/dtp-nearly-empty-site"
         git_user_name: "Test Name"
         git_user_email: "test@example.com"

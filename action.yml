@@ -15,8 +15,9 @@ inputs:
   # todo add clone-content as argument
 
   target_env:
-    description: ' '
-    required: true
+    description: 'The Pantheon environment to which the deployment will be made. If left blank, the value used will be automatically derrived. Pull requests will deploy to environments named "pr-[NUMBER]" and main/master branch commits will deploy to the Pantheon "dev" environment'
+    required: false
+    default: ""
 
   delete_old_environments:
     description: "If set to true, Multidev environments associated with closed pull requests will be deleted after deployment completes. It is recommended to set this parameter to true for workflows that run after merges to the main branch."
@@ -51,13 +52,37 @@ runs:
     using: 'composite'
     steps:
 
+      - name: set target_env
+        id: set_target_env
+        shell: bash
+        env:
+          PR_NUM: ${{ github.event.pull_request.number }}
+          INPUT_TARGET_ENV: ${{ inputs.target_env }}
+        run: |
+          #!/bin/bash
+          set +e
+
+            if [ -n "${INPUT_TARGET_ENV}" ]; then
+              TARGET_ENV="${INPUT_TARGET_ENV}"
+            elif [ -n "${PR_NUM}" ]; then
+              TARGET_ENV="pr-${PR_NUM}"
+            elif [ "${GITHUB_REF}" == "refs/heads/main" ] || [ "${GITHUB_REF}" == "refs/heads/master" ]; then
+              TARGET_ENV='dev'
+            else
+              echo "Error: you must set the 'target_env' parameter when running this action on a branch that is not 'main' or 'master' or when not executing a workflow in a pull request."
+              exit 1
+            fi
+
+          echo "PANTHEON_TARGET_ENV=${TARGET_ENV}" >> $GITHUB_ENV
+
+
       - name: start deployment
         uses: bobheadxi/deployments@v1
         id: deployment
         with:
           step: start
           token: ${{ github.token }}
-          env: ${{ inputs.target_env }}
+          env: ${{ env.PANTHEON_TARGET_ENV }}
           ref: ${{ github.head_ref }}
 
       - uses: webfactory/ssh-agent@v0.9.0
@@ -114,7 +139,6 @@ runs:
         id: deploy_to_pantheon
         env:
           PANTHEON_SITE: ${{ inputs.pantheon_site }}
-          TARGET_ENV: ${{ inputs.target_env }}
           SITE_ROOT: ${{ inputs.relative_site_root }}
           PANTHEON_COMMIT_MESSAGE: ${{ inputs.git_commit_message }}
           # todo, might need to make this configurable too.
@@ -129,7 +153,7 @@ runs:
             cd ${SITE_ROOT}
           fi
 
-          terminus -n build:env:create ${PANTHEON_SITE}.live ${TARGET_ENV} --yes --message="${PANTHEON_COMMIT_MESSAGE}"
+          terminus -n build:env:create ${PANTHEON_SITE}.live ${PANTHEON_TARGET_ENV} --yes --message="${PANTHEON_COMMIT_MESSAGE}"
 
       - name: Update deployment status
         uses: bobheadxi/deployments@v1
@@ -141,8 +165,8 @@ runs:
           ref: ${{ github.head_ref }}
           # todo, how does this work when there is a step above with the id of "deployment" not "deployment_id"
           deployment_id: ${{ steps.deployment.outputs.deployment_id }}
-          env: ${{ inputs.target_env }}-${{ inputs.pantheon_site }}
-          env_url: https://${{ inputs.target_env }}-${{ inputs.pantheon_site }}.pantheonsite.io
+          env: ${{ env.PANTHEON_TARGET_ENV }}-${{ inputs.pantheon_site }}
+          env_url: https://${{ env.PANTHEON_TARGET_ENV }}-${{ inputs.pantheon_site }}.pantheonsite.io
 
       - name: Deleting old multidevs
         if: ${{ inputs.delete_old_environments == 'true' && steps.deploy_to_pantheon.outcome == 'success' }}

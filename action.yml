@@ -19,6 +19,11 @@ inputs:
     required: false
     default: ""
 
+  source_env:
+    description: "The environment from which the database and uploaded files will be copied."
+    required: false
+    default: "live"
+
   delete_old_environments:
     description: "If set to true, Multidev environments associated with closed pull requests will be deleted after deployment completes. It is recommended to set this parameter to true for workflows that run after merges to the main branch."
     required: false
@@ -139,6 +144,7 @@ runs:
         id: deploy_to_pantheon
         env:
           PANTHEON_SITE: ${{ inputs.pantheon_site }}
+          PANTHEON_SOURCE_ENV: ${{ inputs.source_env }}
           SITE_ROOT: ${{ inputs.relative_site_root }}
           PANTHEON_COMMIT_MESSAGE: ${{ inputs.git_commit_message }}
           # todo, might need to make this configurable too.
@@ -153,7 +159,7 @@ runs:
             cd ${SITE_ROOT}
           fi
 
-          terminus -n build:env:create ${PANTHEON_SITE}.live ${PANTHEON_TARGET_ENV} --yes --message="${PANTHEON_COMMIT_MESSAGE}"
+          terminus -n build:env:create ${PANTHEON_SITE}.${PANTHEON_SOURCE_ENV} ${PANTHEON_TARGET_ENV} --yes --message="${PANTHEON_COMMIT_MESSAGE}"
 
       - name: Update deployment status
         uses: bobheadxi/deployments@v1

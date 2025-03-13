@@ -1,19 +1,19 @@
-name: deploy-to-pantheon
+name: Deploy Site to Pantheon
 inputs:
   ssh_key:
     description: 'A private key that corresponds to a public key on Pantheon: https://docs.pantheon.io/ssh-keys'
     required: true
 
   machine_token:
-    description: "A token for interacting with Pantheon's command line: https://docs.pantheon.io/machine-tokens"
+    description: "A token for authenticating with Pantheon's command line: https://docs.pantheon.io/machine-tokens"
     required: true
 
   site:
-    description: 'The machine name of your Pantheon site'
+    description: 'The machine name of your Pantheon site.'
     required: true
 
   target_env:
-    description: 'The Pantheon environment to which the deployment will be made. If left blank, the value used will be automatically derrived. Pull requests will deploy to environments named "pr-[NUMBER]" and main/master branch commits will deploy to the Pantheon "dev" environment'
+    description: 'The Pantheon environment to which the deployment will be made. If left blank, the value used will be automatically derived. Pull requests will deploy to environments named "pr-[NUMBER]" and main/master branch commits will deploy to the Pantheon "dev" environment'
     required: false
     default: ""
 
@@ -34,23 +34,23 @@ inputs:
     default: false
     type: boolean
 
-  relative_site_root:
-    description: "The root directory of the site to be deployed relative to the repository root. The vast majority of users of this action should leave this value unchanged from the default. The action will use this value to change directories after checking out the repo."
-    required: false
-    default: ""
-
   git_user_name:
-    description: "The name to be used with the Git commit that will be pushed to Pantheon. This value is not used on newer 'eVCS' sites for which there is no Pantheon-provided Git Repo"
+    description: "The name to be used with the Git commit that will be pushed to Pantheon. This value is not used on newer 'eVCS' sites for which there is no Pantheon-provided Git repo."
     required: false
     default: "GitHub Action Automation"
 
   git_user_email:
-    description: "The email address to be used with the Git commit that will be pushed to Pantheon. This value is not used on newer 'eVCS' sites for which there is no Pantheon-provided Git Repo"
+    description: "The email address to be used with the Git commit that will be pushed to Pantheon. This value is not used on newer 'eVCS' sites for which there is no Pantheon-provided Git repo."
     required: false
     default: "GitHubAction@example.com"
 
   git_commit_message:
-    description: "A custom commit message to be used with the Git commit that will be pushed to Pantheon. Leaving this Action parameter blank will result in a generic commit message being used. This value is not used on newer 'eVCS' sites for which there is no Pantheon-provided Git Repo"
+    description: "A custom commit message to be used with the Git commit that will be pushed to Pantheon. Leaving this Action parameter blank will result in a generic commit message being used. This value is not used on newer 'eVCS' sites for which there is no Pantheon-provided Git repo."
+    required: false
+    default: ""
+
+  relative_site_root:
+    description: "The root directory of the site to be deployed relative to the repository root. The vast majority of users of this action should leave this value unchanged from the default. The action will use this value to change directories after checking out the repo."
     required: false
     default: ""
 

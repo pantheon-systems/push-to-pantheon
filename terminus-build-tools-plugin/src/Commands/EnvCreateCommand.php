@@ -74,6 +74,8 @@ class EnvCreateCommand extends BuildToolsBase
         // instead -- but only if requested. No point in running 'clone'
         // if the user plans on re-installing Drupal.
         if ($environmentExists && $options['clone-content']) {
+            // Get (or re-fetch) a reference to our target multidev site.
+            $target = $site->getEnvironments()->get($multidev);
             $this->cloneContent($target, $env, $options['db-only']);
         }
 

@@ -58,18 +58,41 @@ setup_mock_pantheon_repo() {
     return 0
 }
 
+setup_mock_ci_environment() {
+    local repo_path="$1"
+    local github_repo_path="$2"
+
+    # Clone the GitHub repository
+    git clone "$github_repo_path" "$repo_path"
+    
+    # Configure git user for this repo
+    cd "$repo_path"
+    git config --local user.email "test@example.com"
+    git config --local user.name "Test User"
+
+    # Checkout the test-pr branch
+    git checkout test-pr
+
+    return 0
+}
+
 setup_mock_repos() {
     local github_path="$1"
     local pantheon_path="$2"
+    local ci_path="${3:-}"  # Make the third parameter optional
 
     setup_mock_github_repo "$github_path"
     setup_mock_pantheon_repo "$pantheon_path" "$github_path"
+    
+    # Only set up CI environment if path is provided
+    if [ -n "$ci_path" ]; then
+        setup_mock_ci_environment "$ci_path" "$github_path"
+    fi
 
-    # Additional setup for shared history will go here
     return 0
 }
 
 # Only execute main if script is run directly (not sourced)
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
-    setup_mock_repos "$1" "$2"
+    setup_mock_repos "$1" "$2" "${3:-}"
 fi 

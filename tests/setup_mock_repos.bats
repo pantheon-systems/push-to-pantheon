@@ -7,12 +7,14 @@ setup() {
     # Create temporary directories for our tests
     export GITHUB_DIR="$(mktemp -d)"
     export PANTHEON_DIR="$(mktemp -d)"
+    export CI_DIR="$(mktemp -d)"
 }
 
 teardown() {
     # Clean up temporary directories
     rm -rf "$GITHUB_DIR"
     rm -rf "$PANTHEON_DIR"
+    rm -rf "$CI_DIR"
 }
 
 @test "setup creates a git repository at specified path" {
@@ -106,4 +108,28 @@ teardown() {
     git checkout master
     run git merge-base --is-ancestor "$GITHUB_MAIN_COMMIT" HEAD
     [ "$status" -eq 0 ]
+}
+
+@test "CI environment has correct GitHub checkout on test-pr branch" {
+    run setup_mock_repos "$GITHUB_DIR" "$PANTHEON_DIR" "$CI_DIR"
+    [ "$status" -eq 0 ]
+    
+    # Check that CI repo exists and is a git repo
+    [ -d "$CI_DIR/.git" ]
+    
+    # Check that we're on test-pr branch
+    cd "$CI_DIR"
+    run git branch --show-current
+    [ "$status" -eq 0 ]
+    [[ "${output}" == "test-pr" ]]
+    
+    # Get the HEAD commit of test-pr branch in GitHub repo
+    cd "$GITHUB_DIR"
+    git checkout test-pr
+    GITHUB_PR_COMMIT=$(git rev-parse HEAD)
+    
+    # Verify CI repo has the same HEAD commit
+    cd "$CI_DIR"
+    CI_COMMIT=$(git rev-parse HEAD)
+    [ "$GITHUB_PR_COMMIT" = "$CI_COMMIT" ]
 } 

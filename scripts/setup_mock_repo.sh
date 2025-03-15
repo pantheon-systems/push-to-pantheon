@@ -14,11 +14,11 @@ setup_mock_repo() {
     git init -b main
     
     # # 2. Create and commit index.php on main branch
-    # echo '<?php echo "Hello world"; ?>' > index.php
-    # git add index.php
+    echo '<?php echo "Hello world"; ?>' > index.php
+    git add index.php
     # git config --local user.email "test@example.com"
     # git config --local user.name "Test User"
-    # git commit -m "Initial commit with Hello World"
+    git commit -m "Initial commit with Hello World"
     
     # # 3. Create test-pr branch
     # git checkout -b test-pr

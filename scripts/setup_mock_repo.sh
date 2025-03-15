@@ -21,15 +21,15 @@ setup_mock_repo() {
     git commit -m "Initial commit with Hello World"
     
     # # 3. Create test-pr branch
-    # git checkout -b test-pr
+    git checkout -b test-pr
     
     # # 4. Modify and commit changes on test-pr branch
-    # echo '<?php
-    # echo "Hello world";
-    # echo "this is a commit on test-pr";
-    # ?>' > index.php
-    # git add index.php
-    # git commit -m "Add additional echo statement"
+    echo '<?php
+    echo "Hello world";
+    echo "this is a commit on test-pr";
+    ?>' > index.php
+    git add index.php
+    git commit -m "Add additional echo statement in the branch test-pr"
     
     # # 5. Return to main branch
     # git checkout main

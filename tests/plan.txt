@@ -1,15 +1,14 @@
-
 ✅ Given I have a GitHub repo with a pull request 
 
-And given I have a site on Pantheon with no corresponding branch (TBD of how I’ll check that. Probably by inspecting the logs of the full sh script.)
+✅ And given I have a site on Pantheon with no corresponding branch
 
-And those two repos have a shared history
+✅ And those two repos have a shared history
+
+✅ And given I have a CI environment containing a checkout of the GitHub repo on the test-pr branch
 
 When the build process runs for the PR
 
-And then a CI env is made that contains a checkout of the GitHub repo
-
-And then a new branch is checked out and created specific to this CI run
+Then a new branch is checked out and created specific to this CI run
 
 And then npm build runs (adding some comment in a css file about the build run that generated it. This could be checked later via curl)
 

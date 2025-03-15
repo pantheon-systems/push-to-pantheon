@@ -9,9 +9,9 @@ setup_mock_repo() {
     # Uncomment and implement each step to make tests pass
     
     # # 1. Create and initialize the repository
-    # mkdir -p "$repo_path"
-    # cd "$repo_path"
-    # git init -b main
+    mkdir -p "$repo_path"
+    cd "$repo_path"
+    git init -b main
     
     # # 2. Create and commit index.php on main branch
     # echo '<?php echo "Hello world"; ?>' > index.php

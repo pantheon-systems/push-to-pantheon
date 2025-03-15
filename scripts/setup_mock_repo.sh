@@ -16,8 +16,8 @@ setup_mock_repo() {
     # # 2. Create and commit index.php on main branch
     echo '<?php echo "Hello world"; ?>' > index.php
     git add index.php
-    # git config --local user.email "test@example.com"
-    # git config --local user.name "Test User"
+    git config --local user.email "test@example.com"
+    git config --local user.name "Test User"
     git commit -m "Initial commit with Hello World"
     
     # # 3. Create test-pr branch
@@ -31,10 +31,9 @@ setup_mock_repo() {
     git add index.php
     git commit -m "Add additional echo statement in the branch test-pr"
     
-    # # 5. Return to main branch
-    # git checkout main
 
-    return 0  # This will make the function "succeed" but the tests will fail
+
+    return 0
 }
 
 # Only execute main if script is run directly (not sourced)

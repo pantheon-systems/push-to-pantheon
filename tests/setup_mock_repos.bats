@@ -1,7 +1,7 @@
 #!/usr/bin/env bats
 
 # Load the script to test
-load '../scripts/setup_mock_repo.sh'
+load '../scripts/setup_mock_repos.sh'
 
 setup() {
     # Create a temporary directory for our test
@@ -14,13 +14,13 @@ teardown() {
 }
 
 @test "setup creates a git repository at specified path" {
-    run setup_mock_repo "$TEMP_DIR"
+    run setup_mock_github_repo "$TEMP_DIR"
     [ "$status" -eq 0 ]
     [ -d "$TEMP_DIR/.git" ]
 }
 
 @test "repository has a main branch" {
-    run setup_mock_repo "$TEMP_DIR"
+    run setup_mock_github_repo "$TEMP_DIR"
     [ "$status" -eq 0 ]
     
     cd "$TEMP_DIR"
@@ -30,7 +30,7 @@ teardown() {
 }
 
 @test "main branch has index.php with expected content" {
-    run setup_mock_repo "$TEMP_DIR"
+    run setup_mock_github_repo "$TEMP_DIR"
     [ "$status" -eq 0 ]
     
     cd "$TEMP_DIR"
@@ -41,7 +41,7 @@ teardown() {
 }
 
 @test "repository has test-pr branch" {
-    run setup_mock_repo "$TEMP_DIR"
+    run setup_mock_github_repo "$TEMP_DIR"
     [ "$status" -eq 0 ]
     
     cd "$TEMP_DIR"
@@ -51,7 +51,7 @@ teardown() {
 }
 
 @test "test-pr branch contains main's commit and has additional commit" {
-    run setup_mock_repo "$TEMP_DIR"
+    run setup_mock_github_repo "$TEMP_DIR"
     [ "$status" -eq 0 ]
     
     cd "$TEMP_DIR"

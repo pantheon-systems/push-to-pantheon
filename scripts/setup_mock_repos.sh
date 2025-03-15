@@ -34,9 +34,27 @@ setup_mock_github_repo() {
 
 setup_mock_pantheon_repo() {
     local repo_path="$1"
-    # Implementation will go here
-    # This repo should share history with the GitHub repo
-    # but not have the test-pr branch
+    local github_repo_path="$2"
+
+    # Create and initialize the repository
+    mkdir -p "$repo_path"
+    cd "$repo_path"
+    git init -b master
+    
+    # Configure git user for this repo
+    git config --local user.email "test@example.com"
+    git config --local user.name "Test User"
+
+    # Add GitHub repo as a remote to get its history
+    git remote add github "$github_repo_path"
+    git fetch github
+
+    # Reset master to GitHub's main branch
+    git reset --hard github/main
+
+    # Remove the remote to keep repos separate
+    git remote remove github
+
     return 0
 }
 
@@ -45,7 +63,7 @@ setup_mock_repos() {
     local pantheon_path="$2"
 
     setup_mock_github_repo "$github_path"
-    setup_mock_pantheon_repo "$pantheon_path"
+    setup_mock_pantheon_repo "$pantheon_path" "$github_path"
 
     # Additional setup for shared history will go here
     return 0

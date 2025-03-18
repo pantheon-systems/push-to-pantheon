@@ -1,11 +1,8 @@
-# Deploy Site to to Pantheon (GitHub Action)
+# Push Site to Pantheon (GitHub Action)
 
+This GitHub Action pushes your site's code from GitHub to [the Pantheon `Dev` environment](https://docs.pantheon.io/pantheon-workflow) or [Multidev environment](https://docs.pantheon.io/guides/multidev).
 
-This GitHub Action deploys a site to Pantheon as a step in your GitHub Action workflow. It is meant to be used within individual repositories that contain the code a single site.
-
-
-It is meant to be used in workflows that run upon pushes to Pull Requests and pushes to the `main` branch of a repository.
-
+It is designed to be used in GitHub Actions workflows that are triggered by Pull Requests and pushes to the `main` branch of your repository.
 
 When running workflow triggered by a pull request, this action will create a [Multidev environment](https://docs.pantheon.io/guides/multidev) and deploy code to it.
 
@@ -13,13 +10,13 @@ When running workflow triggered by a pull request, this action will create a [Mu
 
 When running on workflows triggered by merges/pushes to the `main` branch this action will deploy code to [the Pantheon `Dev` environment](https://docs.pantheon.io/pantheon-workflow).
 
-![Deploying main to Pantheon](.github/documentation/diagram--deploying-main.png)
+![Deploying main to Pantheon](.github/documentation/diagram--pushing-main.png)
 
 ## Basic Usage
 
-
 This action provides a step that can be used as the only step within a job.
 More complex examples further below show additional steps and jobs used in conjunction with this action.
+
 Here is the beginning of a `jobs` section of [a real `.github/workflows/deploy-pr.yml` file](https://github.com/stevector/stevector-composed/blob/6a1c0183ef6e429761fcc090c34cfcc2dcd7c573/.github/workflows/deploy-pr.yml) that deploys a site to Pantheon when triggered by a Pull Request.
 
 
@@ -36,14 +33,9 @@ jobs:
         site: ${{ vars.PANTHEON_SITE }}
 ```
 
+## Parameters
 
-
-
-
-
-## Arguments
-
-In order to use the step supplied by this Action, the GitHub Workflow must have access to [a token for authenticating with Pantheon's command line](https://docs.pantheon.io/machine-tokens) and [a private key](https://docs.pantheon.io/ssh-keys) that will allow deployments to Pantheon and other operations.
+In order to use the step supplied by this Action, the GitHub Workflow must have access to [a token for authenticating with Pantheon's command line](https://docs.pantheon.io/machine-tokens) and [a private key](https://docs.pantheon.io/ssh-keys) that will allow Git pushes to Pantheon and other operations.
 Both of those values should be treated senstively and stored as [GitHub Secrets](https://docs.github.com/en/actions/reference/encrypted-secrets).
 
 The only other required argument is the machine name of the Pantheon site to which the code will be deployed.
@@ -51,7 +43,6 @@ The only other required argument is the machine name of the Pantheon site to whi
 The optional argument likely to be most commonly used is `delete_old_environments` which will delete Multidev environments associated with closed pull requests after the deployment completes. Setting `delete_old_environments: true` is recommended for workflows that run after merges to the `main` branch to avoid accumulating Multidev environments that are no longer needed.
 
 ### Required Arguments
-
 
 #### `ssh_key`
 
@@ -67,9 +58,7 @@ The optional argument likely to be most commonly used is `delete_old_environment
 
 The machine name of your Pantheon site.
 
-
 ### Optional Arguments
-
 
 #### `delete_old_environments`
 
@@ -148,7 +137,6 @@ For example, to use version 0.2.1 of this action, the step would look like this:
     site: ${{ vars.PANTHEON_SITE }}
 ```
 
-
 ### Additional build steps like `composer install` and `npm build`
 
 [_todo: explain_](https://github.com/stevector-streaming/dtp/issues/54)
@@ -181,21 +169,21 @@ concurrency:
 ### Using additional jobs to test your code and the deployed site
 
 Unit tests and code sniffing/linting generally do not need a fully functioning site in order to execute.
-Therefore you can run them in parallel with the job that deploys the site to Pantheon.
-End to end tests that depend on a fully functioning site should wait for the job that deploys to complete so that the tests can run against the deployed site.
+Therefore you can run them in parallel with the job that pushes the site to Pantheon.
+End to end tests that depend on a fully functioning site should wait for the job that pushes to complete so that the tests can run against the deployed site.
 
-In this example, coding standards checks are run in parallel with the deployment job and tests written in playwright which check customized CMS functionality run after the deployment completes.
+In this example, coding standards checks are run in parallel with the `push-to-pantheon` job and tests written in [Playwright](https://playwright.dev/) which check customized CMS functionality run after the deployment completes.
 
-Here is an example from a real site that runs a coding standards check in parallel to the deployment job.
+Here is an example from a real site that runs a coding standards check in parallel to the `push-to-pantheon` job.
 
-![Parallel and Serial Jobs](.github/documentation/parallel-and-serial-jobs.jpg)
+![Parallel and Serial Jobs](.github/documentation/parallel-and-serial-jobs.png)
 
 Here is how those jobs are defined in an example site's `.github/workflows/deploy-pr.yml` file:
 
 ```yml
 
 jobs:
-  deploy:
+  push-to-pantheon:
     runs-on: ubuntu-latest
     steps:
     - name: Deploy to Pantheon
@@ -215,7 +203,7 @@ jobs:
       run: composer run cs
 
   playwright:
-    needs: deploy
+    needs: push-to-pantheon
     runs-on: ubuntu-latest
     steps:
     - name: Check out the repository
@@ -225,5 +213,4 @@ jobs:
         pantheon_ssh_key: ${{ secrets.PANTHEON_SSH_KEY }}
         terminus_machine_token: ${{ secrets.TERMINUS_MACHINE_TOKEN }}
         pantheon_site: ${{ vars.PANTHEON_SITE }}
-
 ```

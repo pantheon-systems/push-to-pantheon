@@ -8,38 +8,23 @@ When running workflow triggered by a pull request, this action will create a [Mu
 
 ```mermaid
 
+  flowchart LR
 
-flowchart LR
-
- subgraph Cloud["Cloud services"]
-    direction LR
-            GitHubAction --> PantheonEnv
 
              subgraph GitHub["GitHub"]
                direction LR
-               GitHubRepo["GitHub Repo"] --> GitHubAction["GitHub Action"]
+               GitHubRepo["GitHub Repo"]-->|"Branch with pull request<br>triggers a workflow"|GitHubAction["GitHub Action"]
               end
 
             subgraph Pantheon["Pantheon"]
-                PantheonEnv["PantheonEnv"]
+                PantheonEnv["Pantheon Multidev Environment"]
             end
 
+     GitHubAction -->|"Action sends code to Pantheon"| PantheonEnv
 
 
 
-  end
-
-
-            subgraph asdf
-               direction LR
-               AnotherThing
-               Laptop["Developer's Computer"] --> GitHubRepo
-            end
-
-
-
-
-
+  Laptop["Developer's Computer"]-->|"Pushing Git branch"|GitHubRepo
 ```
 
 

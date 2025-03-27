@@ -31,9 +31,10 @@ When running workflow triggered by a pull request, this action will create a [Mu
 ```mermaid
 
 block-beta
-      columns 5
-      A B C:3
-      D:3 E:2
+  columns 3
+  a["github repo"] b["github action"] c["pantheon multidev"] d
+  a-->b
+  b-->c
 
 
 

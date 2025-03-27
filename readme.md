@@ -6,7 +6,43 @@ It is designed to be used in GitHub Actions workflows that are triggered by Pull
 
 When running workflow triggered by a pull request, this action will create a [Multidev environment](https://docs.pantheon.io/guides/multidev) and deploy code to it.
 
-![Deploying a PR to a Pantheon Multidev](.github/documentation/diagram--deploying-pr.png)
+```mermaid
+
+
+flowchart LR
+
+ subgraph Cloud["Cloud services"]
+    direction LR
+            GitHubAction --> PantheonEnv
+
+             subgraph GitHub["GitHub"]
+               direction LR
+               GitHubRepo["GitHub Repo"] --> GitHubAction["GitHub Action"]
+              end
+
+            subgraph Pantheon["Pantheon"]
+                PantheonEnv["PantheonEnv"]
+            end
+
+
+
+
+  end
+
+
+            subgraph asdf
+               direction LR
+               AnotherThing
+               Laptop["Developer's Computer"] --> GitHubRepo
+            end
+
+
+
+
+
+```
+
+
 
 When running on workflows triggered by merges/pushes to the `main` branch this action will deploy code to [the Pantheon `Dev` environment](https://docs.pantheon.io/pantheon-workflow).
 

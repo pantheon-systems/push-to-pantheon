@@ -28,6 +28,18 @@ When running workflow triggered by a pull request, this action will create a [Mu
 ```
 
 
+```mermaid
+
+block-beta
+      columns 5
+      A B C:3
+      D:3 E:2
+
+
+
+```
+
+
 
 When running on workflows triggered by merges/pushes to the `main` branch this action will deploy code to [the Pantheon `Dev` environment](https://docs.pantheon.io/pantheon-workflow).
 

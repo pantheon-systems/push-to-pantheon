@@ -30,11 +30,28 @@ When running workflow triggered by a pull request, this action will create a [Mu
 
 ```mermaid
 
-block-beta
-  columns 3
-  a["github repo"] b["github action"] c["pantheon multidev"] d
-  a-->b
-  b-->c
+graph TD
+    block-beta
+    columns 3
+    a["github repo"]
+    b["github action"]
+    c["pantheon multidev"]
+    d
+
+    a --> b
+    b --> c
+
+    %% Adding styles for increased space between boxes
+    style a padding: 20px;
+    style b padding: 20px;
+    style c padding: 20px;
+    style d padding: 20px;
+
+    %% You can also try adjusting the spacing between nodes if needed:
+    %% These settings might work in some cases but are not part of a specific "block" feature.
+    %% style a margin: 20px;
+    %% style b margin: 20px;
+    %% style c margin: 20px;
 
 
 

@@ -150,7 +150,7 @@ For example, to use version 0.2.1 of this action, the step would look like this:
 
 By default this action will check out the code from the GitHub repository and push it to Pantheon.
 For many WordPress sites and Drupal sites, this is all that is needed.
-By setting `build_step: true` in the `pantheon.yml`, Pantheon will execute `composer install` and eventually `npm build` for compilation of CSS and JS assets needed for a theme(TODO, LINK NEEDED).
+By setting [`build_step: true` in the `pantheon.yml`](https://docs.pantheon.io/pantheon-yml#integrated-composer-build-step), Pantheon will execute `composer install` and eventually `npm build` for compilation of CSS and JS assets needed for a theme.
 
 However, some teams prefer to do these build steps in GitHub Actions before pushing to Pantheon.
 
@@ -163,9 +163,14 @@ Here's an example from a real site that uses Tailwind to prepare CSS in the site
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
-    - run: "cd web/themes/stevector2024 && npm ci && npm run build"
-    - run: "cd web/themes/stevector2024/css && rm .gitignore"
-    - name: Deploy to Pantheon
+    # The custom theme for this site uses Tailwind to build the
+    # appropriate CSS file.
+    - run: "cd web/themes/my_custom_theme && npm ci && npm run build"
+    # deleting this small .gitignore that ignores compiled CSS
+    # from the GitHub repo will allow it to be committed and pushed
+    # to Pantheon in the later "push-to-pantheon" step.
+    - run: "cd web/themes/my_custom_theme/css && rm .gitignore"
+    - name: Push to Pantheon
       uses: stevector/push-to-pantheon@checkout_repo
       with:
         ssh_key: ${{ secrets.PANTHEON_SSH_KEY }}
@@ -176,11 +181,10 @@ Here's an example from a real site that uses Tailwind to prepare CSS in the site
 
 The important elements to note are that:
 
-- the first step is checking out the code from the GitHub repository.
-- the `cd` commands are used to change directories to the location of the `package.json` file.
-- the `npm ci` command is used to install the dependencies listed in the `package.json` file.
-- the `npm run build` command is used to run the build script defined in the `package.json` file.
-- the `rm .gitignore` command is used to remove the `.gitignore` file from the `css` directory. This allows the CSS to be committed later by the action.
+- The first step in this job is the checking out the code from the GitHub repository. Since the repo is checked out in this first step, it should not be checked out again by the `push-to-pantheon` step.
+- The next step builds a CSS file that will be used by Drupal. It does so by using `cd` to go to the theme directory and processing a `package.json`
+ that lives there. It is a question of preference for teams as to whether they want such `package.json` files living in their custom themes, the root of their projects or elsewhere.
+- After the CSS file is built a small `.gitignore` file is removed so that `push-to-pantheon` will detect, commit, and push the generated CSS that is not meant to be version controlled on GitHub.
 - the `checkout_repo` parameter is set to `false` in the step that uses this action. This prevents the action from checking out the code again, which would undo the work done in the previous steps.
 
 ### Concurrency

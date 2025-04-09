@@ -69,7 +69,6 @@ runs:
           INPUT_TARGET_ENV: ${{ inputs.target_env }}
         run: |
           # Set target_env
-          #!/bin/bash
           set +e
 
             if [ -n "${INPUT_TARGET_ENV}" ]; then

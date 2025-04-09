@@ -227,8 +227,13 @@ runs:
             cd ${SITE_ROOT}
           fi
 
+          echo "Deleting Pantheon PR multidev environment..."
           terminus build:env:delete:pr $PANTHEON_SITE --yes
-        # todo, also add deletion of GitHub environments representation
-        # https://github.com/bobheadxi/deployments?tab=readme-ov-file#step-delete-env
 
-          
+          echo "Finding closed PRs to clean up GitHub environments..."
+          CLOSED_PRS=$(gh pr list --state closed --json number --jq '.[].number')
+          for PR_NUM in "${CLOSED_PRS}"; do
+            ENV_NAME="pr-$PR_NUM"
+            echo "Attempting to delete GitHub environment: $ENV_NAME..."
+            gh api --method DELETE "repos/${{ github.repository }}/environments/$ENV_NAME"
+          done        

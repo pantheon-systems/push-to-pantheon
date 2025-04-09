@@ -37,7 +37,7 @@ jobs:
       uses: bats-core/bats-action@3.0.0
     - name: My test
       shell: bash
-      env:
+      # env:
       # BATS_LIB_PATH: ${{ steps.setup-bats.outputs.lib-path }}
       # TERM: xterm
       run: bats tests/setup_mock_repos.bats

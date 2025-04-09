@@ -25,8 +25,9 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
+    - uses: actions/checkout@v4
     - name: Deploy to Pantheon
-      uses: stevector-streaming/dtp@0.2.1
+      uses: stevector/push-to-pantheon@0.4
       with:
         ssh_key: ${{ secrets.PANTHEON_SSH_KEY }}
         machine_token: ${{ secrets.TERMINUS_MACHINE_TOKEN }}
@@ -139,7 +140,37 @@ For example, to use version 0.2.1 of this action, the step would look like this:
 
 ### Additional build steps like `composer install` and `npm build`
 
-[_todo: explain_](https://github.com/stevector-streaming/dtp/issues/54)
+By default this action will check out the code from the GitHub repository and push it to Pantheon.
+For many WordPress sites and Drupal sites, this is all that is needed.
+By setting [`build_step: true` in the `pantheon.yml`](https://docs.pantheon.io/pantheon-yml#integrated-composer-build-step), Pantheon will execute `composer install` and eventually `npm build` for compilation of CSS and JS assets needed for a theme.
+
+However, some teams prefer to do these build steps in GitHub Actions before pushing to Pantheon.
+
+That use case can be accommodated by adding additional steps to the workflow before the step that uses this action.
+
+Here's an example from a real site that uses Tailwind to prepare CSS in the site's custom theme.
+
+```
+  push-to-pantheon:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    # The custom theme for this site uses Tailwind to build the
+    # appropriate CSS file.
+    - run: "cd web/themes/my_custom_theme && npm ci && npm run build"
+    # Deleting this small .gitignore that ignores compiled CSS
+    # from the GitHub repo will allow it to be committed and pushed
+    # to Pantheon in the later "push-to-pantheon" step.
+    - run: "cd web/themes/my_custom_theme/css && rm .gitignore"
+    - name: Push to Pantheon
+      uses: stevector/push-to-pantheon@0.4
+      with:
+        ssh_key: ${{ secrets.PANTHEON_SSH_KEY }}
+        machine_token: ${{ secrets.TERMINUS_MACHINE_TOKEN }}
+        site: ${{ vars.PANTHEON_SITE }}
+```
+
+By calling `npm run build` and modifying `gitignore` prior to calling `push-to-pantheon`, the Tailwind-generated CSS (which is not wanted in the GitHub repo) is available to be committed (and pushed) inside the `push-to-pantheon` step.
 
 ### Concurrency
 
@@ -150,7 +181,6 @@ However, for most WordPress and Drupal teams deploying to Pantheon we recommend 
 Multiple workflows each attempting to deploy code to the same environment at the same time could result in confusing error states or failing automated tests that follow deployment.
 
 To ensure that only one build runs at a time for a pull request, include this `concurrency` section in your workflow's yml file:
-
 
 ```yml
 concurrency:

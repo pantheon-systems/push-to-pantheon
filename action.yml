@@ -61,12 +61,16 @@ runs:
     using: 'composite'
     steps:
 
+
+
       - name: set target_env
         id: set_target_env
         shell: bash
         env:
           PR_NUM: ${{ github.event.pull_request.number }}
           INPUT_TARGET_ENV: ${{ inputs.target_env }}
+
+          # todo, move this variable setting to a separate script and test it with bats.
         run: |
           #!/bin/bash
           set +e

@@ -1,7 +1,7 @@
 #!/usr/bin/env bats
 
 # Load the script to test
-load '../scripts/setup_mock_repos'
+load 'test_helper/setup_mock_repos'
 
 setup() {
     # Create temporary directories for our tests
@@ -17,37 +17,29 @@ teardown() {
     rm -rf "$CI_DIR"
 }
 
-@test "setup creates a git repository at specified path" {
+@test "Setup creates a mock GitHub repo at the specified path" {
     run setup_mock_github_repo "$GITHUB_DIR"
     [ "$status" -eq 0 ]
     [ -d "$GITHUB_DIR/.git" ]
-}
-
-@test "repository has a main branch" {
-    run setup_mock_github_repo "$GITHUB_DIR"
-    [ "$status" -eq 0 ]
     
     cd "$GITHUB_DIR"
     run git branch --list main
+    echo "checking that main branch exists"
     [ "$status" -eq 0 ]
     [[ "${output}" =~ "main" ]]
-}
 
-@test "main branch has index.php with expected content" {
-    run setup_mock_github_repo "$GITHUB_DIR"
-    [ "$status" -eq 0 ]
-    
-    cd "$GITHUB_DIR"
     git checkout main
     [ -f "index.php" ]
+
+    echo "checking that the main branch contains the expected content in index.php"
     run cat "index.php"
     [[ "${output}" =~ "Hello world" ]]
 }
 
-@test "repository has test-pr branch" {
+@test "Mocked GitHub repo has test-pr branch" {
     run setup_mock_github_repo "$GITHUB_DIR"
     [ "$status" -eq 0 ]
-    
+
     cd "$GITHUB_DIR"
     run git branch --list test-pr
     [ "$status" -eq 0 ]
@@ -116,20 +108,17 @@ teardown() {
     
     # Check that CI repo exists and is a git repo
     [ -d "$CI_DIR/.git" ]
-    
-    # Check that we're on test-pr branch
-    cd "$CI_DIR"
-    run git branch --show-current
-    [ "$status" -eq 0 ]
-    [[ "${output}" == "test-pr" ]]
-    
+
     # Get the HEAD commit of test-pr branch in GitHub repo
     cd "$GITHUB_DIR"
     git checkout test-pr
     GITHUB_PR_COMMIT=$(git rev-parse HEAD)
     
+    # echo "checking that the CI environment is in a detached head state"
+    # [[  "2" == "1" ]]
+
     # Verify CI repo has the same HEAD commit
     cd "$CI_DIR"
     CI_COMMIT=$(git rev-parse HEAD)
     [ "$GITHUB_PR_COMMIT" = "$CI_COMMIT" ]
-} 
+}

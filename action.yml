@@ -119,7 +119,7 @@ runs:
             ssh-private-key: ${{ inputs.ssh_key }}
 
       - uses: actions/checkout@v4
-        if: ${{ inputs.checkout_repo }}
+        if: ${{ inputs.checkout_repo == 'true' }}
 
       - name: Install Terminus
         uses: pantheon-systems/terminus-github-actions@main

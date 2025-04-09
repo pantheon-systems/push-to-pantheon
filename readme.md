@@ -62,10 +62,19 @@ The machine name of your Pantheon site.
 
 #### `delete_old_environments`
 
-If set to true, Multidev environments associated with closed pull requests will be deleted after deployment completes. It is recommended to set this parameter to true for workflows that run after merges to the main branch.
+If set to true, Multidev environments associated with closed pull requests will be deleted after deployment completes. It is recommended to set this parameter to `true` for workflows that run after merges to the main branch.
 
 ```yml
    default: false
+   type: boolean
+```
+
+#### `checkout_repo`
+
+A boolean for whether or not this composite step should checkout the Git repo. Set to `false` if a checkout has already been performed by earlier steps (such as ones that would process CSS/JS).
+
+```yml
+   default: true
    type: boolean
 ```
 

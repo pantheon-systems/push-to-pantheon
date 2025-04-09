@@ -17,7 +17,7 @@ jobs:
       uses: ./
       with:
         ssh_key: ${{ secrets.PANTHEON_SSH_KEY }}
-        machine_token: ${{ secrets.TERMINUS_MACHINE_TOKEN }}
+        machine_token: ${{ secrets.PANTHEON_MACHINE_TOKEN }}
         site: dtp-nearly-empty-site
         target_env: "pr-${{ github.event.pull_request.number }}"
         relative_site_root: ".github/testing_fixtures/dtp-nearly-empty-site"

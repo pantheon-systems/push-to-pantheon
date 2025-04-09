@@ -61,14 +61,14 @@ runs:
     using: 'composite'
     steps:
 
-      - name: set target_env
+      - name: Set target_env
         id: set_target_env
         shell: bash
         env:
           PR_NUM: ${{ github.event.pull_request.number }}
           INPUT_TARGET_ENV: ${{ inputs.target_env }}
         run: |
-          #!/bin/bash
+          # Set target_env
           set +e
 
             if [ -n "${INPUT_TARGET_ENV}" ]; then
@@ -82,6 +82,7 @@ runs:
               exit 1
             fi
 
+          echo "PANTHEON_TARGET_ENV set to ${TARGET_ENV}"
           echo "PANTHEON_TARGET_ENV=${TARGET_ENV}" >> $GITHUB_ENV
 
       - name: Set clone content flag
@@ -89,9 +90,8 @@ runs:
         env:
           CLONE_CONTENT: ${{ inputs.clone_content }}
         run: |
-          #!/bin/bash
+          # Set clone content flag
           set +e
-
           if [ "$CLONE_CONTENT" == "true" ]; then
             export CLONE_CONTENT_FLAG="--clone-content"
             echo "Content will be cloned again if the target environment already exists"
@@ -102,7 +102,7 @@ runs:
 
           echo "PANTHEON_CLONE_CONTENT_FLAG=${CLONE_CONTENT_FLAG}" >> $GITHUB_ENV
 
-      - name: start deployment
+      - name: Start deployment
         uses: bobheadxi/deployments@v1
         id: deployment
         with:
@@ -111,7 +111,8 @@ runs:
           env: ${{ env.PANTHEON_TARGET_ENV }}
           ref: ${{ github.head_ref }}
 
-      - uses: webfactory/ssh-agent@v0.9.0
+      - name: Configure SSH key
+        uses: webfactory/ssh-agent@v0.9.0
         with:
             ssh-private-key: ${{ inputs.ssh_key }}
 
@@ -123,7 +124,7 @@ runs:
       - name: Install Terminus Plugin
         shell: bash
         run: |
-          #!/bin/bash
+          # Install Terminus Plugin
           set +e
           terminus self:plugin:install "${{ github.action_path }}/terminus-build-tools-plugin"
 
@@ -133,7 +134,7 @@ runs:
           PANTHEON_GIT_USER_NAME: ${{ inputs.git_user_name }}
           PANTHEON_GIT_USER_EMAIL: ${{ inputs.git_user_email }}
         run: |
-          #!/bin/bash
+          # Configure Git User
           set +e
           git config --global user.email "${PANTHEON_GIT_USER_EMAIL}"
           git config --global user.name "${PANTHEON_GIT_USER_NAME}"
@@ -143,7 +144,7 @@ runs:
         env:
           SITE_ROOT: ${{ inputs.relative_site_root }}
         run: |
-          #!/bin/bash
+          # Prepare site root
           set +e
           if [ -n "$SITE_ROOT" ]; then
             cd ${SITE_ROOT}
@@ -167,7 +168,7 @@ runs:
           # on a small personal site.
           TERMINUS_BUILD_TOOLS_WORKFLOW_TIMEOUT: 300
         run: |
-          #!/bin/bash
+          # Push to Pantheon
           set +e
 
           if [ -n "$SITE_ROOT" ]; then
@@ -196,7 +197,7 @@ runs:
           GITHUB_TOKEN: ${{ github.token }}
           SITE_ROOT: ${{ inputs.relative_site_root }}
         run: |
-          #!/bin/bash
+          # Delete old multidevs
           set +e
 
           if [ -n "$SITE_ROOT" ]; then

@@ -12,6 +12,12 @@ inputs:
     description: 'The machine name of your Pantheon site.'
     required: true
 
+  checkout_repo:
+    description: "A boolean for whether or not this composite step should checkout the Git repo. Set to false if a checkout has already been performed by earlier steps (such as ones that would process CSS/JS)"
+    required: false
+    default: true
+    type: boolean
+
   target_env:
     description: 'The Pantheon environment to which the deployment will be made. If left blank, the value used will be automatically derived. Pull requests will deploy to environments named "pr-[NUMBER]" and main/master branch commits will deploy to the Pantheon "dev" environment'
     required: false
@@ -53,9 +59,6 @@ inputs:
     description: "The root directory of the site to be deployed relative to the repository root. The vast majority of users of this action should leave this value unchanged from the default. The action will use this value to change directories after checking out the repo."
     required: false
     default: ""
-
-  # todo checkout_repo:
-  #   description: "A boolean for whether or not this composite step should checkout the git repo. Set to false if a checkout has already been perf"
 
 runs:
     using: 'composite'
@@ -115,10 +118,8 @@ runs:
         with:
             ssh-private-key: ${{ inputs.ssh_key }}
 
-      # todo, make checkout conditional.
-      # Consumers might have checked out before calling this
-      # composite action.
       - uses: actions/checkout@v4
+        if: ${{ inputs.checkout_repo }}
 
       - name: Install Terminus
         uses: pantheon-systems/terminus-github-actions@main

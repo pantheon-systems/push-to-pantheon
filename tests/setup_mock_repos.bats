@@ -1,7 +1,7 @@
 #!/usr/bin/env bats
 
 # Load the script to test
-load '../scripts/setup_mock_repos.sh'
+load '../scripts/setup_mock_repos'
 
 setup() {
     # Create temporary directories for our tests

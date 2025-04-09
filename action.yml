@@ -118,12 +118,6 @@ runs:
         with:
             ssh-private-key: ${{ inputs.ssh_key }}
 
-      # todo, make checkout conditional.
-      # Consumers might have checked out before calling this
-      # composite action.
-      - name: Checkout
-        uses: actions/checkout@v4
-
       - name: Install Terminus
         uses: pantheon-systems/terminus-github-actions@main
         with:

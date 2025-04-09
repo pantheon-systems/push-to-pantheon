@@ -12,11 +12,11 @@ inputs:
     description: 'The machine name of your Pantheon site.'
     required: true
 
-  checkout_repo:
-    description: "A boolean for whether or not this composite step should checkout the Git repo. Set to false if a checkout has already been performed by earlier steps (such as ones that would process CSS/JS)"
-    required: false
-    default: true
-    type: boolean
+  # checkout_repo:
+  #   description: "A boolean for whether or not this composite step should checkout the Git repo. Set to false if a checkout has already been performed by earlier steps (such as ones that would process CSS/JS)"
+  #   required: false
+  #   default: true
+  #   type: boolean
 
   target_env:
     description: 'The Pantheon environment to which the deployment will be made. If left blank, the value used will be automatically derived. Pull requests will deploy to environments named "pr-[NUMBER]" and main/master branch commits will deploy to the Pantheon "dev" environment'

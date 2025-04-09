@@ -148,7 +148,40 @@ For example, to use version 0.2.1 of this action, the step would look like this:
 
 ### Additional build steps like `composer install` and `npm build`
 
-[_todo: explain_](https://github.com/stevector-streaming/dtp/issues/54)
+By default this action will check out the code from the GitHub repository and push it to Pantheon.
+For many WordPress sites and Drupal sites, this is all that is needed.
+By setting `build_step: true` in the `pantheon.yml`, Pantheon will execute `composer install` and eventually `npm build` for compilation of CSS and JS assets needed for a theme(TODO, LINK NEEDED).
+
+However, some teams prefer to do these build steps in GitHub Actions before pushing to Pantheon.
+
+That use case can be accommodated by adding additional steps to the workflow before the step that uses this action.
+
+Here's an example from a real site that uses Tailwind to prepare CSS in the site's custom theme.
+
+```
+  push-to-pantheon:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - run: "cd web/themes/stevector2024 && npm ci && npm run build"
+    - run: "cd web/themes/stevector2024/css && rm .gitignore"
+    - name: Deploy to Pantheon
+      uses: stevector/push-to-pantheon@checkout_repo
+      with:
+        ssh_key: ${{ secrets.PANTHEON_SSH_KEY }}
+        machine_token: ${{ secrets.TERMINUS_MACHINE_TOKEN }}
+        site: ${{ vars.PANTHEON_SITE }}
+        checkout_repo: false
+```
+
+The important elements to note are that:
+
+- the first step is checking out the code from the GitHub repository.
+- the `cd` commands are used to change directories to the location of the `package.json` file.
+- the `npm ci` command is used to install the dependencies listed in the `package.json` file.
+- the `npm run build` command is used to run the build script defined in the `package.json` file.
+- the `rm .gitignore` command is used to remove the `.gitignore` file from the `css` directory. This allows the CSS to be committed later by the action.
+- the `checkout_repo` parameter is set to `false` in the step that uses this action. This prevents the action from checking out the code again, which would undo the work done in the previous steps.
 
 ### Concurrency
 

@@ -91,9 +91,7 @@ runs:
           CLONE_CONTENT: ${{ inputs.clone_content }}
         run: |
           # Set clone content flag
-
           set +e
-
           if [ "$CLONE_CONTENT" == "true" ]; then
             export CLONE_CONTENT_FLAG="--clone-content"
             echo "Content will be cloned again if the target environment already exists"

@@ -91,7 +91,7 @@ runs:
           CLONE_CONTENT: ${{ inputs.clone_content }}
         run: |
           # Set clone content flag
-          #!/bin/bash
+
           set +e
 
           if [ "$CLONE_CONTENT" == "true" ]; then
@@ -126,7 +126,7 @@ runs:
       - name: Install Terminus Plugin
         shell: bash
         run: |
-          #!/bin/bash
+          # Install Terminus Plugin
           set +e
           terminus self:plugin:install "${{ github.action_path }}/terminus-build-tools-plugin"
 
@@ -136,7 +136,7 @@ runs:
           PANTHEON_GIT_USER_NAME: ${{ inputs.git_user_name }}
           PANTHEON_GIT_USER_EMAIL: ${{ inputs.git_user_email }}
         run: |
-          #!/bin/bash
+          # Configure Git User
           set +e
           git config --global user.email "${PANTHEON_GIT_USER_EMAIL}"
           git config --global user.name "${PANTHEON_GIT_USER_NAME}"
@@ -147,7 +147,6 @@ runs:
           SITE_ROOT: ${{ inputs.relative_site_root }}
         run: |
           # Prepare site root
-          #!/bin/bash
           set +e
           if [ -n "$SITE_ROOT" ]; then
             cd ${SITE_ROOT}
@@ -172,7 +171,6 @@ runs:
           TERMINUS_BUILD_TOOLS_WORKFLOW_TIMEOUT: 300
         run: |
           # Push to Pantheon
-          #!/bin/bash
           set +e
 
           if [ -n "$SITE_ROOT" ]; then
@@ -202,7 +200,6 @@ runs:
           SITE_ROOT: ${{ inputs.relative_site_root }}
         run: |
           # Delete old multidevs
-          #!/bin/bash
           set +e
 
           if [ -n "$SITE_ROOT" ]; then

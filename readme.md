@@ -19,7 +19,6 @@ More complex examples further below show additional steps and jobs used in conju
 
 Here is the beginning of a `jobs` section of [a real `.github/workflows/deploy-pr.yml` file](https://github.com/stevector/stevector-composed/blob/6a1c0183ef6e429761fcc090c34cfcc2dcd7c573/.github/workflows/deploy-pr.yml) that deploys a site to Pantheon when triggered by a Pull Request.
 
-
 ```
 jobs:
   deploy:

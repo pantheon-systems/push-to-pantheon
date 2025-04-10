@@ -184,7 +184,7 @@ runs:
           export PANTHEON_REPO_LOCATION=$(terminus connection:info ${PANTHEON_SITE}.dev  --field=git_url)
 
           echo ${PANTHEON_REPO_LOCATION}
-          echo "${{ github.action_path }}
+
           echo "here is the SCRIPT!!!"
           echo "${GITHUB_WORKSPACE}/scripts/prepare-repo.sh"
 

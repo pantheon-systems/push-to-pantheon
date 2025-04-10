@@ -184,13 +184,13 @@ runs:
           export PANTHEON_REPO_LOCATION=$(terminus connection:info ${PANTHEON_SITE}.dev  --field=git_url)
 
           echo ${PANTHEON_REPO_LOCATION}
-
+          echo "${{ github.action_path }}
           echo "here is the SCRIPT!!!"
-          echo "${{ github.action_path }}/scripts/prepare-repo.sh"
+          echo "${{ github.action_path }}scripts/prepare-repo.sh"
 
-          cat ${{ github.action_path }}/scripts/prepare-repo.sh
+          cat ${{ github.action_path }}scripts/prepare-repo.sh
 
-          ./${{ github.action_path }}/scripts/prepare-repo.sh
+          ./${{ github.action_path }}scripts/prepare-repo.sh
 
 
           terminus -n build:env:create ${PANTHEON_SITE}.${PANTHEON_SOURCE_ENV} ${PANTHEON_TARGET_ENV} --yes --message="${PANTHEON_COMMIT_MESSAGE}" ${PANTHEON_CLONE_CONTENT_FLAG}

@@ -152,6 +152,10 @@ runs:
             git fetch --unshallow origin
           fi
 
+          mkdir -p $HOME/.ssh && echo "StrictHostKeyChecking no" >> "$HOME/.ssh/config"
+          export PANTHEON_REPO_LOCATION=$(terminus connection:info ${PANTHEON_SITE}.dev  --field=git_url)
+          bash ${GITHUB_WORKSPACE}/scripts/prepare-repo.sh
+
       - name: Deployment Processing
         shell: bash
         id: deploy_to_pantheon
@@ -172,10 +176,6 @@ runs:
           if [ -n "$SITE_ROOT" ]; then
             cd ${SITE_ROOT}
           fi
-
-          mkdir -p $HOME/.ssh && echo "StrictHostKeyChecking no" >> "$HOME/.ssh/config"
-          export PANTHEON_REPO_LOCATION=$(terminus connection:info ${PANTHEON_SITE}.dev  --field=git_url)
-          bash ${GITHUB_WORKSPACE}/scripts/prepare-repo.sh
 
           terminus -n build:env:create ${PANTHEON_SITE}.${PANTHEON_SOURCE_ENV} ${PANTHEON_TARGET_ENV} --yes --message="${PANTHEON_COMMIT_MESSAGE}" ${PANTHEON_CLONE_CONTENT_FLAG}
 

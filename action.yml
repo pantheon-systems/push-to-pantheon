@@ -181,6 +181,9 @@ runs:
             cd ${SITE_ROOT}
           fi
 
+          pwd
+
+
           export PANTHEON_REPO_LOCATION=$(terminus connection:info ${PANTHEON_SITE}.dev  --field=git_url)
 
 

@@ -92,6 +92,17 @@ setup_mock_repos() {
     return 0
 }
 
+mock_ci_build_process() {
+    local repo_path="$1"
+    
+    # Configure git user for this repo
+    cd "$repo_path"
+    echo 'body {background-color: #FF0000}' > test.css
+
+    return 0
+}
+
+
 # Only execute main if script is run directly (not sourced)
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
     setup_mock_repos "$1" "$2" "${3:-}"

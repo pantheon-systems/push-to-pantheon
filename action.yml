@@ -183,6 +183,7 @@ runs:
 
           pwd
 
+          export GIT_SSH_COMMAND=ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o LogLevel=QUIET
 
           export PANTHEON_REPO_LOCATION=$(terminus connection:info ${PANTHEON_SITE}.dev  --field=git_url)
 

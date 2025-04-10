@@ -24,7 +24,7 @@ setup() {
 @test "simulate a push to pantheon job when Pantheon does not have the target branch" {
 
     export PANTHEON_REPO_LOCATION=$PANTHEON_DIR
-    export TARGET_ENV=pr-123
+    export PANTHEON_TARGET_ENV=pr-123
 
     run mock_ci_build_process "$CI_DIR"
     [ "$status" -eq 0 ]
@@ -39,7 +39,7 @@ setup() {
     git add .
     # todo use a variable for the commit message.
     git commit -m 'build process for pr-123'
-    git push pantheon temp-build-branch:$TARGET_ENV
+    git push pantheon temp-build-branch:$PANTHEON_TARGET_ENV
 
 
     echo "checkout that the pantheon repo contains the built CSS"
@@ -53,16 +53,16 @@ setup() {
 @test "simulate a push to pantheon job when Pantheon already does have the target branch" {
 
     export PANTHEON_REPO_LOCATION=$PANTHEON_DIR
-    export TARGET_ENV=pr-123
+    export PANTHEON_TARGET_ENV=pr-123
 
     cd $PANTHEON_DIR
-    git checkout -b $TARGET_ENV
+    git checkout -b $PANTHEON_TARGET_ENV
     echo "hello world" > test.txt
     git add .
     git commit -m 'adding test.txt'
     git checkout master
 
-    run git show $TARGET_ENV:test.txt
+    run git show $PANTHEON_TARGET_ENV:test.txt
     echo ${output}
     [[ "${output}" =~ "hello world" ]]
 
@@ -81,7 +81,7 @@ setup() {
     git add .
     # todo use a variable for the commit message.
     git commit -m 'build process for pr-123'
-    git push pantheon temp-build-branch:$TARGET_ENV
+    git push pantheon temp-build-branch:$PANTHEON_TARGET_ENV
 
 
 

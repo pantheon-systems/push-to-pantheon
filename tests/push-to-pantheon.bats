@@ -28,19 +28,25 @@ setup() {
 
     run mock_ci_build_process "$CI_DIR"
     [ "$status" -eq 0 ]
-    
+
     run cat "test.css"
-    [[ "${output}" =~ "background-color: #FF0000" ]]    
-    
+    [[ "${output}" =~ "background-color: #FF0000" ]]
+
     run $ROOT_OF_TESTS_INVOCATION/scripts/push-to-pantheon.sh
     echo ${output}
     [ "$status" -eq 0 ]
+
+    git add .
+    # todo use a variable for the commit message.
+    git commit -m 'build process for pr-123'
+    git push pantheon temp-build-branch:$TARGET_ENV
+
 
     echo "checkout that the pantheon repo contains the built CSS"
     cd $PANTHEON_DIR
     run git show pr-123:test.css
     echo ${output}
-    [[ "${output}" =~ "background-color: #FF0000" ]] 
+    [[ "${output}" =~ "background-color: #FF0000" ]]
 }
 
 
@@ -63,18 +69,25 @@ setup() {
     cd $CI_DIR
     run mock_ci_build_process "$CI_DIR"
     [ "$status" -eq 0 ]
-    
+
     run cat "test.css"
     [[ "${output}" =~ "background-color: #FF0000" ]]
-    
+
 
     run $ROOT_OF_TESTS_INVOCATION/scripts/push-to-pantheon.sh
     echo ${output}
     [ "$status" -eq 0 ]
 
+    git add .
+    # todo use a variable for the commit message.
+    git commit -m 'build process for pr-123'
+    git push pantheon temp-build-branch:$TARGET_ENV
+
+
+
     echo "checkout that the pantheon repo contains the built CSS"
     cd $PANTHEON_DIR
     run git show pr-123:test.css
     echo ${output}
-    [[ "${output}" =~ "background-color: #FF0000" ]] 
+    [[ "${output}" =~ "background-color: #FF0000" ]]
 }

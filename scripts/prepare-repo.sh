@@ -9,6 +9,7 @@ set -euo pipefail
 
 git remote add pantheon $PANTHEON_REPO_LOCATION
 git remote -v
+git fetch pantheon $PANTHEON_TARGET_ENV
 
 if git ls-remote --exit-code --heads pantheon "$PANTHEON_TARGET_ENV" > /dev/null; then
     echo "the branch already exists in the remote"

@@ -167,6 +167,7 @@ runs:
           PANTHEON_SOURCE_ENV: ${{ inputs.source_env }}
           SITE_ROOT: ${{ inputs.relative_site_root }}
           PANTHEON_COMMIT_MESSAGE: ${{ inputs.git_commit_message }}
+
           # todo, might need to make this configurable too.
           # the default in build tools is 180. But that's regularly failing
           # on a small personal site.
@@ -178,6 +179,10 @@ runs:
           if [ -n "$SITE_ROOT" ]; then
             cd ${SITE_ROOT}
           fi
+
+          export PANTHEON_REPO_LOCATION=(terminus connection:info stevector-composed.dev  --field=git_url)
+
+          echo ${PANTHEON_REPO_LOCATION}
 
           terminus -n build:env:create ${PANTHEON_SITE}.${PANTHEON_SOURCE_ENV} ${PANTHEON_TARGET_ENV} --yes --message="${PANTHEON_COMMIT_MESSAGE}" ${PANTHEON_CLONE_CONTENT_FLAG}
 

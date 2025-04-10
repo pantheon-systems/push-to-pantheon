@@ -24,6 +24,9 @@ git reset --hard pantheon/$TARGET_ENV
 # todo, name the branch based on some variable.
 git checkout -B temp-build-branch
 
+# todo, wrap this in a check for whether the git committing and pushing should be done directly like this, or by
+# terminus -n build:env:create
+
 git add .
 # todo use a variable for the commit message.
 git commit -m 'build process for pr-123'

@@ -184,6 +184,8 @@ runs:
           pwd
 
           export GIT_SSH_COMMAND=ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o LogLevel=QUIET
+          mkdir -p $HOME/.ssh && echo "StrictHostKeyChecking no" >> "$HOME/.ssh/config"
+
 
           export PANTHEON_REPO_LOCATION=$(terminus connection:info ${PANTHEON_SITE}.dev  --field=git_url)
 

@@ -130,6 +130,7 @@ runs:
         run: |
           #!/bin/bash
           set +e
+          # echo "todo, switch back to regular build tools plugin. and turn off force push."
           terminus self:plugin:install "${{ github.action_path }}/terminus-build-tools-plugin"
 
       - name: Configure Git User
@@ -185,6 +186,10 @@ runs:
           echo ${PANTHEON_REPO_LOCATION}
 
           echo "here is the SCRIPT!!!"
+          echo "${{ github.action_path }}/scripts/prepare-repo.sh"
+
+          cat ${{ github.action_path }}/scripts/prepare-repo.sh
+
           ./${{ github.action_path }}/scripts/prepare-repo.sh
 
 

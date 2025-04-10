@@ -126,8 +126,12 @@ runs:
         run: |
           # Install Terminus Plugin
           set +e
+<<<<<<< HEAD
           # echo "todo, switch back to regular build tools plugin. and turn off force push."
           terminus self:plugin:install "${{ github.action_path }}/terminus-build-tools-plugin"
+=======
+          terminus self:plugin:install terminus-build-tools-plugin
+>>>>>>> origin/0.x
 
       - name: Configure Git User
         shell: bash

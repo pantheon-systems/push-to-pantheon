@@ -116,10 +116,6 @@ A custom commit message to be used with the Git commit that will be pushed to Pa
    default: ""
 ```
 
-## todo, relationship to eVCS and GitHub App
-
-
-
 ## Additional recommendations
 
 ### Pin exact version of this action prior to the release of version 1.0.0

@@ -126,7 +126,7 @@ runs:
         run: |
           # Install Terminus Plugin
           set +e
-          terminus self:plugin:install "${{ github.action_path }}/terminus-build-tools-plugin"
+          terminus self:plugin:install terminus-build-tools-plugin
 
       - name: Configure Git User
         shell: bash

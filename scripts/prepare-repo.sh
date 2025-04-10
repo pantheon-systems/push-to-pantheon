@@ -9,7 +9,7 @@ set -euo pipefail
 
 git remote add pantheon $PANTHEON_REPO_LOCATION
 git remote -v
-git fetch pantheon $PANTHEON_TARGET_ENV
+
 
 if git ls-remote --exit-code --heads pantheon "$PANTHEON_TARGET_ENV" > /dev/null; then
     echo "the branch already exists in the remote"
@@ -18,6 +18,7 @@ else
   git push pantheon FETCH_HEAD:refs/heads/$PANTHEON_TARGET_ENV
 fi
 
+git fetch pantheon $PANTHEON_TARGET_ENV
 # Reset your working directory to match the remote branch
 git reset --hard pantheon/$PANTHEON_TARGET_ENV
 # Create and switch to a local branch tracking the remote one

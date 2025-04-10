@@ -140,13 +140,15 @@ runs:
         shell: bash
         env:
           SITE_ROOT: ${{ inputs.relative_site_root }}
+          PANTHEON_SITE: ${{ inputs.site }}
         run: |
-          # Prepare site root
+          # Prepare local repository prior to pushing
           set +e
+
           if [ -n "$SITE_ROOT" ]; then
             cd ${SITE_ROOT}
             git init -b main
-            echo "this origin setting is a hack to get past the 'inferring' of a git provider in build tools"
+            echo "this origin setting is a hack to get past the 'inferring' of a Git provider in Build Tools"
             git remote add origin https://github.com/${{ github.repository }}
           else
             git fetch --unshallow origin

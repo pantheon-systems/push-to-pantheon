@@ -182,14 +182,10 @@ runs:
           fi
 
           mkdir -p $HOME/.ssh && echo "StrictHostKeyChecking no" >> "$HOME/.ssh/config"
-
-
           export PANTHEON_REPO_LOCATION=$(terminus connection:info ${PANTHEON_SITE}.dev  --field=git_url)
-
 
           git remote add pantheon $PANTHEON_REPO_LOCATION
           git remote -v
-
 
           if git ls-remote --exit-code --heads pantheon "$PANTHEON_TARGET_ENV" > /dev/null; then
               echo "the branch already exists in the remote"

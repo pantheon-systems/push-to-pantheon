@@ -32,7 +32,7 @@ setup() {
     run cat "test.css"
     [[ "${output}" =~ "background-color: #FF0000" ]]
 
-    run $ROOT_OF_TESTS_INVOCATION/scripts/push-to-pantheon.sh
+    run $ROOT_OF_TESTS_INVOCATION/scripts/prepare-repo.sh
     echo ${output}
     [ "$status" -eq 0 ]
 
@@ -74,7 +74,7 @@ setup() {
     [[ "${output}" =~ "background-color: #FF0000" ]]
 
 
-    run $ROOT_OF_TESTS_INVOCATION/scripts/push-to-pantheon.sh
+    run $ROOT_OF_TESTS_INVOCATION/scripts/prepare-repo.sh
     echo ${output}
     [ "$status" -eq 0 ]
 

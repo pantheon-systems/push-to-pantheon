@@ -26,3 +26,18 @@ jobs:
         git_commit_message: "This is an automated commit message from GitHub Actions."
         delete_old_environments: true
         clone_content: true
+
+
+  unit-tests:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Setup Bats and bats libs
+      id: setup-bats
+      uses: bats-core/bats-action@3.0.0
+    - name: My test
+      shell: bash
+      # env:
+      # BATS_LIB_PATH: ${{ steps.setup-bats.outputs.lib-path }}
+      # TERM: xterm
+      run: bats tests/setup_mock_repos.bats

@@ -181,9 +181,6 @@ runs:
             cd ${SITE_ROOT}
           fi
 
-          pwd
-
-          export GIT_SSH_COMMAND=ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o LogLevel=QUIET
           mkdir -p $HOME/.ssh && echo "StrictHostKeyChecking no" >> "$HOME/.ssh/config"
 
 
@@ -208,12 +205,7 @@ runs:
           # todo, name the branch based on some variable.
           git checkout -B temp-build-branch
 
-
-
-
-
           # bash ${GITHUB_WORKSPACE}/scripts/prepare-repo.sh
-
 
           terminus -n build:env:create ${PANTHEON_SITE}.${PANTHEON_SOURCE_ENV} ${PANTHEON_TARGET_ENV} --yes --message="${PANTHEON_COMMIT_MESSAGE}" ${PANTHEON_CLONE_CONTENT_FLAG}
 

@@ -183,14 +183,30 @@ runs:
 
           export PANTHEON_REPO_LOCATION=$(terminus connection:info ${PANTHEON_SITE}.dev  --field=git_url)
 
-          echo ${PANTHEON_REPO_LOCATION}
 
-          echo "here is the SCRIPT!!!"
-          echo "${GITHUB_WORKSPACE}/scripts/prepare-repo.sh"
 
-          cat ${GITHUB_WORKSPACE}/scripts/prepare-repo.sh
 
-          bash ${GITHUB_WORKSPACE}/scripts/prepare-repo.sh
+          git remote add pantheon $PANTHEON_REPO_LOCATION
+          git remote -v
+
+          if git ls-remote --exit-code --heads pantheon "$PANTHEON_TARGET_ENV" > /dev/null; then
+              echo "the branch already exists in the remote"
+          else
+            git fetch pantheon master
+            git push pantheon FETCH_HEAD:refs/heads/$PANTHEON_TARGET_ENV
+          fi
+
+          # Reset your working directory to match the remote branch
+          git reset --hard pantheon/$PANTHEON_TARGET_ENV
+          # Create and switch to a local branch tracking the remote one
+          # todo, name the branch based on some variable.
+          git checkout -B temp-build-branch
+
+
+
+
+
+          # bash ${GITHUB_WORKSPACE}/scripts/prepare-repo.sh
 
 
           terminus -n build:env:create ${PANTHEON_SITE}.${PANTHEON_SOURCE_ENV} ${PANTHEON_TARGET_ENV} --yes --message="${PANTHEON_COMMIT_MESSAGE}" ${PANTHEON_CLONE_CONTENT_FLAG}

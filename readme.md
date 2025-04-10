@@ -22,12 +22,12 @@ Here is the beginning of a `jobs` section of [a real `.github/workflows/deploy-p
 
 ```
 jobs:
-  deploy:
+  push:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
-    - name: Deploy to Pantheon
-      uses: stevector/push-to-pantheon@0.4
+    - name: Push to Pantheon
+      uses: stevector/push-to-pantheon@0.4.1
       with:
         ssh_key: ${{ secrets.PANTHEON_SSH_KEY }}
         machine_token: ${{ secrets.TERMINUS_MACHINE_TOKEN }}
@@ -39,7 +39,7 @@ jobs:
 In order to use the step supplied by this Action, the GitHub Workflow must have access to [a token for authenticating with Pantheon's command line](https://docs.pantheon.io/machine-tokens) and [a private key](https://docs.pantheon.io/ssh-keys) that will allow Git pushes to Pantheon and other operations.
 Both of those values should be treated senstively and stored as [GitHub Secrets](https://docs.github.com/en/actions/reference/encrypted-secrets).
 
-The only other required argument is the machine name of the Pantheon site to which the code will be deployed.
+The only other required argument is the machine name of the Pantheon site to which the code will be ed.
 
 The optional argument likely to be most commonly used is `delete_old_environments` which will delete Multidev environments associated with closed pull requests after the deployment completes. Setting `delete_old_environments: true` is recommended for workflows that run after merges to the `main` branch to avoid accumulating Multidev environments that are no longer needed.
 
@@ -127,11 +127,11 @@ For instance is `delete_old_environments` the best name for that parameter?
 [We might change it.](https://github.com/stevector-streaming/dtp/issues/53)
 
 To pin the version of this action to a specific version, use the `@` symbol followed by the version number in the `uses` key of the step that uses this action.
-For example, to use version 0.2.1 of this action, the step would look like this:
+For example, to use version 0.4.1 of this action, the step would look like this:
 
 ```yml
-- name: Deploy to Pantheon
-  uses: stevector-streaming/dtp@0.2.1
+- name: Push to Pantheon
+  uses: stevector/push-to-pantheon@0.4.1
   with:
     ssh_key: ${{ secrets.PANTHEON_SSH_KEY }}
     machine_token: ${{ secrets.TERMINUS_MACHINE_TOKEN }}
@@ -163,7 +163,7 @@ Here's an example from a real site that uses Tailwind to prepare CSS in the site
     # to Pantheon in the later "push-to-pantheon" step.
     - run: "cd web/themes/my_custom_theme/css && rm .gitignore"
     - name: Push to Pantheon
-      uses: stevector/push-to-pantheon@0.4
+      uses: stevector/push-to-pantheon@0.4.1
       with:
         ssh_key: ${{ secrets.PANTHEON_SSH_KEY }}
         machine_token: ${{ secrets.TERMINUS_MACHINE_TOKEN }}
@@ -217,7 +217,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: Deploy to Pantheon
-      uses: stevector-streaming/dtp@0.2.1
+      uses: stevector/push-to-pantheon@0.4.1
       with:
         ssh_key: ${{ secrets.PANTHEON_SSH_KEY }}
         machine_token: ${{ secrets.TERMINUS_MACHINE_TOKEN }}

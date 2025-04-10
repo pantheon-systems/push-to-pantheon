@@ -180,7 +180,7 @@ runs:
             cd ${SITE_ROOT}
           fi
 
-          export PANTHEON_REPO_LOCATION=(terminus connection:info stevector-composed.dev  --field=git_url)
+          export PANTHEON_REPO_LOCATION=$(terminus connection:info stevector-composed.dev  --field=git_url)
 
           echo ${PANTHEON_REPO_LOCATION}
 

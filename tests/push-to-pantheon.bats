@@ -28,13 +28,11 @@ setup() {
     [[ "${output}" =~ "background-color: #FF0000" ]]    
     
 
-    # run push-to-pantheon
-    # set a numeric PR env var
-
     # absolute paths aren't a good idea.
     export PANTHEON_REPO_LOCATION=$PANTHEON_DIR
+    export TARGET_ENV=pr-123
     run /workspaces/push-to-pantheon/scripts/push-to-pantheon.sh
-    # echo ${output}
+    echo ${output}
     [ "$status" -eq 0 ]
 
         # check that pantheon repo contains the CSS file in the expected branch.

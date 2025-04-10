@@ -13,18 +13,18 @@ git fetch pantheon
 
 if git ls-remote --exit-code --heads pantheon "$TARGET_ENV" > /dev/null; then
     echo "the branch already exists in the remote"
-    git checkout -b temp-build-branch
-    # Reset your working directory to match the remote branch
-    git reset --hard pantheon/$TARGET_ENV
 else
+  git fetch pantheon master
   git push pantheon FETCH_HEAD:refs/heads/$TARGET_ENV
-
-    # Reset your working directory to match the remote branch
-    git reset --hard pantheon/$TARGET_ENV
-    # Create and switch to a local branch tracking the remote one
-    git checkout -B temp-build-branch
 fi
 
+# Reset your working directory to match the remote branch
+git reset --hard pantheon/$TARGET_ENV
+# Create and switch to a local branch tracking the remote one
+# todo, name the branch based on some variable.
+git checkout -B temp-build-branch
+
 git add .
+# todo use a variable for the commit message.
 git commit -m 'build process for pr-123'
 git push pantheon temp-build-branch:$TARGET_ENV

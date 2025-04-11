@@ -166,7 +166,7 @@ runs:
           SITE_ROOT: ${{ inputs.relative_site_root }}
           PANTHEON_SITE: ${{ inputs.site }}
         run: |
-          # Prepare local repository prior to pushing
+          # Prepare local Git repository prior to pushing
           set +e
 
           export PANTHEON_REPO_LOCATION=$(terminus connection:info ${PANTHEON_SITE}.dev  --field=git_url)

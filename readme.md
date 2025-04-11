@@ -19,10 +19,13 @@ More complex examples further below show additional steps and jobs used in conju
 
 Here is the beginning of a `jobs` section of [a real `.github/workflows/deploy-pr.yml` file](https://github.com/stevector/stevector-composed/blob/6a1c0183ef6e429761fcc090c34cfcc2dcd7c573/.github/workflows/deploy-pr.yml) that deploys a site to Pantheon when triggered by a Pull Request.
 
-
 ```
 jobs:
   push:
+    permissions:
+      deployments: write
+      contents: read
+      pull-requests: read
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
@@ -49,11 +52,9 @@ The optional argument likely to be most commonly used is `delete_old_environment
 
 [A private key that corresponds to a public key on Pantheon](https://docs.pantheon.io/ssh-keys).
 
-
 #### `machine_token`
 
 [A token for authenticating with Pantheon's command line](https://docs.pantheon.io/machine-tokens).
-
 
 #### `site`
 
@@ -183,7 +184,7 @@ This action needs permission to perform its work. Set the following permissions 
       pull-requests: read
 ```
 
-The `deployments: write` permission is required notify GitHub that the deployment has been made (to a Pantheon Multidev usually).
+The `deployments: write` permission is required to notify GitHub that the deployment has been made (to a Pantheon Multidev usually).
 This is required for the GitHub UI to show the deployment status of the pull request:
 
 ![Deployments appearing in GitHub UI](.github/documentation/deployment-in-github-ui.png)

@@ -136,6 +136,12 @@ runs:
           git config --global user.email "${PANTHEON_GIT_USER_EMAIL}"
           git config --global user.name "${PANTHEON_GIT_USER_NAME}"
 
+
+      # This change is necessary to fetch from Pantheon's Git server.
+      - name: Turn off strict host checking
+        shell: bash
+        run: mkdir -p $HOME/.ssh && echo "StrictHostKeyChecking no" >> "$HOME/.ssh/config"
+
       - name: Prepare site root
         shell: bash
         env:
@@ -150,11 +156,8 @@ runs:
             git init -b main
             echo "this origin setting is a hack to get past the 'inferring' of a Git provider in Build Tools"
             git remote add origin https://github.com/${{ github.repository }}
-          else
-            git fetch --unshallow origin
           fi
 
-          mkdir -p $HOME/.ssh && echo "StrictHostKeyChecking no" >> "$HOME/.ssh/config"
           export PANTHEON_REPO_LOCATION=$(terminus connection:info ${PANTHEON_SITE}.dev  --field=git_url)
           bash ${{ github.action_path }}/scripts/prepare-repo.sh
 

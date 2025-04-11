@@ -61,7 +61,9 @@ runs:
     using: 'composite'
     # Use a different working directory if one was set, otherwise stay with
     # the regular checkout of the repo.
-    working-directory: ${{ inputs.relative_site_root != '' && inputs.relative_site_root || '.' }}
+    defaults:
+      run:
+      working-directory: ${{ inputs.relative_site_root != '' && inputs.relative_site_root || '.' }}
     steps:
 
       - name: Set target_env

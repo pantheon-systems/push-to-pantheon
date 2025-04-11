@@ -190,7 +190,7 @@ This is required for the GitHub UI to show the deployment status of the pull req
 ![Deployments appearing in GitHub UI](.github/documentation/deployment-in-github-ui.png)
 
 The `contents: read` permission is required for the job to check out the code from the GitHub repository.
-Even though this action does not checkout of the code itself, it is a good practice to set this permission for the job that uses this action because you will need to check out the code prior to using this action.
+Even though this action does not checkout of the code itself, the code must be checked out prior to this step in order for the action to work.
 
 The `pull-requests: read` permission is required to delete old Multidev environments associated with closed pull requests.
 

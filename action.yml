@@ -142,7 +142,23 @@ runs:
         shell: bash
         run: mkdir -p $HOME/.ssh && echo "StrictHostKeyChecking no" >> "$HOME/.ssh/config"
 
-      - name: Prepare site root
+      - name: Create local Git repo (only when relative_site_root is set)
+        shell: bash
+        if: ${{ inputs.relative_site_root != '' }}
+        env:
+          SITE_ROOT: ${{ inputs.relative_site_root }}
+        run: |
+          # Create local Git repo (only when relative_site_root is set)
+          set +e
+
+          if [ -n "$SITE_ROOT" ]; then
+            cd ${SITE_ROOT}
+            git init -b main
+            echo "this origin setting is a hack to get past the 'inferring' of a Git provider in Build Tools"
+            git remote add origin https://github.com/${{ github.repository }}
+          fi
+
+      - name: Prepare site root's Git History
         shell: bash
         env:
           SITE_ROOT: ${{ inputs.relative_site_root }}
@@ -153,9 +169,6 @@ runs:
 
           if [ -n "$SITE_ROOT" ]; then
             cd ${SITE_ROOT}
-            git init -b main
-            echo "this origin setting is a hack to get past the 'inferring' of a Git provider in Build Tools"
-            git remote add origin https://github.com/${{ github.repository }}
           fi
 
           export PANTHEON_REPO_LOCATION=$(terminus connection:info ${PANTHEON_SITE}.dev  --field=git_url)

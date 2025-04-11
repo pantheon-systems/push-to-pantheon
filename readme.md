@@ -174,7 +174,7 @@ By calling `npm run build` and modifying `gitignore` prior to calling `push-to-p
 
 ### Permissions
 
-_todo_
+This action needs permission to perform its work. Set the following permissions either at the level of the workflow or at the level of the job that uses this action.
 
 ```
     permissions:
@@ -183,6 +183,17 @@ _todo_
       pull-requests: read
 ```
 
+The `deployments: write` permission is required notify GitHub that the deployment has been made (to a Pantheon Multidev usually).
+This is required for the GitHub UI to show the deployment status of the pull request:
+
+![Deployments appearing in GitHub UI](.github/documentation/deployment-in-github-ui.png)
+
+The `contents: read` permission is required for the job to check out the code from the GitHub repository.
+Even though this action does not checkout of the code itself, it is a good practice to set this permission for the job that uses this action because you will need to check out the code prior to using this action.
+
+The `pull-requests: read` permission is required to delete old Multidev environments associated with closed pull requests.
+
+[See the GitHub Actions documentation for more information on permissions.](https://docs.github.com/en/actions/writing-workflows/choosing-what-your-workflow-does/controlling-permissions-for-github_token)
 
 ### Concurrency
 

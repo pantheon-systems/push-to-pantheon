@@ -54,9 +54,6 @@ inputs:
     required: false
     default: ""
 
-  # todo checkout_repo:
-  #   description: "A boolean for whether or not this composite step should checkout the git repo. Set to false if a checkout has already been perf"
-
 runs:
     using: 'composite'
     steps:
@@ -139,7 +136,6 @@ runs:
           set +e
           git config --global user.email "${PANTHEON_GIT_USER_EMAIL}"
           git config --global user.name "${PANTHEON_GIT_USER_NAME}"
-
 
       # This change is necessary to fetch from Pantheon's Git server.
       - name: Turn off strict host checking

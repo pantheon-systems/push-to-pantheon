@@ -59,17 +59,10 @@ inputs:
 
 runs:
     using: 'composite'
-    # Use a different working directory if one was set, otherwise stay with
-    # the regular checkout of the repo.
-    defaults:
-      run:
-      working-directory: ${{ inputs.relative_site_root != '' && inputs.relative_site_root || '.' }}
     steps:
-
       - name: Create SITE_ROOT variable
         shell: bash
         run: echo "SITE_ROOT=${{ inputs.relative_site_root != '' && inputs.relative_site_root || '.' }}" >> $GITHUB_ENV
-
 
       - name: Set target_env
         id: set_target_env
@@ -77,6 +70,7 @@ runs:
         env:
           PR_NUM: ${{ github.event.pull_request.number }}
           INPUT_TARGET_ENV: ${{ inputs.target_env }}
+        # todo, move this to a bats-testable bash script.
         run: |
           # Set target_env
           set +e

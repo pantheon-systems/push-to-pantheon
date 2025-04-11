@@ -159,16 +159,15 @@ runs:
 
       - name: Prepare site root's Git History
         shell: bash
+        # Use a different working directory if one was set, otherwise stay with
+        # the regular checkout of the repo.
+        working-directory: ${{ inputs.relative_site_root != '' && inputs.relative_site_root || '.' }}
         env:
           SITE_ROOT: ${{ inputs.relative_site_root }}
           PANTHEON_SITE: ${{ inputs.site }}
         run: |
           # Prepare local repository prior to pushing
           set +e
-
-          if [ -n "$SITE_ROOT" ]; then
-            cd ${SITE_ROOT}
-          fi
 
           export PANTHEON_REPO_LOCATION=$(terminus connection:info ${PANTHEON_SITE}.dev  --field=git_url)
           bash ${{ github.action_path }}/scripts/prepare-repo.sh

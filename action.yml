@@ -175,25 +175,19 @@ runs:
       - name: Deployment Processing
         shell: bash
         id: deploy_to_pantheon
+        # Use a different working directory if one was set, otherwise stay with
+        # the regular checkout of the repo.
+        working-directory: ${{ inputs.relative_site_root != '' && inputs.relative_site_root || '.' }}
         env:
           PANTHEON_SITE: ${{ inputs.site }}
           PANTHEON_SOURCE_ENV: ${{ inputs.source_env }}
-          SITE_ROOT: ${{ inputs.relative_site_root }}
           PANTHEON_COMMIT_MESSAGE: ${{ inputs.git_commit_message }}
 
           # todo, might need to make this configurable too.
           # the default in build tools is 180. But that's regularly failing
           # on a small personal site.
           TERMINUS_BUILD_TOOLS_WORKFLOW_TIMEOUT: 300
-        run: |
-          # Push to Pantheon
-          set +e
-
-          if [ -n "$SITE_ROOT" ]; then
-            cd ${SITE_ROOT}
-          fi
-
-          terminus -n build:env:create ${PANTHEON_SITE}.${PANTHEON_SOURCE_ENV} ${PANTHEON_TARGET_ENV} --yes --message="${PANTHEON_COMMIT_MESSAGE}" ${PANTHEON_CLONE_CONTENT_FLAG} --no-git-force
+        run: terminus -n build:env:create ${PANTHEON_SITE}.${PANTHEON_SOURCE_ENV} ${PANTHEON_TARGET_ENV} --yes --message="${PANTHEON_COMMIT_MESSAGE}" ${PANTHEON_CLONE_CONTENT_FLAG} --no-git-force
 
       - name: Update deployment status
         uses: bobheadxi/deployments@v1
@@ -207,19 +201,15 @@ runs:
           deployment_id: ${{ steps.deployment.outputs.deployment_id }}
           env: ${{ env.PANTHEON_TARGET_ENV }}-${{ inputs.site }}
           env_url: https://${{ env.PANTHEON_TARGET_ENV }}-${{ inputs.site }}.pantheonsite.io
+
       - name: Deleting old multidevs
         if: ${{ inputs.delete_old_environments == 'true' && steps.deploy_to_pantheon.outcome == 'success' }}
+        # Use a different working directory if one was set, otherwise stay with
+        # the regular checkout of the repo.
+        working-directory: ${{ inputs.relative_site_root != '' && inputs.relative_site_root || '.' }}
         shell: bash
         env:
           PANTHEON_SITE: ${{ inputs.site }}
           GITHUB_TOKEN: ${{ github.token }}
           SITE_ROOT: ${{ inputs.relative_site_root }}
-        run: |
-          # Delete old multidevs
-          set +e
-
-          if [ -n "$SITE_ROOT" ]; then
-            cd ${SITE_ROOT}
-          fi
-
-          terminus build:env:delete:pr $PANTHEON_SITE --yes
+        run: terminus build:env:delete:pr $PANTHEON_SITE --yes

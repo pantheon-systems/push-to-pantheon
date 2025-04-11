@@ -66,6 +66,11 @@ runs:
       working-directory: ${{ inputs.relative_site_root != '' && inputs.relative_site_root || '.' }}
     steps:
 
+      - name: Create SITE_ROOT variable
+        shell: bash
+        run: echo "SITE_ROOT=${{ inputs.relative_site_root != '' && inputs.relative_site_root || '.' }}" >> $GITHUB_ENV
+
+
       - name: Set target_env
         id: set_target_env
         shell: bash
@@ -150,7 +155,7 @@ runs:
       - name: Create local Git repo (only when relative_site_root is set)
         shell: bash
         if: ${{ inputs.relative_site_root != '' }}
-        working-directory: ${{ inputs.relative_site_root }}
+        working-directory: ${{ env.SITE_ROOT }}
         env:
           SITE_ROOT: ${{ inputs.relative_site_root }}
         run: |
@@ -162,25 +167,19 @@ runs:
 
       - name: Prepare site root's Git History
         shell: bash
-        # Use a different working directory if one was set, otherwise stay with
-        # the regular checkout of the repo.
-        working-directory: ${{ inputs.relative_site_root != '' && inputs.relative_site_root || '.' }}
+        working-directory: ${{ env.SITE_ROOT }}
         env:
-          SITE_ROOT: ${{ inputs.relative_site_root }}
           PANTHEON_SITE: ${{ inputs.site }}
         run: bash ${{ github.action_path }}/scripts/prepare-repo.sh
 
       - name: Deployment Processing
         shell: bash
         id: deploy_to_pantheon
-        # Use a different working directory if one was set, otherwise stay with
-        # the regular checkout of the repo.
-        working-directory: ${{ inputs.relative_site_root != '' && inputs.relative_site_root || '.' }}
+        working-directory: ${{ env.SITE_ROOT }}
         env:
           PANTHEON_SITE: ${{ inputs.site }}
           PANTHEON_SOURCE_ENV: ${{ inputs.source_env }}
           PANTHEON_COMMIT_MESSAGE: ${{ inputs.git_commit_message }}
-
           # todo, might need to make this configurable too.
           # the default in build tools is 180. But that's regularly failing
           # on a small personal site.
@@ -202,9 +201,7 @@ runs:
 
       - name: Deleting old multidevs
         if: ${{ inputs.delete_old_environments == 'true' && steps.deploy_to_pantheon.outcome == 'success' }}
-        # Use a different working directory if one was set, otherwise stay with
-        # the regular checkout of the repo.
-        working-directory: ${{ inputs.relative_site_root != '' && inputs.relative_site_root || '.' }}
+        working-directory: ${{ env.SITE_ROOT }}
         shell: bash
         env:
           PANTHEON_SITE: ${{ inputs.site }}

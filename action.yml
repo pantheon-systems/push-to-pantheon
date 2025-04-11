@@ -117,7 +117,7 @@ runs:
             ssh-private-key: ${{ inputs.ssh_key }}
 
       - name: Install Terminus
-        uses: kyletaylored/terminus-github-actions@fix-cache-error-output 
+        uses: pantheon-systems/terminus-github-actions@fix-cache-error-output
         with:
           pantheon-machine-token: ${{ inputs.machine_token }}
 

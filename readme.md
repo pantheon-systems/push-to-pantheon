@@ -172,6 +172,18 @@ Here's an example from a real site that uses Tailwind to prepare CSS in the site
 
 By calling `npm run build` and modifying `gitignore` prior to calling `push-to-pantheon`, the Tailwind-generated CSS (which is not wanted in the GitHub repo) is available to be committed (and pushed) inside the `push-to-pantheon` step.
 
+### Permissions
+
+_todo_
+
+```
+    permissions:
+      deployments: write
+      contents: read
+      pull-requests: read
+```
+
+
 ### Concurrency
 
 Sometimes in the course of development it is normal to push one commit to a branch with a pull request and then push another commit a minute later and then another. Similarly, a team might merge five pull requests in quick succession.

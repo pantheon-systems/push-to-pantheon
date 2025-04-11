@@ -121,6 +121,13 @@ runs:
         with:
           pantheon-machine-token: ${{ inputs.machine_token }}
 
+      - run: "echo 'running Terminus installation twice'"
+
+      - name: Install Terminus
+        uses: kyletaylored/terminus-github-actions@fix-cache-error-output 
+        with:
+          pantheon-machine-token: ${{ inputs.machine_token }}
+
       - name: Install Terminus Plugin
         shell: bash
         run: |

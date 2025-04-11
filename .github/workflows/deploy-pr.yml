@@ -10,6 +10,10 @@ on:
 
 jobs:
   build:
+    permissions:
+      deployments: write
+      contents: read
+      pull-requests: read   
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4

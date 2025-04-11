@@ -19,10 +19,13 @@ More complex examples further below show additional steps and jobs used in conju
 
 Here is the beginning of a `jobs` section of [a real `.github/workflows/deploy-pr.yml` file](https://github.com/stevector/stevector-composed/blob/6a1c0183ef6e429761fcc090c34cfcc2dcd7c573/.github/workflows/deploy-pr.yml) that deploys a site to Pantheon when triggered by a Pull Request.
 
-
 ```
 jobs:
   push:
+    permissions:
+      deployments: write
+      contents: read
+      pull-requests: read
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
@@ -49,11 +52,9 @@ The optional argument likely to be most commonly used is `delete_old_environment
 
 [A private key that corresponds to a public key on Pantheon](https://docs.pantheon.io/ssh-keys).
 
-
 #### `machine_token`
 
 [A token for authenticating with Pantheon's command line](https://docs.pantheon.io/machine-tokens).
-
 
 #### `site`
 
@@ -171,6 +172,29 @@ Here's an example from a real site that uses Tailwind to prepare CSS in the site
 ```
 
 By calling `npm run build` and modifying `gitignore` prior to calling `push-to-pantheon`, the Tailwind-generated CSS (which is not wanted in the GitHub repo) is available to be committed (and pushed) inside the `push-to-pantheon` step.
+
+### Permissions
+
+This action needs permission to perform its work. Set the following permissions either at the level of the workflow or at the level of the job that uses this action.
+
+```
+    permissions:
+      deployments: write
+      contents: read
+      pull-requests: read
+```
+
+The `deployments: write` permission is required to notify GitHub that the deployment has been made (to a Pantheon Multidev usually).
+This is required for the GitHub UI to show the deployment status of the pull request:
+
+![Deployments appearing in GitHub UI](.github/documentation/deployment-in-github-ui.png)
+
+The `contents: read` permission is required for the job to check out the code from the GitHub repository.
+Even though this action does not checkout of the code itself, the code must be checked out prior to this step in order for the action to work.
+
+The `pull-requests: read` permission is required to delete old Multidev environments associated with closed pull requests.
+
+[See the GitHub Actions documentation for more information on permissions.](https://docs.github.com/en/actions/writing-workflows/choosing-what-your-workflow-does/controlling-permissions-for-github_token)
 
 ### Concurrency
 

@@ -145,18 +145,17 @@ runs:
       - name: Create local Git repo (only when relative_site_root is set)
         shell: bash
         if: ${{ inputs.relative_site_root != '' }}
+        working-directory: ${{ inputs.relative_site_root }}
         env:
           SITE_ROOT: ${{ inputs.relative_site_root }}
         run: |
           # Create local Git repo (only when relative_site_root is set)
           set +e
+          pwd
+          git init -b main
+          echo "this origin setting is a hack to get past the 'inferring' of a Git provider in Build Tools"
+          git remote add origin https://github.com/${{ github.repository }}
 
-          if [ -n "$SITE_ROOT" ]; then
-            cd ${SITE_ROOT}
-            git init -b main
-            echo "this origin setting is a hack to get past the 'inferring' of a Git provider in Build Tools"
-            git remote add origin https://github.com/${{ github.repository }}
-          fi
 
       - name: Prepare site root's Git History
         shell: bash

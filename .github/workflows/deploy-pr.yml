@@ -26,3 +26,14 @@ jobs:
         git_commit_message: "This is an automated commit message from GitHub Actions."
         delete_old_environments: true
         clone_content: true
+
+  another_step_but_in_serial:
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Install Terminus
+        uses: kyletaylored/terminus-github-actions@fix-cache-error-output 
+        with:
+          pantheon-machine-token: ${{ inputs.machine_token }}
+
+        

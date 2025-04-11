@@ -3,6 +3,12 @@
 # Exit on error, undefined variables, and pipe failures
 set -euo pipefail
 
+if [[ -n "${PANTHEON_REPO_LOCATION:-}" ]]; then
+  echo "PANTHEON_REPO_LOCATION exists."
+else
+  export PANTHEON_REPO_LOCATION=$(terminus connection:info ${PANTHEON_SITE}.dev  --field=git_url)
+fi
+
 # todo exit with errors if needed env vars are missing.
 # $PANTHEON_REPO_LOCATION
 # $PANTHEON_TARGET_ENV

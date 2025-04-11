@@ -151,11 +151,9 @@ runs:
         run: |
           # Create local Git repo (only when relative_site_root is set)
           set +e
-          pwd
           git init -b main
           echo "this origin setting is a hack to get past the 'inferring' of a Git provider in Build Tools"
           git remote add origin https://github.com/${{ github.repository }}
-
 
       - name: Prepare site root's Git History
         shell: bash
@@ -165,12 +163,7 @@ runs:
         env:
           SITE_ROOT: ${{ inputs.relative_site_root }}
           PANTHEON_SITE: ${{ inputs.site }}
-        run: |
-          # Prepare local Git repository prior to pushing
-          set +e
-
-          export PANTHEON_REPO_LOCATION=$(terminus connection:info ${PANTHEON_SITE}.dev  --field=git_url)
-          bash ${{ github.action_path }}/scripts/prepare-repo.sh
+        run: bash ${{ github.action_path }}/scripts/prepare-repo.sh
 
       - name: Deployment Processing
         shell: bash

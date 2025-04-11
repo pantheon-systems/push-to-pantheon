@@ -13,7 +13,7 @@ jobs:
     permissions:
       deployments: write
       contents: read
-      pull-requests: read   
+      pull-requests: read
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
@@ -44,4 +44,4 @@ jobs:
       # env:
       # BATS_LIB_PATH: ${{ steps.setup-bats.outputs.lib-path }}
       # TERM: xterm
-      run: bats tests/setup_mock_repos.bats
+      run: bats tests/

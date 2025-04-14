@@ -155,7 +155,6 @@ We do not intend to make a GitHub Application that will work with the pre-existi
 
 ![App vs Action diagram](.github/documentation/app-vs-action-repo-diagram.png)
 
-
 ### Additional build steps like `composer install` and `npm build`
 
 By default this action will check out the code from the GitHub repository and push it to Pantheon.

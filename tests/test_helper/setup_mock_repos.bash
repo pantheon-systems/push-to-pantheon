@@ -102,7 +102,6 @@ mock_ci_build_process() {
     return 0
 }
 
-
 # Only execute main if script is run directly (not sourced)
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
     setup_mock_repos "$1" "$2" "${3:-}"

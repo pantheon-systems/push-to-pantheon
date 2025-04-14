@@ -126,7 +126,7 @@ runs:
         run: |
           # Install Terminus Plugin
           set +e
-          terminus self:plugin:install terminus-build-tools-plugin
+          terminus self:plugin:install "pantheon-systems/terminus-build-tools-plugin:3.x"
 
       - name: Configure Git User
         shell: bash

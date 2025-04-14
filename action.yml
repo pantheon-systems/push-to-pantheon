@@ -57,6 +57,10 @@ inputs:
 runs:
     using: 'composite'
     steps:
+      # Setting this environment variable at the first step makes it cleaner
+      # for later steps to run inside with working-directory: ${{ env.SITE_ROOT }}
+      # Not all consumers of this Action have a Git root on GitHub that matches
+      # the site root on Pantheon. For those projects, we need to set this variable.
       - name: Create SITE_ROOT variable
         shell: bash
         run: echo "SITE_ROOT=${{ inputs.relative_site_root != '' && inputs.relative_site_root || '.' }}" >> $GITHUB_ENV

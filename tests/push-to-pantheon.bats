@@ -10,16 +10,10 @@ setup() {
     GITHUB_DIR="$(mktemp -d)"
     PANTHEON_DIR="$(mktemp -d)"
     CI_DIR="$(mktemp -d)"
-    # LOG_FILE="$(mktemp)"
 
     # Set up mock repositories
     setup_mock_repos "$GITHUB_DIR" "$PANTHEON_DIR" "$CI_DIR"
 }
-
-# teardown() {
-    # Clean up temporary directories
-    # rm -rf "$GITHUB_DIR" "$PANTHEON_DIR" "$CI_DIR" "$LOG_FILE"
-# }
 
 @test "simulate a push to pantheon job when Pantheon does not have the target branch" {
 

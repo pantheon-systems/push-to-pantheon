@@ -145,7 +145,7 @@ Pantheon provides a Git repository for each site hosted on our platform.
 This assumption allows teams to use Git without paying for a separate Git hosting service.
 However, many teams prefer to use GitHub as their Git hosting service.
 
-This Action is designed to work with both Git repositories.
+This Action is designed to work with both Git repositories (pushing from GitHub to Pantheon).
 Additionally, we are updating our platform so on a site-by-site basis, teams can opt-in to having only a 3rd party Git repository (like GitHub) and not have a Pantheon-hosted Git repository.
 
 That architecture is currently only accommodated by a [GitHub _Application_](https://roadmap.pantheon.io/c/115-github-gitlab-and-bitbucket-integration) that handles the syncing of code between GitHub and Pantheon.

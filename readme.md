@@ -16,7 +16,7 @@ When running on workflows triggered by merges/pushes to the `main` branch this a
 
 ## Early Access
 
-As a publicly available GitHub Action, there is no gating mechanism preventing any Pantheon customer from using the code in this repository. However, this reposistory is in active development and behaviors may change between versions. Only teams with pre-existing functioning Continuous Integration pipelines that they could fall back to, should try this repository at this time. [See our documentation for more information about software maturity and support](https://docs.pantheon.io/oss-support-levels#early-access).
+As a publicly available GitHub Action, there is no gating mechanism preventing any Pantheon customer from using the code in this repository. However, this reposistory is in active development and behaviors may change between versions. Only teams with pre-existing Continuous Integration pipelines that they could fall back to, should try this repository at this time. [See our documentation for more information about software maturity and support](https://docs.pantheon.io/oss-support-levels#early-access).
 
 ## Basic Usage
 

@@ -13,7 +13,6 @@ fi
 # $PANTHEON_REPO_LOCATION
 # $PANTHEON_TARGET_ENV
 
-
 git remote add pantheon $PANTHEON_REPO_LOCATION
 
 if git ls-remote --exit-code --heads pantheon "$PANTHEON_TARGET_ENV" > /dev/null; then

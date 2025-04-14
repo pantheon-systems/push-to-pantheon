@@ -17,6 +17,13 @@ if [[ -z "${PANTHEON_TARGET_ENV:-}" ]]; then
   exit 1
 fi
 
+# When runnning on the "main" branch, the target environment is "dev" but the
+# associated git branch on Pantheon is "master". So that is the branch we need to
+# fetch and reset to.
+if [[ "$PANTHEON_TARGET_ENV" == "dev" ]]; then
+  PANTHEON_TARGET_ENV="master"
+fi
+
 git remote add pantheon $PANTHEON_REPO_LOCATION
 
 if git ls-remote --exit-code --heads pantheon "$PANTHEON_TARGET_ENV" > /dev/null; then

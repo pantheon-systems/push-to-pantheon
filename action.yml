@@ -125,13 +125,6 @@ runs:
         shell: bash
         run: terminus self:plugin:install "pantheon-systems/terminus-build-tools-plugin:3.x-dev"
 
-      - name: Check Terminus Plugin
-        shell: bash
-        run: |
-          cat ~/.terminus/plugins-3.x/composer.json
-          terminus plugin:update
-          terminus plugin:list
-
       - name: Configure Git User
         shell: bash
         env:

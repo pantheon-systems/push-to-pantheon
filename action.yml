@@ -128,17 +128,13 @@ runs:
 
       - name: Install Terminus Plugin
         shell: bash
-        run: terminus self:plugin:install terminus-build-tools-plugin
+        run: terminus self:plugin:install "pantheon-systems/terminus-build-tools-plugin:3.x"
 
       - name: Set PANTHEON_REPO_LOCATION
         shell: bash
         env:
           PANTHEON_SITE: ${{ inputs.site }}
         run: echo "PANTHEON_REPO_LOCATION=$(terminus connection:info ${PANTHEON_SITE}.dev  --field=git_url)" >> $GITHUB_ENV
-        run: |
-          # Install Terminus Plugin
-          set +e
-          terminus self:plugin:install "pantheon-systems/terminus-build-tools-plugin:3.x"
 
       - name: Configure Git User
         shell: bash

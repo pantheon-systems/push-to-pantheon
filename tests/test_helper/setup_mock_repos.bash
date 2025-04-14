@@ -13,7 +13,8 @@ setup_mock_github_repo() {
 
     export DIRECTORY_OF_SCRIPT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-    cp -r "$DIRECTORY_OF_SCRIPT/../../.github/testing_fixtures/dtp-nearly-empty-site/" "$repo_path"
+    cp -r "$DIRECTORY_OF_SCRIPT/../../.github/testing_fixtures/dtp-nearly-empty-site/"* "$repo_path"
+
 
     ls -al
 

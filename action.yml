@@ -129,6 +129,7 @@ runs:
         shell: bash
         run: |
           cat ~/.terminus/plugins-3.x/composer.json
+          terminus plugin:update
 
       - name: Configure Git User
         shell: bash

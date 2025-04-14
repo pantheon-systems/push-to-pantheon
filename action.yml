@@ -128,7 +128,7 @@ runs:
       - name: Check Terminus Plugin
         shell: bash
         run: |
-          echo cat ~/.terminus/plugins-3.x/composer.json
+          cat ~/.terminus/plugins-3.x/composer.json
 
       - name: Configure Git User
         shell: bash

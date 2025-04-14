@@ -14,7 +14,6 @@ setup_mock_github_repo() {
     export DIRECTORY_OF_SCRIPT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
     cp -r "$DIRECTORY_OF_SCRIPT/../../.github/testing_fixtures/dtp-nearly-empty-site/"* "$repo_path"
 
-
     # Create and commit index.php on main branch
     git add .
     git config --local user.email "test@example.com"
@@ -25,10 +24,7 @@ setup_mock_github_repo() {
     git checkout -b test-pr
 
     # Modify and commit changes on test-pr branch
-    echo '<?php
-    echo "Hello world";
-    echo "this is a commit on test-pr";
-    ?>' > index.php
+    cp sample-files/test-pr-change.php index.php
     git add index.php
     git commit -m "Add additional echo statement in the branch test-pr"
 

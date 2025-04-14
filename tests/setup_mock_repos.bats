@@ -32,6 +32,7 @@ setup() {
 
 @test "Mocked GitHub repo has test-pr branch" {
     run setup_mock_github_repo "$GITHUB_DIR"
+    echo $GITHUB_DIR
     [ "$status" -eq 0 ]
 
     cd "$GITHUB_DIR"

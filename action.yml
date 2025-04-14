@@ -123,7 +123,7 @@ runs:
 
       - name: Install Terminus Plugin
         shell: bash
-        run: terminus self:plugin:install "pantheon-systems/terminus-build-tools-plugin:dev-3.x"
+        run: terminus self:plugin:install "pantheon-systems/terminus-build-tools-plugin:3.x-dev"
 
       - name: Check Terminus Plugin
         shell: bash

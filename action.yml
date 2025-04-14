@@ -123,10 +123,7 @@ runs:
 
       - name: Install Terminus Plugin
         shell: bash
-        run: |
-          # Install Terminus Plugin
-          set +e
-          terminus self:plugin:install "pantheon-systems/terminus-build-tools-plugin:3.x"
+        run: terminus self:plugin:install "pantheon-systems/terminus-build-tools-plugin:3.x"
 
       - name: Configure Git User
         shell: bash

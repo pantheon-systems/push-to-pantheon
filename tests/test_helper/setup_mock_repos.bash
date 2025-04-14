@@ -12,11 +12,8 @@ setup_mock_github_repo() {
     git init -b main
 
     export DIRECTORY_OF_SCRIPT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-
     cp -r "$DIRECTORY_OF_SCRIPT/../../.github/testing_fixtures/dtp-nearly-empty-site/"* "$repo_path"
 
-
-    ls -al
 
     # Create and commit index.php on main branch
     git add .

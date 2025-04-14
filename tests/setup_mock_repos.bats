@@ -13,7 +13,6 @@ setup() {
 
 @test "Setup creates a mock GitHub repo at the specified path" {
     run setup_mock_github_repo "$GITHUB_DIR"
-    echo $output
     [ "$status" -eq 0 ]
     [ -d "$GITHUB_DIR/.git" ]
 

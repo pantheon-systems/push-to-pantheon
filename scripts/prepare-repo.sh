@@ -7,6 +7,10 @@
 # Exit on error, undefined variables, and pipe failures
 set -euo pipefail
 
+
+cat index.php
+
+
 # todo exit with errors if needed env vars are missing.
 if [[ -z "${PANTHEON_REPO_LOCATION:-}" ]]; then
   echo "Error: PANTHEON_REPO_LOCATION is not set. It should be set to the Pantheon repository URL."
@@ -34,9 +38,21 @@ else
 fi
 git fetch pantheon $PANTHEON_TARGET_ENV
 
-# Switch to a new branch based on the Pantheon target environment branch
-# stashing and popping any uncommitted changes will allow us to
-# keep our changes while also getting the history from Pantheon.
-git stash --include-untracked --quiet
-git checkout -B temp-build-branch pantheon/$PANTHEON_TARGET_ENV
-git stash pop --quiet
+echo "--------------------------------------------------------------"
+
+
+cat index.php
+echo "--------------------------------------------------------------"
+git reset --soft pantheon/"$PANTHEON_TARGET_ENV"
+
+
+echo "-------------------------------------------------------AFTER DETACH-------"
+cat index.php
+echo "--------------------------------------------------------------"
+
+git checkout -b ci-temp-branch
+
+echo "--------------------------------------------------------------"
+cat index.php
+echo "--------------------------------------------------------------"
+

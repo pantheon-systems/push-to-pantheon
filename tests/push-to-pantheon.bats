@@ -40,6 +40,15 @@ setup() {
     run git show pr-123:test.css
     echo ${output}
     [[ "${output}" =~ "background-color: #FF0000" ]]
+
+
+
+
+    run git show pr-123:index.php
+    echo ${output}
+    [[ "${output}" =~ "this is a commit on test-pr" ]]
+
+
 }
 
 @test "simulate a push to pantheon job when Pantheon already does have the target branch" {

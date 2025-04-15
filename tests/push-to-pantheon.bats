@@ -33,7 +33,7 @@ setup() {
     git add .
     # todo use a variable for the commit message.
     git commit -m 'build process for pr-123'
-    git push pantheon ci-temp-branch:$PANTHEON_TARGET_ENV
+    git push pantheon $PANTHEON_TARGET_ENV:$PANTHEON_TARGET_ENV
 
     echo "checkout that the pantheon repo contains the built CSS"
     cd $PANTHEON_DIR
@@ -81,7 +81,7 @@ setup() {
     git add .
     # todo use a variable for the commit message.
     git commit -m 'build process for pr-123'
-    git push pantheon ci-temp-branch:$PANTHEON_TARGET_ENV
+    git push pantheon $PANTHEON_TARGET_ENV:$PANTHEON_TARGET_ENV
 
     echo "checkout that the pantheon repo contains the built CSS"
     cd $PANTHEON_DIR

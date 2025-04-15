@@ -24,6 +24,8 @@ if [[ "$PANTHEON_TARGET_ENV" == "dev" ]]; then
   PANTHEON_TARGET_ENV="master"
 fi
 
+git checkout -B $PANTHEON_TARGET_ENV
+
 git remote add pantheon $PANTHEON_REPO_LOCATION
 
 if git ls-remote --exit-code --heads pantheon "$PANTHEON_TARGET_ENV" > /dev/null; then
@@ -35,4 +37,3 @@ fi
 git fetch pantheon $PANTHEON_TARGET_ENV
 
 git reset --soft pantheon/"$PANTHEON_TARGET_ENV"
-git checkout -b ci-temp-branch

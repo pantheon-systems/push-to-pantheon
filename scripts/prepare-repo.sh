@@ -7,10 +7,6 @@
 # Exit on error, undefined variables, and pipe failures
 set -euo pipefail
 
-
-cat index.php
-
-
 # todo exit with errors if needed env vars are missing.
 if [[ -z "${PANTHEON_REPO_LOCATION:-}" ]]; then
   echo "Error: PANTHEON_REPO_LOCATION is not set. It should be set to the Pantheon repository URL."

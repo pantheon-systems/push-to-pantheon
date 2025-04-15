@@ -34,8 +34,9 @@ else
 fi
 git fetch pantheon $PANTHEON_TARGET_ENV
 
-# Reset your working directory to match the remote branch
-git reset --hard pantheon/$PANTHEON_TARGET_ENV
-# Create and switch to a local branch tracking the remote one
-# todo, name the branch based on some variable.
-git checkout -B temp-build-branch
+# Switch to a new branch based on the Pantheon target environment branch
+# stashing and popping any uncommitted changes will allow us to
+# keep our changes while also getting the history from Pantheon.
+git stash --include-untracked --quiet
+git checkout -B temp-build-branch pantheon/$PANTHEON_TARGET_ENV
+git stash pop --quiet

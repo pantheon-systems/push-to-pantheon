@@ -36,7 +36,7 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     - name: Push to Pantheon
-      uses: stevector/push-to-pantheon@0.5.0
+      uses: pantheon-systems/push-to-pantheon@0.5.0
       with:
         ssh_key: ${{ secrets.PANTHEON_SSH_KEY }}
         machine_token: ${{ secrets.TERMINUS_MACHINE_TOKEN }}
@@ -131,14 +131,14 @@ Prior to the release of version 1.0.0, it is recommended to pin the version of t
 This will prevent breaking changes from being introduced to your workflow without your knowledge.
 The most likely breaking change would be a change to the name of the action or the name of the inputs.
 For instance is `delete_old_environments` the best name for that parameter?
-[We might change it.](https://github.com/stevector-streaming/dtp/issues/53)
+[We might change it.](https://github.com/pantheon-systems/push-to-pantheon/issues/6)
 
 To pin the version of this action to a specific version, use the `@` symbol followed by the version number in the `uses` key of the step that uses this action.
 For example, to use version 0.4.1 of this action, the step would look like this:
 
 ```yml
 - name: Push to Pantheon
-  uses: stevector/push-to-pantheon@0.4.1
+  uses: pantheon-systems/push-to-pantheon@0.4.1
   with:
     ssh_key: ${{ secrets.PANTHEON_SSH_KEY }}
     machine_token: ${{ secrets.TERMINUS_MACHINE_TOKEN }}
@@ -170,7 +170,7 @@ Here's an example from a real site that uses Tailwind to prepare CSS in the site
     # to Pantheon in the later "push-to-pantheon" step.
     - run: "cd web/themes/my_custom_theme/css && rm .gitignore"
     - name: Push to Pantheon
-      uses: stevector/push-to-pantheon@0.5.0
+      uses: pantheon-systems/push-to-pantheon@0.5.0
       with:
         ssh_key: ${{ secrets.PANTHEON_SSH_KEY }}
         machine_token: ${{ secrets.TERMINUS_MACHINE_TOKEN }}
@@ -247,7 +247,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: Deploy to Pantheon
-      uses: stevector/push-to-pantheon@0.5.0
+      uses: pantheon-systems/push-to-pantheon@0.5.0
       with:
         ssh_key: ${{ secrets.PANTHEON_SSH_KEY }}
         machine_token: ${{ secrets.TERMINUS_MACHINE_TOKEN }}

@@ -23,7 +23,7 @@ As a publicly available GitHub Action, there is no gating mechanism preventing a
 This action provides a step that can be used as the only step within a job.
 More complex examples further below show additional steps and jobs used in conjunction with this action.
 
-Here is the beginning of a `jobs` section of [a real `.github/workflows/deploy-pr.yml` file](https://github.com/stevector/stevector-composed/blob/6a1c0183ef6e429761fcc090c34cfcc2dcd7c573/.github/workflows/deploy-pr.yml) that deploys a site to Pantheon when triggered by a Pull Request.
+Here is the beginning of a `jobs` section of a site's `.github/workflows/deploy-pr.yml` file that deploys a site to Pantheon when triggered by a Pull Request.
 
 ```
 jobs:
@@ -46,9 +46,9 @@ jobs:
 ## Parameters
 
 In order to use the step supplied by this Action, the GitHub Workflow must have access to [a token for authenticating with Pantheon's command line](https://docs.pantheon.io/machine-tokens) and [a private key](https://docs.pantheon.io/ssh-keys) that will allow Git pushes to Pantheon and other operations.
-Both of those values should be treated senstively and stored as [GitHub Secrets](https://docs.github.com/en/actions/reference/encrypted-secrets).
+Both of those values should be treated sensitively and stored as [GitHub Secrets](https://docs.github.com/en/actions/reference/encrypted-secrets).
 
-The only other required argument is the machine name of the Pantheon site to which the code will be ed.
+The only other required argument is the machine name of the Pantheon site to which the code will be pushed.
 
 The optional argument likely to be most commonly used is `delete_old_environments` which will delete Multidev environments associated with closed pull requests after the deployment completes. Setting `delete_old_environments: true` is recommended for workflows that run after merges to the `main` branch to avoid accumulating Multidev environments that are no longer needed.
 

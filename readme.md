@@ -39,7 +39,7 @@ jobs:
       uses: pantheon-systems/push-to-pantheon@0.5.0
       with:
         ssh_key: ${{ secrets.PANTHEON_SSH_KEY }}
-        machine_token: ${{ secrets.TERMINUS_MACHINE_TOKEN }}
+        machine_token: ${{ secrets.PANTHEON_MACHINE_TOKEN }}
         site: ${{ vars.PANTHEON_SITE }}
 ```
 
@@ -141,7 +141,7 @@ For example, to use version 0.4.1 of this action, the step would look like this:
   uses: pantheon-systems/push-to-pantheon@0.4.1
   with:
     ssh_key: ${{ secrets.PANTHEON_SSH_KEY }}
-    machine_token: ${{ secrets.TERMINUS_MACHINE_TOKEN }}
+    machine_token: ${{ secrets.PANTHEON_MACHINE_TOKEN }}
     site: ${{ vars.PANTHEON_SITE }}
 ```
 
@@ -173,7 +173,7 @@ Here's an example from a real site that uses Tailwind to prepare CSS in the site
       uses: pantheon-systems/push-to-pantheon@0.5.0
       with:
         ssh_key: ${{ secrets.PANTHEON_SSH_KEY }}
-        machine_token: ${{ secrets.TERMINUS_MACHINE_TOKEN }}
+        machine_token: ${{ secrets.PANTHEON_MACHINE_TOKEN }}
         site: ${{ vars.PANTHEON_SITE }}
 ```
 
@@ -250,7 +250,7 @@ jobs:
       uses: pantheon-systems/push-to-pantheon@0.5.0
       with:
         ssh_key: ${{ secrets.PANTHEON_SSH_KEY }}
-        machine_token: ${{ secrets.TERMINUS_MACHINE_TOKEN }}
+        machine_token: ${{ secrets.PANTHEON_MACHINE_TOKEN }}
         site: ${{ vars.PANTHEON_SITE }}
 
   code_standards_check:
@@ -271,6 +271,6 @@ jobs:
     - uses: ./.github/actions/playwright-against-pantheon
       with:
         pantheon_ssh_key: ${{ secrets.PANTHEON_SSH_KEY }}
-        terminus_machine_token: ${{ secrets.TERMINUS_MACHINE_TOKEN }}
+        pantheon_machine_token: ${{ secrets.PANTHEON_MACHINE_TOKEN }}
         pantheon_site: ${{ vars.PANTHEON_SITE }}
 ```

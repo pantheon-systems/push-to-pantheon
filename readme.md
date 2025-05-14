@@ -270,7 +270,7 @@ jobs:
       uses: actions/checkout@v2
     - uses: ./.github/actions/playwright-against-pantheon
       with:
-        pantheon_ssh_key: ${{ secrets.PANTHEON_SSH_KEY }}
+        ssh_key: ${{ secrets.PANTHEON_SSH_KEY }}
         machine_token: ${{ secrets.PANTHEON_MACHINE_TOKEN }}
         pantheon_site: ${{ vars.PANTHEON_SITE }}
 ```

@@ -271,6 +271,6 @@ jobs:
     - uses: ./.github/actions/playwright-against-pantheon
       with:
         pantheon_ssh_key: ${{ secrets.PANTHEON_SSH_KEY }}
-        pantheon_machine_token: ${{ secrets.PANTHEON_MACHINE_TOKEN }}
+        machine_token: ${{ secrets.PANTHEON_MACHINE_TOKEN }}
         pantheon_site: ${{ vars.PANTHEON_SITE }}
 ```

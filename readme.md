@@ -1,4 +1,4 @@
-# Push Site to Pantheon (GitHub Action)
+# Push to Pantheon (GitHub Action)
 
 [![Early Access](https://img.shields.io/badge/pantheon-early_access-yellow?logo=pantheon&logoColor=FFDC28&color=FFDC28)](https://docs.pantheon.io/oss-support-levels#early-access)
 

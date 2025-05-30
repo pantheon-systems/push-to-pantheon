@@ -27,7 +27,7 @@ jobs:
         echo "and I want to tell you about our new Github Action."
         sleep 10;
 
-    - name:  sentence
+    - name: second sentence
       shell: bash
       # env:
       #   YOUR_NAME: "Steve Persch"

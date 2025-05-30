@@ -23,16 +23,14 @@ jobs:
       env:
         YOUR_NAME: "Steve Persch"
       run: |
-        echo "Hi, I'm ${YOUR_NAME} from Pantheon."
+        echo "Hi, I'm YOUR_NAME from Pantheon."
         echo "and I want to tell you about our new Github Action."
         sleep 10;
 
     - name: second sentence
       shell: bash
-      # env:
-      #   YOUR_NAME: "Steve Persch"
       run: |
-        echo "Writing CI scripts can be time consuming."
+        echo "Writing CI scripts can be time consiming."
         echo "You need to install Terminus,"
         echo "you need to set up SSH keys and access tokens."
         sleep 10;

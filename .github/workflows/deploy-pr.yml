@@ -13,10 +13,27 @@ jobs:
     permissions:
       deployments: write
       contents: read
-      pull-requests: read   
+      pull-requests: read
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
+
+    - name: First sentence
+      shell: bash
+      env:
+        YOUR_NAME: "Steve Persch"
+      run: |
+        echo "Hi, I'm YOUR_NAME from Pantheon. and I want to tell you about our new Github Action."
+        sleep 10;
+
+    - name: Second sentence
+      shell: bash
+      # env:
+      #   YOUR_NAME: "Steve Persch"
+      run: |
+        echo "Writing CI scripts can be time consiming. You need to install Terminus, you need to set up SSH keys and access tokens."
+        sleep 10;
+
     - name: deploy to Pantheon
       uses: ./
       with:

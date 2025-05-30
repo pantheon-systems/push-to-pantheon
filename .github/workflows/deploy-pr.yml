@@ -30,7 +30,7 @@ jobs:
     - name: second sentence
       shell: bash
       run: |
-        echo "Writing CI scripts can be time consiming."
+        echo "Writing CI scripts can be time consuming."
         echo "You need to install Terminus,"
         echo "you need to set up SSH keys and access tokens."
         sleep 10;

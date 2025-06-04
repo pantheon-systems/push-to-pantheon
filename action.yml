@@ -117,7 +117,7 @@ runs:
             ssh-private-key: ${{ inputs.ssh_key }}
 
       - name: Install Terminus
-        uses: pantheon-systems/terminus-github-actions@main
+        uses: pantheon-systems/terminus-github-actions@v1
         with:
           pantheon-machine-token: ${{ inputs.machine_token }}
 

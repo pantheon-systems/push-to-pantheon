@@ -205,17 +205,15 @@ The `pull-requests: read` permission is required to delete old Multidev environm
 ### Concurrency
 
 Sometimes in the course of development it is normal to push one commit to a branch with a pull request and then push another commit a minute later and then another. Similarly, a team might merge five pull requests in quick succession.
-Depending on the nature of the project, the team might want relevant Workflows to be processed for every single commit.
-
-However, for most WordPress and Drupal teams deploying to Pantheon we recommend running no more than one workflow on a branch at a time because this GitHub Action presumes (though does not strictly enforce) that all workflow runs on a given branch will deploy code to the same Pantheon environment.
-Multiple workflows each attempting to deploy code to the same environment at the same time could result in confusing error states or failing automated tests that follow deployment.
+Depending on the nature of the project, the team might not want Workflows to be processed for every single commit.
+In addition, when multiple GitHub Workflows run concurrently, the subsequent pushes to the Pantheon environment may fail anyway, because Pantheon only supports a single `sync_code` workflow to run at a time.
 
 To ensure that only one build runs at a time for a pull request, include this `concurrency` section in your workflow's yml file:
 
 ```yml
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
-  cancel-in-progress: false
+  cancel-in-progress: true
 ```
 
 For a workflow that handles only the main branch, that section could be altered to:
@@ -223,8 +221,10 @@ For a workflow that handles only the main branch, that section could be altered 
 ```yml
 concurrency:
   group: ${{ github.workflow }}-main
-  cancel-in-progress: false
+  cancel-in-progress: true
 ```
+
+**Note:** Cancelled workflows do not necessarily immediately halt all operations, for example when Terminus triggers a workflow to run. This can sometimes result in confusing error states or failed automated tests. In most cases, a subsequent push will resolve the conflict but it is nevertheless recommended to avoid pushing many commits in quick succession.
 
 ### Using additional jobs to test your code and the deployed site
 

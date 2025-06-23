@@ -37,12 +37,12 @@ inputs:
   git_user_name:
     description: "The name to be used with the Git commit that will be pushed to Pantheon. This value is not used on newer 'eVCS' sites for which there is no Pantheon-provided Git repo."
     required: false
-    default: "GitHub Action Automation"
+    default: "Pantheon Automation"
 
   git_user_email:
     description: "The email address to be used with the Git commit that will be pushed to Pantheon. This value is not used on newer 'eVCS' sites for which there is no Pantheon-provided Git repo."
     required: false
-    default: "GitHubAction@example.com"
+    default: "bot@getpantheon.com"
 
   git_commit_message:
     description: "A custom commit message to be used with the Git commit that will be pushed to Pantheon. Leaving this Action parameter blank will result in a generic commit message being used. This value is not used on newer 'eVCS' sites for which there is no Pantheon-provided Git repo."

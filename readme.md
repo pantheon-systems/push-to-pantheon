@@ -143,15 +143,10 @@ For example, to use version 0.4.1 of this action, the step would look like this:
 
 Pantheon provides a Git repository for each site hosted on our platform.
 This assumption allows teams to use Git without paying for a separate Git hosting service.
-However, many teams prefer to use GitHub as their Git hosting service.
+However, many teams prefer to use third-party repositories like GitHub as their Git hosting service.
 
-This Action is designed to work with both Git repositories (pushing from GitHub to Pantheon).
-Additionally, we are updating our platform so on a site-by-site basis, teams can opt-in to having only a 3rd party Git repository (like GitHub) and not have a Pantheon-hosted Git repository.
-
-That architecture is currently only accommodated by a [GitHub _Application_](https://roadmap.pantheon.io/c/115-github-gitlab-and-bitbucket-integration) that handles the syncing of code between GitHub and Pantheon.
-
-Once that architecture is more mature, we expect to create a new GitHub Action (very similar to this one) that will work with the new architecture.
-We do not intend to make a GitHub Application that will work with the pre-existing two-repository architecture.
+This Action is designed to work with those workflows where the Git repository is hosted on GitHub and pushing from GitHub to Pantheon.
+If you are interested in a native integration with GitHub that _only_ uses a single repository hosted on GitHub via a [GitHub Application](https://docs.pantheon.io/github-application), you may [request access to the private beta](https://docs.google.com/forms/d/e/1FAIpQLSf0vYrRbPQBxR-hT8kGJ4bEdYPtpkTtfDvPM89xD2dNZeqLqA/viewform).
 
 ![App vs Action diagram](.github/documentation/app-vs-action-repo-diagram.png)
 

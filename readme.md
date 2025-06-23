@@ -206,6 +206,7 @@ The `pull-requests: read` permission is required to delete old Multidev environm
 
 Sometimes in the course of development it is normal to push one commit to a branch with a pull request and then push another commit a minute later and then another. Similarly, a team might merge five pull requests in quick succession.
 Depending on the nature of the project, the team might not want Workflows to be processed for every single commit.
+In addition, when multiple GitHub Workflows run concurrently, the subsequent pushes to the Pantheon environment may fail anyway, because Pantheon only supports a single `sync_code` workflow to run at a time.
 
 To ensure that only one build runs at a time for a pull request, include this `concurrency` section in your workflow's yml file:
 

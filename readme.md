@@ -3,7 +3,6 @@
 [![Early Access](https://img.shields.io/badge/pantheon-early_access-yellow?logo=pantheon&logoColor=FFDC28&color=FFDC28)](https://docs.pantheon.io/oss-support-levels#early-access)
 
 This GitHub Action pushes your site's code from GitHub to [the Pantheon `Dev` environment](https://docs.pantheon.io/pantheon-workflow) or [Multidev environment](https://docs.pantheon.io/guides/multidev).
-You can read a basic overview of how this action works on our [documentation site](https://docs.pantheon.io/github-actions#push-to-pantheon) or the initial [Pantheon release note](https://docs.pantheon.io/release-notes/2025/05/github-action).
 
 It is designed to be used in GitHub Actions workflows that are triggered by Pull Requests and pushes to the `main` branch of your repository.
 
@@ -19,6 +18,13 @@ When running on workflows triggered by merges/pushes to the `main` branch this a
 
 As a publicly available GitHub Action, there is no gating mechanism preventing any Pantheon customer from using the code in this repository. However, this reposistory is in active development and behaviors may change between versions. Only teams with pre-existing Continuous Integration pipelines that they could fall back to, should try this repository at this time. [See our documentation for more information about software maturity and support](https://docs.pantheon.io/oss-support-levels#early-access).
 
+## Related Resources
+
+- [Pantheon's GitHub Actions](https://docs.pantheon.io/github-actions)
+- [GitHub Application](https://docs.pantheon.io/github-application)
+- [Native GitHub workflows on Pantheon livestream recording](https://www.youtube.com/live/Wj9KoTqXwY0?si=1MQlHXDyjMVvWOyX)
+- [Terminus GitHub Action](https://github.com/pantheon-systems/terminus-github-actions)
+
 ## Basic Usage
 
 This action provides a step that can be used as the only step within a job.
@@ -26,7 +32,7 @@ More complex examples further below show additional steps and jobs used in conju
 
 Here is the beginning of a `jobs` section of a site's `.github/workflows/deploy-pr.yml` file that deploys a site to Pantheon when triggered by a Pull Request.
 
-```
+```yml
 jobs:
   push:
     permissions:

@@ -3,6 +3,7 @@
 [![Early Access](https://img.shields.io/badge/pantheon-early_access-yellow?logo=pantheon&logoColor=FFDC28&color=FFDC28)](https://docs.pantheon.io/oss-support-levels#early-access)
 
 This GitHub Action pushes your site's code from GitHub to [the Pantheon `Dev` environment](https://docs.pantheon.io/pantheon-workflow) or [Multidev environment](https://docs.pantheon.io/guides/multidev).
+You can read a basic overview of how this action works on our [documentation site](https://docs.pantheon.io/github-actions#push-to-pantheon) or the initial [Pantheon release note](https://docs.pantheon.io/release-notes/2025/05/github-action).
 
 It is designed to be used in GitHub Actions workflows that are triggered by Pull Requests and pushes to the `main` branch of your repository.
 

@@ -43,7 +43,7 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     - name: Push to Pantheon
-      uses: pantheon-systems/push-to-pantheon@0.5.0
+      uses: pantheon-systems/push-to-pantheon@0.6.1
       with:
         ssh_key: ${{ secrets.PANTHEON_SSH_KEY }}
         machine_token: ${{ secrets.PANTHEON_MACHINE_TOKEN }}
@@ -188,7 +188,7 @@ Here's an example from a real site that uses Tailwind to prepare CSS in the site
     # to Pantheon in the later "push-to-pantheon" step.
     - run: "cd web/themes/my_custom_theme/css && rm .gitignore"
     - name: Push to Pantheon
-      uses: pantheon-systems/push-to-pantheon@0.5.0
+      uses: pantheon-systems/push-to-pantheon@0.6.1
       with:
         ssh_key: ${{ secrets.PANTHEON_SSH_KEY }}
         machine_token: ${{ secrets.PANTHEON_MACHINE_TOKEN }}
@@ -265,7 +265,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: Deploy to Pantheon
-      uses: pantheon-systems/push-to-pantheon@0.5.0
+      uses: pantheon-systems/push-to-pantheon@0.6.1
       with:
         ssh_key: ${{ secrets.PANTHEON_SSH_KEY }}
         machine_token: ${{ secrets.PANTHEON_MACHINE_TOKEN }}

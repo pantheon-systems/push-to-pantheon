@@ -1,7 +1,8 @@
 name: Deploy Site to Pantheon
 description: A GitHub Action that pushes code to Pantheon Dev and Multidev environments
-icon: activity
-color: yellow
+branding:
+  icon: activity
+  color: yellow
 inputs:
   ssh_key:
     description: 'A private key that corresponds to a public key on Pantheon: https://docs.pantheon.io/ssh-keys'

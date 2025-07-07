@@ -16,6 +16,7 @@ jobs:
       - name: Run Auto-Doc
         uses: tj-actions/auto-doc@v3.6.0
         with:
+          output: 'read_me.md'
           reusable: 'true'
 
       - name: Verify changed files
@@ -23,7 +24,7 @@ jobs:
         id: verify-changed-files
         with:
             files: |
-              readme.md
+              read_me.md
 
       - name: Create pull request
         if: steps.verify-changed-files.outputs.files_changed == 'true'

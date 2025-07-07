@@ -14,7 +14,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Run Auto-Doc
-        uses: tj-actions/auto-doc@3.6.0
+        uses: tj-actions/auto-doc@v3.6.0
 
       - name: Verify changed files
         uses: tj-actions/verify-changed-files@v20.0.4

@@ -1,0 +1,80 @@
+name: Create Release
+
+on:
+  # Allows manual triggering of the workflow from the Actions tab
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'The version to release (e.g., v1.2.3)'
+        required: true
+        type: string
+
+jobs:
+  release:
+    name: 'Release Push to Pantheon update'
+    runs-on: ubuntu-latest
+    permissions:
+      # Required for checking out the code, committing, and creating a release
+      contents: write
+      
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          # We need to fetch all history and tags to correctly determine the previous version
+          fetch-depth: 0
+
+      - name: Get previous version tag
+        id: get_version
+        run: |
+          # Get the latest tag from the repository
+          PREVIOUS_VERSION=$(git describe --tags --abbrev=0)
+          echo "previous_version=$PREVIOUS_VERSION" >> $GITHUB_OUTPUT
+        shell: bash
+
+      - name: Update version in README.md
+        run: |
+          # Replace all occurrences of the old version with the new one
+          sed -i 's/${{ steps.get_version.outputs.previous_version }}/${{ github.event.inputs.version }}/g' readme.md
+        shell: bash
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+        shell: bash
+
+      - name: Commit version update
+        id: commit
+        run: |
+          git add readme.md
+          # Check if there are changes to commit
+          if ! git diff --staged --quiet; then
+            git commit -m "docs: Bump version to ${{ github.event.inputs.version }}"
+            echo "commit_hash=$(git rev-parse HEAD)" >> $GITHUB_OUTPUT
+          else
+            echo "No changes to commit."
+            echo "commit_hash=$(git rev-parse HEAD)" >> $GITHUB_OUTPUT
+          fi
+        shell: bash
+
+      - name: Push commit
+        run: |
+          git push
+        shell: bash
+
+      - name: Create and push Git tag
+        run: |
+          git tag ${{ github.event.inputs.version }} ${{ steps.commit.outputs.commit_hash }}
+          git push origin ${{ github.event.inputs.version }}
+        shell: bash
+
+      - name: Create GitHub Release
+        env:
+          # The GITHUB_TOKEN is automatically provided by GitHub
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create ${{ github.event.inputs.version }} \
+            --title "Release ${{ github.event.inputs.version }}" \
+            --generate-notes
+        shell: bash

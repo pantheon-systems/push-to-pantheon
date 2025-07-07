@@ -34,8 +34,12 @@ jobs:
 
       - name: Update version in README.md
         run: |
-          # Replace all occurrences of the old version with the new one
-          sed -i 's/${{ steps.get_version.outputs.previous_version }}/${{ github.event.inputs.version }}/g' readme.md
+          # Escape dots in the previous version to ensure they are treated as literal characters in the sed regex.
+          PREVIOUS_VERSION_ESCAPED=$(echo "${{ steps.get_version.outputs.previous_version }}" | sed 's/\./\\./g')
+          NEW_VERSION="${{ github.event.inputs.version }}"
+
+          # Use the escaped version for a safe replacement.
+          sed -i "s/$PREVIOUS_VERSION_ESCAPED/$NEW_VERSION/g" readme.md
         shell: bash
 
       - name: Configure Git

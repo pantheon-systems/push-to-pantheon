@@ -1,0 +1,31 @@
+name: Run Auto-Doc on README.md
+on:
+  push:
+    branches:
+      - 0.x
+jobs:
+  update-docs:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run Auto-Doc
+        uses: tj-actions/auto-doc@3.6.0
+
+      - name: Verify changed files
+        uses: tj-actions/verify-changed-files@v20.0.4
+        id: verify-changed-files
+        with:
+            files: |
+              README.md
+
+      - name: Create pull request
+        if: steps.verify-changed-files.outputs.files_changed == 'true'
+        uses: peter-evans/create-pull-request@v3
+        with:
+          base: "0.x"
+          title: "[auto-doc] Update README.md"
+          branch: "chore/auto-doc-update-readme-${{ github.run_id }}"
+          commit-message: "[auto-doc] Update README.md"
+          body: "This pull request updates the documentation to the latest action.yml."

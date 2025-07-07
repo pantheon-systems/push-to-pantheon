@@ -52,28 +52,32 @@ jobs:
         id: commit
         run: |
           git add readme.md
-          # Check if there are changes to commit
           if ! git diff --staged --quiet; then
+            echo "changes_committed=true" >> $GITHUB_OUTPUT
             git commit -m "docs: Bump version to ${{ github.event.inputs.version }}"
             echo "commit_hash=$(git rev-parse HEAD)" >> $GITHUB_OUTPUT
+            echo "New commit created."
           else
+            echo "changes_committed=false" >> $GITHUB_OUTPUT
             echo "No changes to commit."
-            echo "commit_hash=$(git rev-parse HEAD)" >> $GITHUB_OUTPUT
           fi
         shell: bash
 
       - name: Push commit
+        if: steps.commit.outputs.changes_committed == 'true'
         run: |
           git push
         shell: bash
 
       - name: Create and push Git tag
+        if: steps.commit.outputs.changes_committed == 'true'
         run: |
           git tag ${{ github.event.inputs.version }} ${{ steps.commit.outputs.commit_hash }}
           git push origin ${{ github.event.inputs.version }}
         shell: bash
 
       - name: Create GitHub Release
+        if: steps.commit.outputs.changes_committed == 'true'
         env:
           # The GITHUB_TOKEN is automatically provided by GitHub
           GH_TOKEN: ${{ github.token }}

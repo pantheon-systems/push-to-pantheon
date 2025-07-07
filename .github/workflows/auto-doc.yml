@@ -30,6 +30,7 @@ jobs:
         if: steps.verify-changed-files.outputs.files_changed == 'true'
         uses: peter-evans/create-pull-request@v3
         with:
+          token: ${{ secrets.GH_PAT }}
           base: "0.x"
           title: "[auto-doc] Update README.md"
           branch: "chore/auto-doc-update-readme-${{ github.run_id }}"

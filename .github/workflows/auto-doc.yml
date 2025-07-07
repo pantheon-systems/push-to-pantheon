@@ -1,8 +1,8 @@
 name: Run Auto-Doc on README.md
 on:
   push:
-    branches:
-      - 0.x
+    #branches:
+    #  - 0.x
 permissions:
   contents: read
   pull-requests: write

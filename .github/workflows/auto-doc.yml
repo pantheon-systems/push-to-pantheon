@@ -16,7 +16,7 @@ jobs:
       - name: Run Auto-Doc
         uses: tj-actions/auto-doc@v3.6.0
         with:
-          output: 'readme.md'
+          reusable: 'true'
 
       - name: Verify changed files
         uses: tj-actions/verify-changed-files@v20.0.4

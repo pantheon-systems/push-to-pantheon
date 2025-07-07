@@ -32,6 +32,6 @@ jobs:
           token: ${{ secrets.GH_PAT }}
           base: "0.x"
           title: "[auto-doc] Update README.md"
-          branch: "chore/auto-doc-update-readme-${{ github.run_id }}"
+          branch: "chore/auto-doc-update-readme"
           commit-message: "[auto-doc] Update README.md"
           body: "This pull request updates the documentation to the latest action.yml."

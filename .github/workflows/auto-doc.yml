@@ -23,7 +23,7 @@ jobs:
         id: verify-changed-files
         with:
             files: |
-              README.md
+              readme.md
 
       - name: Create pull request
         if: steps.verify-changed-files.outputs.files_changed == 'true'

@@ -55,11 +55,6 @@ jobs:
 
 <!-- AUTO-DOC-INPUT:END -->
 
-## Outputs
-<!-- AUTO-DOC-OUTPUT:START - Do not remove or modify this section -->
-
-<!-- AUTO-DOC-OUTPUT:END -->
-
 ## Parameters
 
 In order to use the step supplied by this Action, the GitHub Workflow must have access to [a token for authenticating with Pantheon's command line](https://docs.pantheon.io/machine-tokens) and [a private key](https://docs.pantheon.io/ssh-keys) that will allow Git pushes to Pantheon and other operations.

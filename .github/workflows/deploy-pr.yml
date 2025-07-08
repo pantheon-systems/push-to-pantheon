@@ -7,9 +7,13 @@ concurrency:
 on:
   pull_request_target:
     types: [opened, synchronize]
+    paths:
+      - '.github/workflows/deploy-pr.yml'
+      - 'action.yml'
+      - '.github/testing_fixtures/**'
 
 jobs:
-  build:
+  deploy:
     # This job uses `pull_request_target` to gain access to secrets, which
     # are not available on normal `pull_request` events for forks.
     # The two-step checkout process below is critical for security.

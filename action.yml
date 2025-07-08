@@ -58,12 +58,16 @@ inputs:
     required: false
     default: ""
 
-  # todo checkout_repo:
-  #   description: "A boolean for whether or not this composite step should checkout the git repo. Set to false if a checkout has already been perf"
-
 runs:
     using: 'composite'
     steps:
+      # Setting this environment variable at the first step makes it cleaner
+      # for later steps to run inside with working-directory: ${{ env.SITE_ROOT }}
+      # Not all consumers of this Action have a Git root on GitHub that matches
+      # the site root on Pantheon. For those projects, we need to set this variable.
+      - name: Create SITE_ROOT variable
+        shell: bash
+        run: echo "SITE_ROOT=${{ inputs.relative_site_root != '' && inputs.relative_site_root || '.' }}" >> $GITHUB_ENV
 
       - name: Set target_env
         id: set_target_env
@@ -71,6 +75,7 @@ runs:
         env:
           PR_NUM: ${{ github.event.pull_request.number }}
           INPUT_TARGET_ENV: ${{ inputs.target_env }}
+        # todo, move this to a bats-testable bash script.
         run: |
           # Set target_env
           set +e
@@ -129,6 +134,12 @@ runs:
         shell: bash
         run: terminus self:plugin:install "pantheon-systems/terminus-build-tools-plugin:3.x-dev"
 
+      - name: Set PANTHEON_REPO_LOCATION
+        shell: bash
+        env:
+          PANTHEON_SITE: ${{ inputs.site }}
+        run: echo "PANTHEON_REPO_LOCATION=$(terminus connection:info ${PANTHEON_SITE}.dev  --field=git_url)" >> $GITHUB_ENV
+
       - name: Configure Git User
         shell: bash
         env:
@@ -140,43 +151,44 @@ runs:
           git config --global user.email "${PANTHEON_GIT_USER_EMAIL}"
           git config --global user.name "${PANTHEON_GIT_USER_NAME}"
 
-      - name: Prepare site root
+      # This change is necessary to fetch from Pantheon's Git server.
+      - name: Turn off strict host checking
         shell: bash
+        run: mkdir -p $HOME/.ssh && echo "StrictHostKeyChecking no" >> "$HOME/.ssh/config"
+
+      - name: Create local Git repo (only when relative_site_root is set)
+        shell: bash
+        if: ${{ inputs.relative_site_root != '' }}
+        working-directory: ${{ env.SITE_ROOT }}
         env:
           SITE_ROOT: ${{ inputs.relative_site_root }}
         run: |
-          # Prepare site root
+          # Create local Git repo (only when relative_site_root is set)
           set +e
-          if [ -n "$SITE_ROOT" ]; then
-            cd ${SITE_ROOT}
-            git init -b main
-            echo "this origin setting is a hack to get past the 'inferring' of a git provider in build tools"
-            git remote add origin https://github.com/${{ github.repository }}
-          else
-            git fetch --unshallow origin
-          fi
+          git init -b main
+          echo "this origin setting is a hack to get past the 'inferring' of a Git provider in Build Tools"
+          git remote add origin https://github.com/${{ github.repository }}
+
+      - name: Prepare site root's Git History
+        shell: bash
+        working-directory: ${{ env.SITE_ROOT }}
+        env:
+          PANTHEON_SITE: ${{ inputs.site }}
+        run: bash ${{ github.action_path }}/scripts/prepare-repo.sh
 
       - name: Deployment Processing
         shell: bash
         id: deploy_to_pantheon
+        working-directory: ${{ env.SITE_ROOT }}
         env:
           PANTHEON_SITE: ${{ inputs.site }}
           PANTHEON_SOURCE_ENV: ${{ inputs.source_env }}
-          SITE_ROOT: ${{ inputs.relative_site_root }}
           PANTHEON_COMMIT_MESSAGE: ${{ inputs.git_commit_message }}
           # todo, might need to make this configurable too.
           # the default in build tools is 180. But that's regularly failing
           # on a small personal site.
           TERMINUS_BUILD_TOOLS_WORKFLOW_TIMEOUT: 300
-        run: |
-          # Push to Pantheon
-          set +e
-
-          if [ -n "$SITE_ROOT" ]; then
-            cd ${SITE_ROOT}
-          fi
-
-          terminus -n build:env:create ${PANTHEON_SITE}.${PANTHEON_SOURCE_ENV} ${PANTHEON_TARGET_ENV} --yes --message="${PANTHEON_COMMIT_MESSAGE}" ${PANTHEON_CLONE_CONTENT_FLAG}
+        run: terminus -n build:env:create ${PANTHEON_SITE}.${PANTHEON_SOURCE_ENV} ${PANTHEON_TARGET_ENV} --yes --message="${PANTHEON_COMMIT_MESSAGE}" ${PANTHEON_CLONE_CONTENT_FLAG} --no-git-force
 
       - name: Update deployment status
         uses: bobheadxi/deployments@v1
@@ -190,19 +202,13 @@ runs:
           deployment_id: ${{ steps.deployment.outputs.deployment_id }}
           env: ${{ env.PANTHEON_TARGET_ENV }}-${{ inputs.site }}
           env_url: https://${{ env.PANTHEON_TARGET_ENV }}-${{ inputs.site }}.pantheonsite.io
+
       - name: Deleting old multidevs
         if: ${{ inputs.delete_old_environments == 'true' && steps.deploy_to_pantheon.outcome == 'success' }}
+        working-directory: ${{ env.SITE_ROOT }}
         shell: bash
         env:
           PANTHEON_SITE: ${{ inputs.site }}
           GITHUB_TOKEN: ${{ github.token }}
           SITE_ROOT: ${{ inputs.relative_site_root }}
-        run: |
-          # Delete old multidevs
-          set +e
-
-          if [ -n "$SITE_ROOT" ]; then
-            cd ${SITE_ROOT}
-          fi
-
-          terminus build:env:delete:pr $PANTHEON_SITE --yes
+        run: terminus build:env:delete:pr $PANTHEON_SITE --yes

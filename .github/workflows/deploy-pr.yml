@@ -7,10 +7,10 @@ concurrency:
 on:
   pull_request:
     types: [opened, synchronize]
-  paths:
-    - '.github/testing_fixtures/dtp-nearly-empty-site/**'
-    - 'action.yml'
-    - '.github/workflows/deploy-pr.yml'
+    paths:
+      - '.github/testing_fixtures/dtp-nearly-empty-site/**'
+      - 'action.yml'
+      - '.github/workflows/deploy-pr.yml'
 
 jobs:
   build:

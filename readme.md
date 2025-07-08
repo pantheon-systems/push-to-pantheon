@@ -194,7 +194,7 @@ That use case can be accommodated by adding additional steps to the workflow bef
 
 Here's an example from a real site that uses Tailwind to prepare CSS in the site's custom theme.
 
-```
+```yml
   push-to-pantheon:
     runs-on: ubuntu-latest
     steps:
@@ -220,7 +220,7 @@ By calling `npm run build` and modifying `gitignore` prior to calling `push-to-p
 
 This action needs permission to perform its work. Set the following permissions either at the level of the workflow or at the level of the job that uses this action.
 
-```
+```yml
     permissions:
       deployments: write
       contents: read
@@ -238,6 +238,49 @@ Even though this action does not checkout of the code itself, the code must be c
 The `pull-requests: read` permission is required to delete old Multidev environments associated with closed pull requests.
 
 [See the GitHub Actions documentation for more information on permissions.](https://docs.github.com/en/actions/writing-workflows/choosing-what-your-workflow-does/controlling-permissions-for-github_token)
+
+### Using this action with robots (like Dependabot)
+
+When using this action with robots like [Dependabot](https://docs.github.com/en/code-security/supply-chain-security/keeping-your-dependencies-updated-automatically/about-dependency-updates), it is important to ensure that the workflow has access to the secrets needed to push to Pantheon.
+This is because robots like Dependabot create pull requests from forks of the repository, and GitHub does not allow secrets to be used in workflows triggered by pull requests from forks for security reasons.
+To work around this, you can use the `pull_request_target` event instead of the `pull_request` event combined with a two-step checkout process that ensures that the code being executed is from the base repository, not the fork.
+
+Here is an example of how to set up a workflow that uses this action with Dependabot:
+
+```yml
+name: Deploy PR to Pantheon
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened]
+jobs:
+  push:
+    permissions:
+      deployments: write
+      contents: write # needed to checkout the PR code.
+      pull-requests: read
+    runs-on: ubuntu-latest
+    steps:
+    # Checkout the base repository code into the root directory.
+    # This is the code that will be used to run the workflow.
+    - name: Checkout base repository code
+      uses: actions/checkout@v4
+
+    # Checkout the pull request code into a subdirectory.
+    # This is the code that will be deployed.
+    - name: Checkout PR code
+      uses: actions/checkout@v4
+      with:
+        repository: ${{ github.event.pull_request.head.repo.full_name }}
+        ref: ${{ github.event.pull_request.head.ref }}
+        path: pr-code
+    - name: Push to Pantheon
+      uses: pantheon-systems/push-to-pantheon@0.6.1
+      with:
+        ssh_key: ${{ secrets.PANTHEON_SSH_KEY }}
+        machine_token: ${{ secrets.MACHINE_TOKEN }}
+        site: ${{ vars.PANTHEON_SITE }}
+        relative_site_root: pr-code
+```
 
 ### Concurrency
 

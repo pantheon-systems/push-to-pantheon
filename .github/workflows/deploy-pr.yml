@@ -8,9 +8,9 @@ on:
   pull_request_target:
     types: [opened, synchronize]
     paths:
-      - '.github/workflows/deploy-pr.yml'
-      - 'action.yml'
       - '.github/testing_fixtures/**'
+      - 'action.yml'
+      - '.github/workflows/deploy-pr.yml'
 
 jobs:
   deploy:

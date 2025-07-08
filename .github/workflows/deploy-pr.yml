@@ -5,22 +5,34 @@ concurrency:
   cancel-in-progress: false
 
 on:
-  pull_request:
+  pull_request_target:
     types: [opened, synchronize]
-    paths:
-      - '.github/testing_fixtures/dtp-nearly-empty-site/**'
-      - 'action.yml'
-      - '.github/workflows/deploy-pr.yml'
 
 jobs:
   build:
+    # This job uses `pull_request_target` to gain access to secrets, which
+    # are not available on normal `pull_request` events for forks.
+    # The two-step checkout process below is critical for security.
+    # It ensures that we are executing trusted code from the base repository
+    # while operating on the untrusted code from the pull request.
     permissions:
       deployments: write
-      contents: read
-      pull-requests: read   
+      contents: write # needed to checkout the PR code.
+      pull-requests: read
     runs-on: ubuntu-latest
     steps:
+    # Checkout the base repository at the current commit.
+    # This is the trusted code that will be executed.
     - uses: actions/checkout@v4
+
+    # Checkout the pull request code into a subdirectory.
+    # This is the code that will be deployed.
+    - name: Checkout PR code
+      uses: actions/checkout@v4
+      with:
+        repository: ${{ github.event.pull_request.head.repo.full_name }}
+        ref: ${{ github.event.pull_request.head.ref }}
+        path: pr-code
     - name: deploy to Pantheon
       uses: ./
       with:
@@ -28,7 +40,7 @@ jobs:
         machine_token: ${{ secrets.PANTHEON_MACHINE_TOKEN }}
         site: dtp-nearly-empty-site
         target_env: "pr-${{ github.event.pull_request.number }}"
-        relative_site_root: ".github/testing_fixtures/dtp-nearly-empty-site"
+        relative_site_root: "pr-code/.github/testing_fixtures/dtp-nearly-empty-site"
         git_user_name: "Test Name"
         git_user_email: "test@example.com"
         git_commit_message: "This is an automated commit message from GitHub Actions."

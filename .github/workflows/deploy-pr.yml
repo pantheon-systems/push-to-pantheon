@@ -10,7 +10,6 @@ on:
     paths:
       - '.github/testing_fixtures/**'
       - 'action.yml'
-      - '.github/workflows/deploy-pr.yml'
   workflow_dispatch:
 
 jobs:

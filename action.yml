@@ -135,6 +135,8 @@ runs:
           if ! command -v terminus &> /dev/null; then
             echo "Terminus not installed, proceeding to install."
             exit 1
+          else
+            echo "Terminus detected. Skipping Terminus installation."
           fi
 
       - name: Install Terminus

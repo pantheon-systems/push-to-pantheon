@@ -17,12 +17,18 @@ jobs:
     steps:
     - name: Checkout Repository
       uses: actions/checkout@v4
+
+    - name: Checkout branch code
+      uses: actions/checkout@v4
       with:
-        fetch-depth: 0
+        ref: ${{ github.ref_name }}
+        path: repo-code
+
     - name: Install Terminus
       uses: pantheon-systems/terminus-github-actions@v1.2.7
       with:
         pantheon-machine-token: ${{ secrets.PANTHEON_MACHINE_TOKEN }}
+
     - name: Run Terminus Command
       run: |
         terminus --version
@@ -30,9 +36,11 @@ jobs:
         terminus auth:whoami
         terminus site:info dtp-nearly-empty-site
       shell: bash
+
     - name: Set short branch name
       id: vars
       run: echo "short_ref_name=$(echo ${{ github.ref_name }} | sed 's/[^a-zA-Z0-9-]//g' | cut -c1-6)" >> $GITHUB_OUTPUT
+
     - name: deploy to Pantheon
       uses: ./
       with:
@@ -40,7 +48,7 @@ jobs:
         machine_token: ${{ secrets.PANTHEON_MACHINE_TOKEN }}
         site: dtp-nearly-empty-site
         target_env: "test-${{ steps.vars.outputs.short_ref_name }}"
-        relative_site_root: ".github/testing_fixtures/dtp-nearly-empty-site"
+        relative_site_root: "repo-code/.github/testing_fixtures/dtp-nearly-empty-site"
         git_user_name: "Test Name"
         git_user_email: "test@example.com"
         git_commit_message: "This is a manual test deployment from GitHub Actions."

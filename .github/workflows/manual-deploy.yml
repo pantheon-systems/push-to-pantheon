@@ -17,6 +17,17 @@ jobs:
     steps:
     - name: Checkout Repository
       uses: actions/checkout@v4
+    - name: Install Terminus
+      uses: pantheon-systems/terminus-github-actions@v1
+      with:
+        pantheon-machine-token: ${{ secrets.PANTHEON_MACHINE_TOKEN }}
+    - name: Run Terminus Command
+      run: |
+        terminus --version
+        terminus art
+        terminus auth:whoami
+        terminus site:info dtp-nearly-empty-site
+      shell: bash
     - name: deploy to Pantheon
       uses: ./
       with:

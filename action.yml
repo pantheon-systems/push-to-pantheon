@@ -138,7 +138,7 @@ runs:
           fi
 
       - name: Install Terminus
-        if: ${{ inputs.skip_terminus_install != 'true' || steps.check_terminus.outcome == 'failure' }}
+        if: ${{ inputs.skip_terminus_install != 'true' && steps.check_terminus.outcome == 'failure' }}
         uses: pantheon-systems/terminus-github-actions@v1
         with:
           pantheon-machine-token: ${{ inputs.machine_token }}

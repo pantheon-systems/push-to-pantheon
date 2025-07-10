@@ -15,7 +15,6 @@ on:
 jobs:
   deploy_pr:
     name: Deploy Pull Request
-    if: github.event_name == 'pull_request_target'
     # This job uses `pull_request_target` to gain access to secrets, which
     # are not available on normal `pull_request` events for forks.
     # The two-step checkout process below is critical for security.
@@ -53,29 +52,5 @@ jobs:
         git_user_name: "Test Name"
         git_user_email: "test@example.com"
         git_commit_message: "This is an automated commit message from GitHub Actions."
-        delete_old_environments: true
-        clone_content: true
-
-  test_workflow:
-    name: Test Workflow Manually
-    if: github.event_name == 'workflow_dispatch'
-    permissions:
-      deployments: write
-      contents: read
-    runs-on: ubuntu-latest
-    steps:
-    - name: Checkout Repository
-      uses: actions/checkout@v4
-    - name: deploy to Pantheon
-      uses: ./
-      with:
-        ssh_key: ${{ secrets.PANTHEON_SSH_KEY }}
-        machine_token: ${{ secrets.PANTHEON_MACHINE_TOKEN }}
-        site: dtp-nearly-empty-site
-        target_env: "test-${{ github.ref_name }}"
-        relative_site_root: ".github/testing_fixtures/dtp-nearly-empty-site"
-        git_user_name: "Test Name"
-        git_user_email: "test@example.com"
-        git_commit_message: "This is a manual test deployment from GitHub Actions."
         delete_old_environments: true
         clone_content: true

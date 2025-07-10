@@ -321,7 +321,6 @@ Here is an example from a real site that runs a coding standards check in parall
 Here is how those jobs are defined in an example site's `.github/workflows/deploy-pr.yml` file:
 
 ```yml
-
 jobs:
   push-to-pantheon:
     runs-on: ubuntu-latest
@@ -354,3 +353,14 @@ jobs:
         machine_token: ${{ secrets.PANTHEON_MACHINE_TOKEN }}
         pantheon_site: ${{ vars.PANTHEON_SITE }}
 ```
+
+## Custom Upstreams
+
+This action is not intended for use in upstream management (e.g. deploying changes to _many_ sites that use a specific custom upstream). In the future, an additional workflow may be added to support this, but this is not currently on the roadmap for a 1.0.0 release.
+
+In the meantime, if you are looking for a GitHub action to manage sites that use custom upstreams, you can look at these example workflows that are built for that purpose:
+
+* https://github.com/danny2p/wp-standard/blob/master/.github/workflows/2-deploy-dev.yml
+* https://github.com/jazzsequence/plague-music-wp-upstream/blob/main/.github/workflows/deploy-dev.yml
+
+PRs are always welcome! You can track updates for this feature in the [associated GitHub issue](https://github.com/pantheon-systems/push-to-pantheon/issues/70).

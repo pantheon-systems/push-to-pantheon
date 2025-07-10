@@ -18,11 +18,8 @@ jobs:
     - name: Checkout Repository
       uses: actions/checkout@v4
 
-    - name: Checkout branch code
-      uses: actions/checkout@v4
-      with:
-        ref: ${{ github.ref_name }}
-        path: repo-code
+    - name: Clone branch code
+      run: git clone --branch ${{ github.ref_name }} --single-branch https://github.com/${{ github.repository }} repo-code
 
     - name: Install Terminus
       uses: pantheon-systems/terminus-github-actions@v1.2.7

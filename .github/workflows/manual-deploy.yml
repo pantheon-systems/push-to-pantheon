@@ -39,5 +39,4 @@ jobs:
         git_user_name: "Test Name"
         git_user_email: "test@example.com"
         git_commit_message: "This is a manual test deployment from GitHub Actions."
-        delete_old_environments: true
         clone_content: true	

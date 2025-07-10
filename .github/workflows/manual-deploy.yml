@@ -18,7 +18,7 @@ jobs:
     - name: Checkout Repository
       uses: actions/checkout@v4
     - name: Install Terminus
-      uses: pantheon-systems/terminus-github-actions@v1
+      uses: pantheon-systems/terminus-github-actions@v1.2.7
       with:
         pantheon-machine-token: ${{ secrets.PANTHEON_MACHINE_TOKEN }}
     - name: Run Terminus Command

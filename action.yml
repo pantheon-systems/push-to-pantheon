@@ -127,7 +127,7 @@ runs:
             ssh-private-key: ${{ inputs.ssh_key }}
 
       - name: Check for Terminus
-        if: ${{ inputs.skip_terminus_install != 'true' }}
+        if: ${{ inputs.skip_terminus_install == false }}
         id: check_terminus
         shell: bash
         continue-on-error: true

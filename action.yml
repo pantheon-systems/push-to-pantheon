@@ -58,6 +58,12 @@ inputs:
     required: false
     default: ""
 
+  skip_terminus_install:
+    description: "If set to true, the action will skip the installation of Terminus. This is useful if you are using a custom Docker image that already has Terminus installed or you are installing it earlier in the workflow. By default, the action will check for the presence of Terminus and install it if it is not found, but if this is set to true, the action will bypass the check and skip the Terminus install."
+    required: false
+    default: false
+    type: boolean
+
   # todo checkout_repo:
   #   description: "A boolean for whether or not this composite step should checkout the git repo. Set to false if a checkout has already been perf"
 
@@ -113,14 +119,29 @@ runs:
           step: start
           token: ${{ github.token }}
           env: ${{ env.PANTHEON_TARGET_ENV }}
-          ref: ${{ github.event.pull_request.head.sha }}
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Configure SSH key
         uses: webfactory/ssh-agent@v0.9.1
         with:
             ssh-private-key: ${{ inputs.ssh_key }}
 
+      - name: Check for Terminus
+        if: ${{ inputs.skip_terminus_install == false }}
+        id: check_terminus
+        shell: bash
+        continue-on-error: true
+        run: |
+          if ! command -v terminus &> /dev/null; then
+            echo "Terminus not installed, proceeding to install."
+            exit 1
+          else
+            echo "Terminus detected. Skipping Terminus installation."
+            exit 0
+          fi
+
       - name: Install Terminus
+        if: ${{ inputs.skip_terminus_install != 'true' && steps.check_terminus.outcome == 'failure' }}
         uses: pantheon-systems/terminus-github-actions@v1
         with:
           pantheon-machine-token: ${{ inputs.machine_token }}
@@ -150,6 +171,8 @@ runs:
           if [ -n "$SITE_ROOT" ]; then
             cd ${SITE_ROOT}
             git init -b main
+            git add .
+            git commit -m "Initial commit for deployment"
             echo "this origin setting is a hack to get past the 'inferring' of a git provider in build tools"
             git remote add origin https://github.com/${{ github.repository }}
           else
@@ -185,7 +208,7 @@ runs:
           step: finish
           token: ${{ github.token }}
           status: ${{ job.status }}
-          ref: ${{ github.event.pull_request.head.sha }}
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           # todo, how does this work when there is a step above with the id of "deployment" not "deployment_id"
           deployment_id: ${{ steps.deployment.outputs.deployment_id }}
           env: ${{ env.PANTHEON_TARGET_ENV }}-${{ inputs.site }}

@@ -119,7 +119,7 @@ runs:
           step: start
           token: ${{ github.token }}
           env: ${{ env.PANTHEON_TARGET_ENV }}
-          ref: ${{ github.event.pull_request.head.sha }}
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Configure SSH key
         uses: webfactory/ssh-agent@v0.9.1
@@ -205,10 +205,10 @@ runs:
           step: finish
           token: ${{ github.token }}
           status: ${{ job.status }}
-          ref: ${{ github.event.pull_request.head.sha }}
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           # todo, how does this work when there is a step above with the id of "deployment" not "deployment_id"
           deployment_id: ${{ steps.deployment.outputs.deployment_id }}
-          env: ${{ env.PANTHEON_TARGET_ENV }}-${{ inputs.site }}
+          env: ${{ env.PANTHEON_TARGET_ENV }}
           env_url: https://${{ env.PANTHEON_TARGET_ENV }}-${{ inputs.site }}.pantheonsite.io
       - name: Deleting old multidevs
         if: ${{ inputs.delete_old_environments == 'true' && steps.deploy_to_pantheon.outcome == 'success' }}

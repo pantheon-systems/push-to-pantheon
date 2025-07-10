@@ -178,6 +178,9 @@ runs:
             else
               # Only initialize a new git repo if one doesn't already exist.
               git init -b main
+              # Create an initial commit so that HEAD exists.
+              git add .
+              git commit -m "Initial commit"
               echo "this origin setting is a hack to get past the 'inferring' of a git provider in build tools"
               git remote add origin "https://github.com/${GH_REPOSITORY}"
             fi

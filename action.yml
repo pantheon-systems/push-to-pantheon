@@ -164,6 +164,7 @@ runs:
         shell: bash
         env:
           SITE_ROOT: ${{ inputs.relative_site_root }}
+          GH_REPOSITORY: ${{ github.repository }}
         run: |
           # Prepare site root
           set +e
@@ -173,7 +174,7 @@ runs:
             if [ ! -e ".git" ]; then
               git init -b main
               echo "this origin setting is a hack to get past the 'inferring' of a git provider in build tools"
-              git remote add origin https://github.com/${{ github.repository }}
+              git remote add origin "https://github.com/${GH_REPOSITORY}"
             fi
           else
             # If we are not in a subdirectory, we need to unshallow the repo to get the full history.

@@ -1,0 +1,32 @@
+name: Manual Deploy Branch to Pantheon
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: false
+
+on:
+  workflow_dispatch:
+
+jobs:
+  test_workflow:
+    name: Test Workflow Manually
+    permissions:
+      deployments: write
+      contents: read
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout Repository
+      uses: actions/checkout@v4
+    - name: deploy to Pantheon
+      uses: ./
+      with:
+        ssh_key: ${{ secrets.PANTHEON_SSH_KEY }}
+        machine_token: ${{ secrets.PANTHEON_MACHINE_TOKEN }}
+        site: dtp-nearly-empty-site
+        target_env: "test-${{ github.ref_name }}"
+        relative_site_root: ".github/testing_fixtures/dtp-nearly-empty-site"
+        git_user_name: "Test Name"
+        git_user_email: "test@example.com"
+        git_commit_message: "This is a manual test deployment from GitHub Actions."
+        delete_old_environments: true
+        clone_content: true	

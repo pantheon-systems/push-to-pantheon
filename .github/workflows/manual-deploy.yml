@@ -18,12 +18,6 @@ jobs:
     - name: Checkout Repository
       uses: actions/checkout@v4
 
-    - name: Checkout branch code
-      uses: actions/checkout@v4
-      with:
-        ref: ${{ github.ref_name }}
-        path: repo-code
-
     - name: Install Terminus
       uses: pantheon-systems/terminus-github-actions@v1.2.7
       with:
@@ -48,7 +42,7 @@ jobs:
         machine_token: ${{ secrets.PANTHEON_MACHINE_TOKEN }}
         site: dtp-nearly-empty-site
         target_env: "test-${{ steps.vars.outputs.short_ref_name }}"
-        relative_site_root: "repo-code/.github/testing_fixtures/dtp-nearly-empty-site"
+        relative_site_root: ".github/testing_fixtures/dtp-nearly-empty-site"
         git_user_name: "Test Name"
         git_user_email: "test@example.com"
         git_commit_message: "This is a manual test deployment from GitHub Actions."

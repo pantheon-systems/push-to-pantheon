@@ -149,6 +149,21 @@ A custom commit message to be used with the Git commit that will be pushed to Pa
    default: ""
 ```
 
+#### `relative_site_root`
+The root directory of the site to be deployed relative to the repository root. The vast majority of users of this action should leave this value unchanged from the default. The action will use this value to change directories after checking out the repo.
+
+```yml
+   default: ""
+```
+
+#### `skip_terminus_install`
+If set to true, the action will skip installing Terminus. This is useful if you are using this action in a workflow that already has Terminus installed, such as the [Terminus GitHub Action](https://github.com/pantheon-systems/terminus).
+
+```yml
+   default: false
+   type: boolean
+```
+
 ## Additional recommendations
 
 ### Pin exact version of this action prior to the release of version 1.0.0

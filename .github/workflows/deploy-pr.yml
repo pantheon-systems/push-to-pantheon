@@ -31,6 +31,9 @@ jobs:
     # This is the trusted code that will be executed.
     - uses: actions/checkout@v4
 
+    - name: Test
+      run: echo "This is a test step to ensure the workflow runs correctly."
+
     # Checkout the pull request code into a subdirectory.
     # This is the code that will be deployed.
     - name: Checkout PR code

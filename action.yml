@@ -86,6 +86,7 @@ runs:
               exit 1
             fi
 
+          echo "Test 👋"
           echo "PANTHEON_TARGET_ENV set to ${TARGET_ENV}"
           echo "PANTHEON_TARGET_ENV=${TARGET_ENV}" >> $GITHUB_ENV
 

@@ -223,4 +223,5 @@ runs:
           GITHUB_REPOSITORY: ${{ github.repository }}
           MULTIDEV_DELETE_PATTERN: pr-
           PANTHEON_TARGET_ENV: ${{ env.PANTHEON_TARGET_ENV }}
-        run: ${{ github.workspace }}/scripts/cleanup.sh
+          WORKSPACE: ${{ github.workspace }}
+        run: $WORKSPACE/scripts/cleanup.sh

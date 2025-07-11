@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
     inputs:
       install_terminus:
-        description: 'Install Terminus CLI?'
+        description: 'Install Terminus during deploy?'
         required: true
         default: 'Yes'
         type: choice

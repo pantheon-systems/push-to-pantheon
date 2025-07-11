@@ -6,10 +6,20 @@ concurrency:
 
 on:
   workflow_dispatch:
+    inputs:
+      install_terminus:
+        description: 'Install Terminus during deploy?'
+        required: true
+        default: 'Yes'
+        type: choice
+        options:
+          - 'Yes'
+          - 'No'
 
 jobs:
-  test_workflow:
-    name: Test Workflow Manually
+  test_workflow_no_terminus_install:
+    name: Test Deploy without Terminus Install
+    if: ${{ github.event.inputs.install_terminus == 'No' }}
     permissions:
       deployments: write
       contents: read
@@ -47,3 +57,31 @@ jobs:
         git_user_email: "test@example.com"
         git_commit_message: "This is a manual test deployment from GitHub Actions."
         clone_content: true
+
+  test_workflow_with_terminus_install:
+    name: Test Deploy with Terminus Install
+    if: ${{ github.event.inputs.install_terminus == 'Yes' }}
+    permissions:
+        deployments: write
+        contents: read
+    runs-on: ubuntu-latest
+    steps:
+        - name: Checkout Repository
+          uses: actions/checkout@v4
+
+        - name: Set short branch name
+          id: vars
+          run: echo "short_ref_name=$(echo ${{ github.ref_name }} | sed 's/[^a-zA-Z0-9-]//g' | cut -c1-6)" >> $GITHUB_OUTPUT
+
+        - name: deploy to Pantheon
+          uses: ./
+          with:
+            ssh_key: ${{ secrets.PANTHEON_SSH_KEY }}
+            machine_token: ${{ secrets.PANTHEON_MACHINE_TOKEN }}
+            site: dtp-nearly-empty-site
+            target_env: "test-${{ steps.vars.outputs.short_ref_name }}"
+            relative_site_root: ".github/testing_fixtures/dtp-nearly-empty-site"
+            git_user_name: "Test Name"
+            git_user_email: "test@example.com"
+            git_commit_message: "This is a manual test deployment from GitHub Actions."
+            clone_content: true

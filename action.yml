@@ -130,18 +130,17 @@ runs:
         if: ${{ inputs.skip_terminus_install == false }}
         id: check_terminus
         shell: bash
-        continue-on-error: true
         run: |
-          if ! command -v terminus &> /dev/null; then
-            echo "Terminus not installed, proceeding to install."
-            exit 1
-          else
+          if command -v terminus &> /dev/null; then
             echo "Terminus detected. Skipping Terminus installation."
-            exit 0
+            echo "should_install_terminus=false" >> $GITHUB_OUTPUT
+          else
+            echo "Terminus not installed, proceeding to install."
+            echo "should_install_terminus=true" >> $GITHUB_OUTPUT
           fi
 
       - name: Install Terminus
-        if: ${{ inputs.skip_terminus_install != 'true' && steps.check_terminus.outcome == 'failure' }}
+        if: ${{ inputs.skip_terminus_install == false && steps.check_terminus.outputs.should_install_terminus == 'true' }}
         uses: pantheon-systems/terminus-github-actions@v1
         with:
           pantheon-machine-token: ${{ inputs.machine_token }}

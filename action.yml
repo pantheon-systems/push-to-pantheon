@@ -219,6 +219,7 @@ runs:
           PANTHEON_SITE: ${{ inputs.site }}
           GITHUB_TOKEN: ${{ github.token }}
           SITE_ROOT: ${{ inputs.relative_site_root }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
         run: |
           # Delete old multidevs
           set +e
@@ -235,5 +236,5 @@ runs:
           for PR_NUM in "${CLOSED_PRS}"; do
             ENV_NAME="pr-$PR_NUM"
             echo "Attempting to delete GitHub environment: $ENV_NAME..."
-            gh api --method DELETE "repos/${{ github.repository }}/environments/$ENV_NAME"
+            gh api --method DELETE "repos/$GITHUB_REPOSITORY/environments/$ENV_NAME"
           done        

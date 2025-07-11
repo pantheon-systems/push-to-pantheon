@@ -3,11 +3,11 @@ set +e
 
 # Delete old multidevs
 if [ -n "$SITE_ROOT" ]; then
-  cd ${SITE_ROOT}
+  cd "${SITE_ROOT}" || return
 fi
 
 echo "Deleting Pantheon PR multidev environment..."
-terminus build:env:delete:pr $PANTHEON_SITE --yes
+terminus build:env:delete:pr "$PANTHEON_SITE" --yes
 
 echo "Deleting GitHub deployment environment: ${PANTHEON_TARGET_ENV}..."
 gh api --method DELETE "repos/${GITHUB_REPOSITORY}/environments/${PANTHEON_TARGET_ENV}" || true
@@ -40,7 +40,7 @@ fi
 
 # Go ahead and delete the oldest environments.
 for ENV_TO_DELETE in $OLDEST_ENVIRONMENTS; do
-  terminus env:delete $TERMINUS_SITE.$ENV_TO_DELETE --delete-branch --yes
+  terminus env:delete "${TERMINUS_SITE}.${ENV_TO_DELETE}" --delete-branch --yes
 
   # Delete related GitHub deployment environment
   if [ -n "$GITHUB_REPOSITORY" ]; then

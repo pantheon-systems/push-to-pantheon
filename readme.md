@@ -20,6 +20,7 @@ As a publicly available GitHub Action, there is no gating mechanism preventing a
 
 ## Related Resources
 
+- [Why We Created a "Push to Pantheon" GitHub Action](https://pantheon.io/blog/github-action)
 - [Pantheon's GitHub Actions](https://docs.pantheon.io/github-actions)
 - [GitHub Application](https://docs.pantheon.io/github-application)
 - [Native GitHub workflows on Pantheon livestream recording](https://www.youtube.com/live/Wj9KoTqXwY0?si=1MQlHXDyjMVvWOyX)

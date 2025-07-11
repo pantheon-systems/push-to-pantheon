@@ -127,7 +127,7 @@ runs:
             ssh-private-key: ${{ inputs.ssh_key }}
 
       - name: Check for Terminus
-        if: ${{ inputs.skip_terminus_install == false }}
+        if: ${{ inputs.skip_terminus_install !== 'true' }}
         id: check_terminus
         shell: bash
         run: |
@@ -140,7 +140,7 @@ runs:
           fi
 
       - name: Install Terminus
-        if: ${{ inputs.skip_terminus_install == false && steps.check_terminus.outputs.should_install_terminus == 'true' }}
+        if: ${{ inputs.skip_terminus_install !== 'true' && steps.check_terminus.outputs.should_install_terminus == 'true' }}
         uses: pantheon-systems/terminus-github-actions@v1
         with:
           pantheon-machine-token: ${{ inputs.machine_token }}

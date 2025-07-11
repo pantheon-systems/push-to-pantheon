@@ -16,7 +16,7 @@ on:
 jobs:
   test_workflow_no_terminus_install:
     name: Test Deploy without Terminus Install
-    if: ${{ inputs.install_terminus == false }}
+    if: ${{ inputs.install_terminus == 'false' }}
     permissions:
       deployments: write
       contents: read
@@ -56,7 +56,7 @@ jobs:
         clone_content: true
   test_workflow_with_terminus_install:
     name: Test Deploy with Terminus Install
-    if: ${{ inputs.install_terminus == true }}
+    if: ${{ inputs.install_terminus == 'true' }}
     permissions:
         deployments: write
         contents: read

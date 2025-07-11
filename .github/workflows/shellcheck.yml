@@ -3,6 +3,7 @@ on:
   push:
     paths:
       - '/scripts/**'
+      - '/.github/workflows/shellcheck.yml'
 
 permissions:
   contents: read

@@ -15,6 +15,14 @@ on:
         options:
           - 'Yes'
           - 'No'
+      run_cleanup:
+        description: 'Run cleanup after successful deploy?'
+        required: true
+        default: 'No'
+        type: choice
+        options:
+          - 'Yes'
+          - 'No'
 
 jobs:
   test_workflow_no_terminus_install:
@@ -57,6 +65,7 @@ jobs:
         git_user_email: "test@example.com"
         git_commit_message: "This is a manual test deployment from GitHub Actions."
         clone_content: true
+        delete_old_environments: ${{ github.event.inputs.run_cleanup == 'Yes' }}
 
   test_workflow_with_terminus_install:
     name: Test Deploy with Terminus Install
@@ -85,3 +94,5 @@ jobs:
             git_user_email: "test@example.com"
             git_commit_message: "This is a manual test deployment from GitHub Actions."
             clone_content: true
+            delete_old_environments: ${{ github.event.inputs.run_cleanup == 'Yes' }}
+       

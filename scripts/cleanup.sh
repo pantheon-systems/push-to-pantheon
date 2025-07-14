@@ -20,9 +20,7 @@ delete_github_environment() {
   if [ -n "$DEPLOYMENT_IDS" ]; then
     for DEPLOYMENT_ID in $DEPLOYMENT_IDS; do
       echo "  - Deleting deployment ID ${DEPLOYMENT_ID}..."
-      # Deployments must be inactive before they can be deleted.
       gh api --method POST "repos/${GITHUB_REPOSITORY}/deployments/${DEPLOYMENT_ID}/statuses" -f state='inactive' -f description='Deployment is being deleted.' > /dev/null
-      # Now delete the deployment itself.
       gh api --method DELETE "repos/${GITHUB_REPOSITORY}/deployments/${DEPLOYMENT_ID}"
     done
   else
@@ -42,7 +40,6 @@ if [ -n "$SITE_ROOT" ]; then
   echo "Re-initializing git in ${SITE_ROOT} to ensure correct repository context..."
   rm -rf .git
   git init -b main >/dev/null 2>&1
-  git remote add origin "https://github.com/${GITHUB_REPOSITORY}" >/dev/null 2>&1
 fi
 
 echo "Deleting stale Pantheon PR multidev environments..."

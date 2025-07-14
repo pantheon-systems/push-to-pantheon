@@ -169,6 +169,7 @@ runs:
           set +e
           if [ -n "$SITE_ROOT" ]; then
             cd ${SITE_ROOT}
+            rm -rf .git
             git init -b main
             git add .
             git commit -m "Initial commit for deployment"

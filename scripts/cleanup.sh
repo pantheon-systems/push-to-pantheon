@@ -21,7 +21,6 @@ delete_github_environment() {
     for DEPLOYMENT_ID in $DEPLOYMENT_IDS; do
       echo "  - Deleting deployment ID ${DEPLOYMENT_ID}..."
       # Deployments must be inactive before they can be deleted.
-      # The bobheadxi/deployments action should handle this, but we do it here to be safe.
       gh api --method POST "repos/${GITHUB_REPOSITORY}/deployments/${DEPLOYMENT_ID}/statuses" -f state='inactive' -f description='Deployment is being deleted.' > /dev/null
       # Now delete the deployment itself.
       gh api --method DELETE "repos/${GITHUB_REPOSITORY}/deployments/${DEPLOYMENT_ID}"
@@ -35,14 +34,20 @@ delete_github_environment() {
   gh api --method DELETE "repos/${GITHUB_REPOSITORY}/environments/${ENV_NAME}"
 }
 
-# Change to the site root if specified.
+# The terminus build:env:delete:pr command relies on the git history to find
+# pull requests. If we are running in a fixture directory, we need to
+# re-initialize git to ensure it points to the correct repository.
 if [ -n "$SITE_ROOT" ]; then
   cd "${SITE_ROOT}" || return
+  echo "Re-initializing git in ${SITE_ROOT} to ensure correct repository context..."
+  rm -rf .git
+  git init -b main >/dev/null 2>&1
+  git remote add origin "https://github.com/${GITHUB_REPOSITORY}" >/dev/null 2>&1
 fi
 
 echo "Deleting stale Pantheon PR multidev environments..."
-# The `terminus build:env:delete:pr` command will find and delete multidev
-# environments that are associated with closed or merged pull requests.
+# This command will find and delete multidev environments that are associated
+# with closed or merged pull requests.
 terminus build:env:delete:pr "$PANTHEON_SITE" --yes
 
 # The block below is intended to delete old environments that are not associated

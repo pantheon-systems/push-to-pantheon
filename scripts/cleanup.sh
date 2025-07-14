@@ -1,29 +1,60 @@
 #!/bin/bash
 set +e
 
-# Delete old multidevs
+# Function to delete a GitHub environment and all of its associated deployments.
+# The GitHub API requires that all deployments be deleted before an environment
+# can be deleted.
+delete_github_environment() {
+  local ENV_NAME=$1
+  echo "Cleaning up GitHub environment: ${ENV_NAME}..."
+
+  # Check if the environment exists before trying to delete it.
+  if ! gh api "repos/${GITHUB_REPOSITORY}/environments/${ENV_NAME}" > /dev/null 2>&1; then
+    echo "GitHub environment ${ENV_NAME} does not exist, skipping deletion."
+    return
+  fi
+
+  # Get the list of deployment IDs for the environment.
+  DEPLOYMENT_IDS=$(gh api "repos/${GITHUB_REPOSITORY}/deployments?environment=${ENV_NAME}" --jq '.[].id')
+
+  if [ -n "$DEPLOYMENT_IDS" ]; then
+    for DEPLOYMENT_ID in $DEPLOYMENT_IDS; do
+      echo "  - Deleting deployment ID ${DEPLOYMENT_ID}..."
+      # Deployments must be inactive before they can be deleted.
+      # The bobheadxi/deployments action should handle this, but we do it here to be safe.
+      gh api --method POST "repos/${GITHUB_REPOSITORY}/deployments/${DEPLOYMENT_ID}/statuses" -f state='inactive' -f description='Deployment is being deleted.' > /dev/null
+      # Now delete the deployment itself.
+      gh api --method DELETE "repos/${GITHUB_REPOSITORY}/deployments/${DEPLOYMENT_ID}"
+    done
+  else
+    echo "  - No deployments found for environment ${ENV_NAME}."
+  fi
+
+  # Finally, delete the environment now that it is empty.
+  echo "  - Deleting environment ${ENV_NAME}..."
+  gh api --method DELETE "repos/${GITHUB_REPOSITORY}/environments/${ENV_NAME}"
+}
+
+# Change to the site root if specified.
 if [ -n "$SITE_ROOT" ]; then
   cd "${SITE_ROOT}" || return
 fi
 
-echo "Deleting Pantheon PR multidev environment..."
+echo "Deleting stale Pantheon PR multidev environments..."
+# The `terminus build:env:delete:pr` command will find and delete multidev
+# environments that are associated with closed or merged pull requests.
 terminus build:env:delete:pr "$PANTHEON_SITE" --yes
 
-echo "Deleting GitHub deployment environment: ${PANTHEON_TARGET_ENV}..."
-gh api --method DELETE "repos/${GITHUB_REPOSITORY}/environments/${PANTHEON_TARGET_ENV}" || true
-
-# Only delete old environments if there is a pattern defined to
-# match environments eligible for deletion. Otherwise, delete the
-# current multidev environment immediately.
-#
-# To use this feature, set MULTIDEV_DELETE_PATTERN to 'pr-' or similar
-# in the CI server environment variables.
+# The block below is intended to delete old environments that are not associated
+# with pull requests. This is useful for cleaning up environments created by
+# manual workflows or other automated processes.
 if [ -z "$MULTIDEV_DELETE_PATTERN" ] || [ -z "$DELETE_OLD_MULTIDEVS" ] || [ "$DELETE_OLD_MULTIDEVS" != "true" ]; then
-  echo "No MULTIDEV_DELETE_PATTERN set or delete old multidevs was not set to true. Skipping deletion of old environments..."
+  echo "No MULTIDEV_DELETE_PATTERN set or delete_old_environments was not set to true. Skipping deletion of old environments..."
   exit 0
 fi
 
-# List all but the newest two environments.
+# List all environments, filter out the standard dev/test/live, find the ones
+# that match our deletion pattern, and then exclude the most recent one.
 ALL_ENVS=$(terminus env:list "$TERMINUS_SITE" --format=list)
 OLDEST_ENVIRONMENTS=$(echo "$ALL_ENVS" \
   | grep -v dev \
@@ -33,24 +64,21 @@ OLDEST_ENVIRONMENTS=$(echo "$ALL_ENVS" \
   | grep "$MULTIDEV_DELETE_PATTERN" \
   | sed -e '$d')
 
-# Exit if there are no environments to delete
+# Exit if there are no environments to delete.
 if [ -z "$OLDEST_ENVIRONMENTS" ] ; then
+  echo "No old environments matching the pattern found to delete."
   exit 0
 fi
 
 # Go ahead and delete the oldest environments.
 for ENV_TO_DELETE in $OLDEST_ENVIRONMENTS; do
+  # Delete the Pantheon multidev environment.
   terminus env:delete "${TERMINUS_SITE}.${ENV_TO_DELETE}" --delete-branch --yes
 
-  # Delete related GitHub deployment environment
+  # Delete the related GitHub deployment environment.
   if [ -n "$GITHUB_REPOSITORY" ]; then
-    echo "Deleting GitHub deployment environment: ${ENV_TO_DELETE}..."
-    if ! gh api "repos/${GITHUB_REPOSITORY}/environments/${ENV_TO_DELETE}" > /dev/null 2>&1; then
-      echo "GitHub environment $ENV_TO_DELETE does not exist, skipping deletion."
-      continue
-    fi
-    gh api --method DELETE "repos/${GITHUB_REPOSITORY}/environments/${ENV_TO_DELETE}"
-  else 
+    delete_github_environment "$ENV_TO_DELETE"
+  else
     echo "Skipping GitHub deletion for ${ENV_TO_DELETE} — GITHUB_TOKEN or GITHUB_REPOSITORY not set."
   fi
 done

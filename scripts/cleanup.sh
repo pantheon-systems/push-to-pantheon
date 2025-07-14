@@ -70,7 +70,6 @@ fi
 for ENV_TO_DELETE in $OLDEST_ENVIRONMENTS; do
     echo "Deleting Pantheon environment: ${ENV_TO_DELETE}..."
     if terminus env:info "${PANTHEON_SITE}.${ENV_TO_DELETE}" > /dev/null 2>&1; then
-        echo "Found Pantheon environment ${ENV_TO_DELETE}, proceeding with deletion."
         terminus env:delete "${PANTHEON_SITE}.${ENV_TO_DELETE}" --delete-branch --yes
         if [ -n "$GITHUB_REPOSITORY" ]; then
             delete_github_environment "$ENV_TO_DELETE"

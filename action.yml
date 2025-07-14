@@ -187,6 +187,7 @@ runs:
           PANTHEON_SOURCE_ENV: ${{ inputs.source_env }}
           SITE_ROOT: ${{ inputs.relative_site_root }}
           PANTHEON_COMMIT_MESSAGE: ${{ inputs.git_commit_message }}
+          GITHUB_TOKEN: ${{ github.token }}
           # todo, might need to make this configurable too.
           # the default in build tools is 180. But that's regularly failing
           # on a small personal site.

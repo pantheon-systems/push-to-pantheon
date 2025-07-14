@@ -174,7 +174,6 @@ runs:
             git add .
             git commit -m "Initial commit for deployment"
             echo "this origin setting is a hack to get past the 'inferring' of a git provider in build tools"
-            git remote add origin https://github.com/${{ github.repository }}
           else
             git fetch --unshallow origin
           fi

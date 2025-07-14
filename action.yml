@@ -118,7 +118,7 @@ runs:
         with:
           step: start
           token: ${{ github.token }}
-          env: ${{ env.PANTHEON_TARGET_ENV }}
+          env: ${{ env.PANTHEON_TARGET_ENV }}-${{ inputs.site }}
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Configure SSH key

@@ -56,9 +56,9 @@ OLDEST_ENVIRONMENTS=$(echo "$ALL_ENVS" \
   | grep -v dev \
   | grep -v test \
   | grep -v live \
-  | sort \
   | grep "$MULTIDEV_DELETE_PATTERN" \
   | grep -v '^pr-' \
+  | sort \
   | sed -e '$d')
 
 # Exit if there are no environments to delete.

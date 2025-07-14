@@ -51,7 +51,7 @@ fi
 
 # List all environments, filter out the standard dev/test/live, find the ones
 # that match our deletion pattern, and then exclude the most recent one.
-ALL_ENVS=$(terminus env:list "$TERMINUS_SITE" --format=list)
+ALL_ENVS=$(terminus env:list "$PANTHEON_SITE" --format=list)
 OLDEST_ENVIRONMENTS=$(echo "$ALL_ENVS" \
   | grep -v dev \
   | grep -v test \
@@ -68,7 +68,9 @@ fi
 
 # Go ahead and delete the oldest environments.
 for ENV_TO_DELETE in $OLDEST_ENVIRONMENTS; do
+    echo "Deleting Pantheon environment: ${ENV_TO_DELETE}..."
     if terminus env:info "${PANTHEON_SITE}.${ENV_TO_DELETE}" > /dev/null 2>&1; then
+        echo "Found Pantheon environment ${ENV_TO_DELETE}, proceeding with deletion."
         terminus env:delete "${PANTHEON_SITE}.${ENV_TO_DELETE}" --delete-branch --yes
         if [ -n "$GITHUB_REPOSITORY" ]; then
             delete_github_environment "$ENV_TO_DELETE"

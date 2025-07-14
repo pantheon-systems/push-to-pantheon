@@ -186,6 +186,7 @@ runs:
           PANTHEON_SOURCE_ENV: ${{ inputs.source_env }}
           SITE_ROOT: ${{ inputs.relative_site_root }}
           PANTHEON_COMMIT_MESSAGE: ${{ inputs.git_commit_message }}
+          GITHUB_TOKEN: ${{ github.token }}
           # todo, might need to make this configurable too.
           # the default in build tools is 180. But that's regularly failing
           # on a small personal site.
@@ -210,21 +211,18 @@ runs:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           # todo, how does this work when there is a step above with the id of "deployment" not "deployment_id"
           deployment_id: ${{ steps.deployment.outputs.deployment_id }}
-          env: ${{ env.PANTHEON_TARGET_ENV }}-${{ inputs.site }}
+          env: ${{ env.PANTHEON_TARGET_ENV }}
           env_url: https://${{ env.PANTHEON_TARGET_ENV }}-${{ inputs.site }}.pantheonsite.io
       - name: Deleting old multidevs
         if: ${{ inputs.delete_old_environments == 'true' && steps.deploy_to_pantheon.outcome == 'success' }}
         shell: bash
         env:
+          DELETE_OLD_MULTIDEVS: ${{ inputs.delete_old_environments }}
           PANTHEON_SITE: ${{ inputs.site }}
           GITHUB_TOKEN: ${{ github.token }}
           SITE_ROOT: ${{ inputs.relative_site_root }}
-        run: |
-          # Delete old multidevs
-          set +e
-
-          if [ -n "$SITE_ROOT" ]; then
-            cd ${SITE_ROOT}
-          fi
-
-          terminus build:env:delete:pr $PANTHEON_SITE --yes
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          MULTIDEV_DELETE_PATTERN: pr-
+          PANTHEON_TARGET_ENV: ${{ env.PANTHEON_TARGET_ENV }}
+          WORKSPACE: ${{ github.workspace }}
+        run: $WORKSPACE/scripts/cleanup.sh

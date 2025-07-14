@@ -15,6 +15,14 @@ on:
         options:
           - 'Yes'
           - 'No'
+      run_cleanup:
+        description: 'Run cleanup after successful deploy?'
+        required: true
+        default: 'No'
+        type: choice
+        options:
+          - 'Yes'
+          - 'No'
 
 jobs:
   test_workflow_no_terminus_install:
@@ -22,7 +30,7 @@ jobs:
     if: ${{ github.event.inputs.install_terminus == 'No' }}
     permissions:
       deployments: write
-      contents: read
+      contents: write
     runs-on: ubuntu-latest
     steps:
     - name: Checkout Repository
@@ -43,7 +51,7 @@ jobs:
 
     - name: Set short branch name
       id: vars
-      run: echo "short_ref_name=$(echo ${{ github.ref_name }} | sed 's/[^a-zA-Z0-9-]//g' | cut -c1-6)" >> $GITHUB_OUTPUT
+      run: echo "short_ref_name=$(echo ${{ github.ref_name }} | sed 's/[^a-zA-Z0-9-]//g' | cut -c1-8)" >> $GITHUB_OUTPUT
 
     - name: deploy to Pantheon
       uses: ./
@@ -51,19 +59,20 @@ jobs:
         ssh_key: ${{ secrets.PANTHEON_SSH_KEY }}
         machine_token: ${{ secrets.PANTHEON_MACHINE_TOKEN }}
         site: dtp-nearly-empty-site
-        target_env: "test-${{ steps.vars.outputs.short_ref_name }}"
+        target_env: "wd-${{ steps.vars.outputs.short_ref_name }}"
         relative_site_root: ".github/testing_fixtures/dtp-nearly-empty-site"
         git_user_name: "Test Name"
         git_user_email: "test@example.com"
         git_commit_message: "This is a manual test deployment from GitHub Actions."
         clone_content: true
+        delete_old_environments: ${{ github.event.inputs.run_cleanup == 'Yes' }}
 
   test_workflow_with_terminus_install:
     name: Test Deploy with Terminus Install
     if: ${{ github.event.inputs.install_terminus == 'Yes' }}
     permissions:
         deployments: write
-        contents: read
+        contents: write
     runs-on: ubuntu-latest
     steps:
         - name: Checkout Repository
@@ -71,7 +80,7 @@ jobs:
 
         - name: Set short branch name
           id: vars
-          run: echo "short_ref_name=$(echo ${{ github.ref_name }} | sed 's/[^a-zA-Z0-9-]//g' | cut -c1-6)" >> $GITHUB_OUTPUT
+          run: echo "short_ref_name=$(echo ${{ github.ref_name }} | sed 's/[^a-zA-Z0-9-]//g' | cut -c1-8)" >> $GITHUB_OUTPUT
 
         - name: deploy to Pantheon
           uses: ./
@@ -79,9 +88,11 @@ jobs:
             ssh_key: ${{ secrets.PANTHEON_SSH_KEY }}
             machine_token: ${{ secrets.PANTHEON_MACHINE_TOKEN }}
             site: dtp-nearly-empty-site
-            target_env: "test-${{ steps.vars.outputs.short_ref_name }}"
+            target_env: "wd-${{ steps.vars.outputs.short_ref_name }}"
             relative_site_root: ".github/testing_fixtures/dtp-nearly-empty-site"
             git_user_name: "Test Name"
             git_user_email: "test@example.com"
             git_commit_message: "This is a manual test deployment from GitHub Actions."
             clone_content: true
+            delete_old_environments: ${{ github.event.inputs.run_cleanup == 'Yes' }}
+       

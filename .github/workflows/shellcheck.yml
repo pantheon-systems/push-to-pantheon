@@ -1,0 +1,19 @@
+name: Shellcheck
+on:
+  push:
+    paths:
+      - 'scripts/**'
+      - '.github/workflows/shellcheck.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  shellcheck:
+    name: Run Shellcheck on Scripts
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Run Shellcheck
+        run: shellcheck scripts/*.sh

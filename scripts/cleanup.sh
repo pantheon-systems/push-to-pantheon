@@ -74,13 +74,14 @@ fi
 
 # Go ahead and delete the oldest environments.
 for ENV_TO_DELETE in $OLDEST_ENVIRONMENTS; do
-  # Delete the Pantheon multidev environment.
-  terminus env:delete "${TERMINUS_SITE}.${ENV_TO_DELETE}" --delete-branch --yes
-
-  # Delete the related GitHub deployment environment.
-  if [ -n "$GITHUB_REPOSITORY" ]; then
-    delete_github_environment "$ENV_TO_DELETE"
-  else
-    echo "Skipping GitHub deletion for ${ENV_TO_DELETE} — GITHUB_TOKEN or GITHUB_REPOSITORY not set."
-  fi
+    if terminus env:info "${PANTHEON_SITE}.${ENV_TO_DELETE}" > /dev/null 2>&1; then
+        terminus env:delete "${TERMINUS_SITE}.${ENV_TO_DELETE}" --delete-branch --yes
+        if [ -n "$GITHUB_REPOSITORY" ]; then
+            delete_github_environment "$ENV_TO_DELETE"
+        else
+            echo "Skipping GitHub deletion for ${ENV_TO_DELETE} — GITHUB_TOKEN or GITHUB_REPOSITORY not set."
+        fi
+    else
+        echo "Pantheon environment ${ENV_TO_DELETE} not found."
+    fi
 done

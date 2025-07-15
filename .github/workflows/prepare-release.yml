@@ -1,0 +1,64 @@
+name: Prepare Release
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'The version to release (e.g., v1.2.3)'
+        required: true
+        type: string
+
+jobs:
+  release:
+    name: 'Prepare Push to Pantheon release'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          # We need to fetch all history and tags to correctly determine the previous version
+          fetch-depth: 0
+
+      - name: Get previous version tag
+        id: get_version
+        run: |
+          # Get the latest tag from the repository
+          PREVIOUS_VERSION=$(git describe --tags --abbrev=0)
+          echo "previous_version=$PREVIOUS_VERSION" >> $GITHUB_OUTPUT
+        shell: bash
+
+      - name: Update version in README.md
+        run: |
+          # Escape dots in the previous version to ensure they are treated as literal characters in the sed regex.
+          PREVIOUS_VERSION_ESCAPED=$(echo "${{ steps.get_version.outputs.previous_version }}" | sed 's/\./\\./g')
+          NEW_VERSION="${{ github.event.inputs.version }}"
+
+          # Use the escaped version for a safe replacement.
+          sed -i "s/$PREVIOUS_VERSION_ESCAPED/$NEW_VERSION/g" readme.md
+        shell: bash
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+        shell: bash
+
+      - name: Create release PR
+        id: commit
+        run: |
+          git checkout -b release-${{ github.event.inputs.version }}
+          git add readme.md
+          if ! git diff --staged --quiet; then
+            echo "changes_committed=true" >> $GITHUB_OUTPUT
+            git commit -m "docs: Bump version to ${{ github.event.inputs.version }}"
+            echo "commit_hash=$(git rev-parse HEAD)" >> $GITHUB_OUTPUT
+            echo "New commit created."
+          else
+            echo "changes_committed=false" >> $GITHUB_OUTPUT
+            echo "No changes to commit."
+          fi
+          git push --set-upstream origin release-${{ github.event.inputs.version }}
+          gh pr create --base main --head release-${{ github.event.inputs.version }} --title "Release ${{ github.event.inputs.version }}" --body "Release ${{ github.event.inputs.version }}"
+        shell: bash

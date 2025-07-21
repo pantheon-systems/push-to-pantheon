@@ -258,7 +258,7 @@ The `pull-requests: read` permission is required to delete old Multidev environm
 
 ### Using this action with robots (like Dependabot)
 
-When using this action with robots like [Dependabot]([https://docs.github.com/en/code-security/supply-chain-security/keeping-your-dependencies-updated-automatically/about-dependency-updates](https://docs.github.com/en/code-security/getting-started/dependabot-quickstart-guide)), it is important to ensure that the workflow has access to the secrets needed to push to Pantheon.
+When using this action with robots like [Dependabot](https://docs.github.com/en/code-security/getting-started/dependabot-quickstart-guide), it is important to ensure that the workflow has access to the secrets needed to push to Pantheon.
 This is because robots like Dependabot create pull requests from forks of the repository, and GitHub does not allow secrets to be used in workflows triggered by pull requests from forks for security reasons.
 To work around this, you can use the `pull_request_target` event instead of the `pull_request` event combined with a two-step checkout process that ensures that the code being executed is from the base repository, not the fork.
 

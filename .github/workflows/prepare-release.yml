@@ -16,7 +16,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           # We need to fetch all history and tags to correctly determine the previous version
           fetch-depth: 0

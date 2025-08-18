@@ -34,7 +34,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: Checkout Repository
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
 
     - name: Install Terminus
       uses: pantheon-systems/terminus-github-actions@v1.2.7
@@ -76,7 +76,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
         - name: Checkout Repository
-          uses: actions/checkout@v4
+          uses: actions/checkout@v5
 
         - name: Set short branch name
           id: vars

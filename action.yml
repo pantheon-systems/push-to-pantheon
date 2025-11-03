@@ -1,5 +1,5 @@
-name: Deploy Site to Pantheon
-description: A GitHub Action that pushes code to Pantheon Dev and Multidev environments
+name: Push to Pantheon
+description: A GitHub Action that deploys code to Pantheon Dev and Multidev environments
 branding:
   icon: activity
   color: yellow

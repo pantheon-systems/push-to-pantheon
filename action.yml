@@ -172,9 +172,21 @@ runs:
             git init -b main
             git add .
             git commit -m "Initial commit for deployment"
-            git remote -v
+            # Check if remote 'origin' exists and if it's already set to a https://github.com origin. If it is, skip adding it again.
             echo "this origin setting is a hack to get past the 'inferring' of a git provider in build tools"
-            git remote add origin https://github.com/${{ github.repository }}
+            if git remote | grep origin; then
+              ORIGIN_URL=$(git remote get-url origin)
+              if [[ "$ORIGIN_URL" == https://github.com/* ]]; then
+                echo "Remote 'origin' already set to a GitHub URL. Skipping adding origin."
+              else
+                echo "Remote 'origin' exists but is not a GitHub URL. Updating origin to GitHub URL."
+                git remote remove origin
+                git remote add origin https://github.com/${{ github.repository }}
+              fi
+            else
+              echo "Remote 'origin' does not exist. Adding origin to GitHub URL."
+              git remote add origin https://github.com/${{ github.repository }}
+            fi
           else
             git fetch --unshallow origin
           fi

@@ -240,6 +240,12 @@ runs:
               terminus multidev:create ${PANTHEON_SITE}.${PANTHEON_SOURCE_ENV} ${PANTHEON_TARGET_ENV} --yes
             fi
 
+            # Ensure repo is not shallow; Pantheon rejects shallow pushes
+            if git rev-parse --is-shallow-repository >/dev/null 2>&1 && [ "$(git rev-parse --is-shallow-repository)" = "true" ]; then
+              echo "Repository is shallow; unshallowing before push."
+              git fetch --unshallow origin || git fetch --depth=1000000 origin
+            fi
+
             # Push code to Pantheon
             git remote add pantheon ssh://codeserver.dev.${SITE_ID}@codeserver.dev.${SITE_ID}.drush.in:2222/~/repository.git
             git push pantheon HEAD:refs/heads/${PANTHEON_TARGET_ENV} --force

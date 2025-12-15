@@ -220,6 +220,7 @@ runs:
           fi
 
           if [ "$SKIP_BUILD_TOOLS" == "true" ]; then
+            SITE_ID=$(terminus site:info ${PANTHEON_SITE} --field=id)
             # Check if a multidev already exists for this PR.
             if terminus multidev:list ${PANTHEON_SITE} --format=list | grep -q "^${PANTHEON_TARGET_ENV}$"; then
               echo "Multidev environment ${PANTHEON_TARGET_ENV} already exists. Pushing code to existing environment."
@@ -229,7 +230,7 @@ runs:
             fi
 
             # Push code to Pantheon
-            git remote add pantheon ssh://codeserver.dev.${PANTHEON_SITE}@codeserver.dev.${PANTHEON_SITE}.drush.in:2222/~/repository.git
+            git remote add pantheon ssh://codeserver.dev.${SITE_ID}@codeserver.dev.${SITE_ID}.drush.in:2222/~/repository.git
             git push pantheon HEAD:refs/heads/${PANTHEON_TARGET_ENV} --force
             exit 0
           fi

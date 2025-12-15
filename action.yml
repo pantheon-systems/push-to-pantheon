@@ -131,6 +131,16 @@ runs:
         with:
             ssh-private-key: ${{ inputs.ssh_key }}
 
+      - name: Set up host keys for Pantheon
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          echo "${{ inputs.ssh_key }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa        
+          echo "Host *.pantheon.io *.drush.in *.getpantheon.com *.panth.io" >> "$HOME/.ssh/config"
+          echo "StrictHostKeyChecking no" >> "$HOME/.ssh/config"
+          echo "HostKeyAlgorithms +ssh-rsa" >> "$HOME/.ssh/config"
+
       - name: Check for Terminus
         if: ${{ inputs.skip_terminus_install != 'true' }}
         id: check_terminus
@@ -230,8 +240,6 @@ runs:
             fi
 
             # Push code to Pantheon
-            mkdir -p ~/.ssh
-            ssh-keyscan -p 2222 codeserver.dev.${SITE_ID}.drush.in >> ~/.ssh/known_hosts
             git remote add pantheon ssh://codeserver.dev.${SITE_ID}@codeserver.dev.${SITE_ID}.drush.in:2222/~/repository.git
             git push pantheon HEAD:refs/heads/${PANTHEON_TARGET_ENV} --force
             exit 0

@@ -152,6 +152,7 @@ runs:
 
       - name: Install Terminus Plugin
         shell: bash
+        if: ${{ inputs.skip_build_tools != 'true' }}
         run: terminus self:plugin:install "pantheon-systems/terminus-build-tools-plugin:3.x-dev"
 
       - name: Configure Git User

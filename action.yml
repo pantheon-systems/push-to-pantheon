@@ -132,6 +132,7 @@ runs:
             ssh-private-key: ${{ inputs.ssh_key }}
 
       - name: Set up host keys for Pantheon
+        shell: bash
         run: |
           mkdir -p ~/.ssh
           chmod 700 ~/.ssh

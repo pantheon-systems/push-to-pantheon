@@ -64,6 +64,11 @@ inputs:
     default: false
     type: boolean
 
+  skip_build_tools:
+    required: false
+    default: false
+    type: boolean
+
   # todo checkout_repo:
   #   description: "A boolean for whether or not this composite step should checkout the git repo. Set to false if a checkout has already been perf"
 
@@ -200,6 +205,7 @@ runs:
           SITE_ROOT: ${{ inputs.relative_site_root }}
           PANTHEON_COMMIT_MESSAGE: ${{ inputs.git_commit_message }}
           GITHUB_TOKEN: ${{ github.token }}
+          SKIP_BUILD_TOOLS: ${{ inputs.skip_build_tools }}
           # todo, might need to make this configurable too.
           # the default in build tools is 180. But that's regularly failing
           # on a small personal site.
@@ -210,6 +216,21 @@ runs:
 
           if [ -n "$SITE_ROOT" ]; then
             cd ${SITE_ROOT}
+          fi
+
+          if [ "$SKIP_BUILD_TOOLS" == "true" ]; then
+            # Check if a multidev already exists for this PR.
+            if terminus multidev:list ${PANTHEON_SITE} --format=list | grep -q "^${PANTHEON_TARGET_ENV}$"; then
+              echo "Multidev environment ${PANTHEON_TARGET_ENV} already exists. Pushing code to existing environment."
+            else
+              echo "Creating new multidev environment: ${PANTHEON_TARGET_ENV}"
+              terminus multidev:create ${PANTHEON_SITE}.${PANTHEON_SOURCE_ENV} ${PANTHEON_TARGET_ENV} --yes
+            fi
+
+            # Push code to Pantheon
+            git remote add pantheon ssh://codeserver.dev.${PANTHEON_SITE}@codeserver.dev.${PANTHEON_SITE}.drush.in:2222/~/repository.git
+            git push pantheon HEAD:refs/heads/${PANTHEON_TARGET_ENV} --force
+            exit 0
           fi
 
           terminus -n build:env:create ${PANTHEON_SITE}.${PANTHEON_SOURCE_ENV} ${PANTHEON_TARGET_ENV} --yes --message="${PANTHEON_COMMIT_MESSAGE}" ${PANTHEON_CLONE_CONTENT_FLAG}

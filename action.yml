@@ -230,6 +230,8 @@ runs:
             fi
 
             # Push code to Pantheon
+            mkdir -p ~/.ssh
+            ssh-keyscan -p 2222 codeserver.dev.${SITE_ID}.drush.in >> ~/.ssh/known_hosts
             git remote add pantheon ssh://codeserver.dev.${SITE_ID}@codeserver.dev.${SITE_ID}.drush.in:2222/~/repository.git
             git push pantheon HEAD:refs/heads/${PANTHEON_TARGET_ENV} --force
             exit 0

@@ -28,12 +28,12 @@ jobs:
     steps:
     # Checkout the base repository at the current commit.
     # This is the trusted code that will be executed.
-    - uses: actions/checkout@v5
+    - uses: actions/checkout@v6
 
     # Checkout the pull request code into a subdirectory.
     # This is the code that will be deployed.
     - name: Checkout PR code
-      uses: actions/checkout@v5
+      uses: actions/checkout@v6
       with:
         repository: ${{ github.event.pull_request.head.repo.full_name }}
         ref: ${{ github.event.pull_request.head.ref }}

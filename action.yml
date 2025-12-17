@@ -133,10 +133,12 @@ runs:
 
       - name: Set up host keys for Pantheon
         shell: bash
+        env:
+          SSH_KEY: ${{ inputs.ssh_key }}
         run: |
           mkdir -p ~/.ssh
           chmod 700 ~/.ssh
-          echo "${{ inputs.ssh_key }}" > ~/.ssh/id_rsa
+          printf "%s" "$SSH_KEY" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa        
           echo "Host *.pantheon.io *.drush.in *.getpantheon.com *.panth.io" >> "$HOME/.ssh/config"
           echo "StrictHostKeyChecking no" >> "$HOME/.ssh/config"

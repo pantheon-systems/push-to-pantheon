@@ -211,6 +211,25 @@ runs:
             git fetch --unshallow origin
           fi
 
+      - name: Check live environment
+        if: ${{ inputs.skip_build_tools != 'true' }}
+        shell: bash
+        id: check_live_env
+        env:
+          PANTHEON_SITE: ${{ inputs.site }}
+        run: |
+          # Check if live environment exists
+          set +e
+          LIVE_INITIALIZED=$(terminus env:info ${PANTHEON_SITE}.live --field=initialized)
+          if [ "$LIVE_INITIALIZED" == "1" ]; then
+            echo "Live environment exists and is initialized."
+            echo "live_env_exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "Live environment is not initialized."
+            echo "[alert] Workflow will proceed without Build Tools operations that depend on live environment. You will need to clone content manually to the multidev if required."
+            echo "live_env_exists=false" >> $GITHUB_OUTPUT
+          fi
+
       - name: Deployment Processing
         shell: bash
         id: deploy_to_pantheon
@@ -233,7 +252,7 @@ runs:
             cd ${SITE_ROOT}
           fi
 
-          if [ "$SKIP_BUILD_TOOLS" == "true" ]; then
+          if [ "$SKIP_BUILD_TOOLS" == "true" ] || [ "${{ steps.check_live_env.outputs.live_env_exists }}" == "false" ]; then
             SITE_ID=$(terminus site:info ${PANTHEON_SITE} --field=id)
             # Check if a multidev already exists for this PR.
             if terminus multidev:list ${PANTHEON_SITE} --format=list | grep -q "^${PANTHEON_TARGET_ENV}$"; then

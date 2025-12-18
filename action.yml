@@ -64,6 +64,12 @@ inputs:
     default: false
     type: boolean
 
+  skip_build_tools:
+    description: "If set to true, the action will skip the installation of the Terminus Build Tools plugin and will not use it to create Multidev environments or push code. This is useful if you just want to push the code and are not interested in syncing the database and files as part of your deploy process. By default, the action will install and use the Build Tools plugin unless this is set to true."
+    required: false
+    default: false
+    type: boolean
+
   # todo checkout_repo:
   #   description: "A boolean for whether or not this composite step should checkout the git repo. Set to false if a checkout has already been perf"
 
@@ -126,6 +132,19 @@ runs:
         with:
             ssh-private-key: ${{ inputs.ssh_key }}
 
+      - name: Set up host keys for Pantheon
+        shell: bash
+        env:
+          SSH_KEY: ${{ inputs.ssh_key }}
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf "%s" "$SSH_KEY" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa        
+          echo "Host *.pantheon.io *.drush.in *.getpantheon.com *.panth.io" >> "$HOME/.ssh/config"
+          echo "StrictHostKeyChecking no" >> "$HOME/.ssh/config"
+          echo "HostKeyAlgorithms +ssh-rsa" >> "$HOME/.ssh/config"
+
       - name: Check for Terminus
         if: ${{ inputs.skip_terminus_install != 'true' }}
         id: check_terminus
@@ -147,6 +166,7 @@ runs:
 
       - name: Install Terminus Plugin
         shell: bash
+        if: ${{ inputs.skip_build_tools != 'true' }}
         run: terminus self:plugin:install "pantheon-systems/terminus-build-tools-plugin:3.x-dev"
 
       - name: Configure Git User
@@ -172,8 +192,21 @@ runs:
             git init -b main
             git add .
             git commit -m "Initial commit for deployment"
+            # Check if remote 'origin' exists and if it's already set to a https://github.com origin. If it is, skip adding it again.
             echo "this origin setting is a hack to get past the 'inferring' of a git provider in build tools"
-            git remote add origin https://github.com/${{ github.repository }}
+            if git remote | grep origin; then
+              ORIGIN_URL=$(git remote get-url origin)
+              if [[ "$ORIGIN_URL" == https://github.com/* ]]; then
+                echo "Remote 'origin' already set to a GitHub URL. Skipping adding origin."
+              else
+                echo "Remote 'origin' exists but is not a GitHub URL. Updating origin to GitHub URL."
+                git remote remove origin
+                git remote add origin https://github.com/${{ github.repository }}
+              fi
+            else
+              echo "Remote 'origin' does not exist. Adding origin to GitHub URL."
+              git remote add origin https://github.com/${{ github.repository }}
+            fi
           else
             git fetch --unshallow origin
           fi
@@ -187,6 +220,7 @@ runs:
           SITE_ROOT: ${{ inputs.relative_site_root }}
           PANTHEON_COMMIT_MESSAGE: ${{ inputs.git_commit_message }}
           GITHUB_TOKEN: ${{ github.token }}
+          SKIP_BUILD_TOOLS: ${{ inputs.skip_build_tools }}
           # todo, might need to make this configurable too.
           # the default in build tools is 180. But that's regularly failing
           # on a small personal site.
@@ -197,6 +231,28 @@ runs:
 
           if [ -n "$SITE_ROOT" ]; then
             cd ${SITE_ROOT}
+          fi
+
+          if [ "$SKIP_BUILD_TOOLS" == "true" ]; then
+            SITE_ID=$(terminus site:info ${PANTHEON_SITE} --field=id)
+            # Check if a multidev already exists for this PR.
+            if terminus multidev:list ${PANTHEON_SITE} --format=list | grep -q "^${PANTHEON_TARGET_ENV}$"; then
+              echo "Multidev environment ${PANTHEON_TARGET_ENV} already exists. Pushing code to existing environment."
+            else
+              echo "Creating new multidev environment: ${PANTHEON_TARGET_ENV}"
+              terminus multidev:create ${PANTHEON_SITE}.${PANTHEON_SOURCE_ENV} ${PANTHEON_TARGET_ENV} --yes
+            fi
+
+            # Ensure repo is not shallow; Pantheon rejects shallow pushes
+            if git rev-parse --is-shallow-repository >/dev/null 2>&1 && [ "$(git rev-parse --is-shallow-repository)" = "true" ]; then
+              echo "Repository is shallow; unshallowing before push."
+              git fetch --unshallow origin || git fetch --depth=1000000 origin
+            fi
+
+            # Push code to Pantheon
+            git remote add pantheon ssh://codeserver.dev.${SITE_ID}@codeserver.dev.${SITE_ID}.drush.in:2222/~/repository.git
+            git push pantheon HEAD:refs/heads/${PANTHEON_TARGET_ENV} --force
+            exit 0
           fi
 
           terminus -n build:env:create ${PANTHEON_SITE}.${PANTHEON_SOURCE_ENV} ${PANTHEON_TARGET_ENV} --yes --message="${PANTHEON_COMMIT_MESSAGE}" ${PANTHEON_CLONE_CONTENT_FLAG}

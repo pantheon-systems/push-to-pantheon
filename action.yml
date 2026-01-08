@@ -199,12 +199,15 @@ runs:
 
       - name: Comment on PR if multidev limit reached
         if: ${{ inputs.target_env == '' && steps.check_multidev_limit.outputs.multidev_available == 'false' }}
-        uses: peter-evans/create-or-update-comment@v2
-        with:
-          token: ${{ github.token }}
-          issue-number: ${{ github.event.pull_request.number }}
-          body: |
-            ⚠️ Unable to create a Multidev environment for this pull request because the Pantheon Multidev limit for the site has been reached. Please contact Pantheon Support to request an increase in the multidev limit or delete unused Multidev environments.
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          # Comment on PR if multidev limit reached
+          set +e
+          gh pr comment "${PR_NUMBER}" --body "⚠️ Unable to create a Multidev environment for this pull request because the Pantheon Multidev limit for the site has been reached. Please contact Pantheon Support to request an increase in the multidev limit or delete unused Multidev environments."
+          
 
       - name: Abort deployment if multidev limit reached
         if: ${{ inputs.target_env == '' && steps.check_multidev_limit.outputs.multidev_available == 'false' }}

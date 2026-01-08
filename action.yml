@@ -178,6 +178,38 @@ runs:
             git fetch --unshallow origin
           fi
 
+      - name: Check multidev limit
+        id: check_multidev_limit
+        shell: bash
+        run: |
+          # Check multidev limit
+          set +e
+          MAX_MULTIDEVS=$(terminus site:info ${{ inputs.site }} --field="Max Multidevs")
+          CURRENT_MULTIDEVS=$(terminus multidev:list ${{ inputs.site }} --format=list | grep -vE '^(dev|test|live)$' | wc -l)
+
+          if [ "$CURRENT_MULTIDEVS" -lt "$MAX_MULTIDEVS" ]; then
+            echo "multidev_available=true" >> $GITHUB_OUTPUT
+          else
+            echo "❌ Multidev limit reached."
+            echo "multidev_available=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Comment on PR if multidev limit reached
+        if: ${{ inputs.target_env == '' && steps.check_multidev_limit.outputs.multidev_available == 'false' }}
+        uses: peter-evans/create-or-update-comment@v2
+        with:
+          token: ${{ github.token }}
+          issue-number: ${{ github.event.pull_request.number }}
+          body: |
+            ⚠️ Unable to create a Multidev environment for this pull request because the Pantheon Multidev limit for the site has been reached. Please contact Pantheon Support to request an increase in the multidev limit or delete unused Multidev environments.
+
+      - name: Abort deployment if multidev limit reached
+        if: ${{ inputs.target_env == '' && steps.check_multidev_limit.outputs.multidev_available == 'false' }}
+        shell: bash
+        run: |
+          echo "Aborting deployment due to multidev limit reached."
+          exit 1
+
       - name: Deployment Processing
         shell: bash
         id: deploy_to_pantheon

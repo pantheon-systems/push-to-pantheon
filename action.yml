@@ -153,8 +153,10 @@ runs:
 
       - name: Install Terminus Plugin
         shell: bash
+        env:
+          BUILD_TOOLS_VERSION_INPUT: ${{ inputs.build_tools_version }}
         run: |
-          BUILD_TOOLS_VERSION="${{ inputs.build_tools_version }}"
+          BUILD_TOOLS_VERSION="${BUILD_TOOLS_VERSION_INPUT}"
           if [ -z "$BUILD_TOOLS_VERSION" ]; then
             echo "Installing latest stable version of Terminus Build Tools plugin"
             terminus self:plugin:install pantheon-systems/terminus-build-tools-plugin

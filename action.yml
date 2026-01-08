@@ -64,6 +64,12 @@ inputs:
     default: false
     type: boolean
 
+  build_tools_version:
+    description: "The version of the Terminus Build Tools plugin to install. By default, the action will install the latest stable version. You can specify a specific version or branch if needed."
+    required: false
+    type: string
+    default: ""
+
   # todo checkout_repo:
   #   description: "A boolean for whether or not this composite step should checkout the git repo. Set to false if a checkout has already been perf"
 

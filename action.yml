@@ -181,11 +181,13 @@ runs:
       - name: Check multidev limit
         id: check_multidev_limit
         shell: bash
+        env:
+          PANTHEON_SITE: ${{ inputs.site }}
         run: |
           # Check multidev limit
           set +e
-          MAX_MULTIDEVS=$(terminus site:info ${{ inputs.site }} --field="Max Multidevs")
-          CURRENT_MULTIDEVS=$(terminus multidev:list ${{ inputs.site }} --format=list | grep -vE '^(dev|test|live)$' | wc -l)
+          MAX_MULTIDEVS=$(terminus site:info "${PANTHEON_SITE}" --field="Max Multidevs")
+          CURRENT_MULTIDEVS=$(terminus multidev:list "${PANTHEON_SITE}" --format=list | grep -vE '^(dev|test|live)$' | wc -l)
 
           if [ "$CURRENT_MULTIDEVS" -lt "$MAX_MULTIDEVS" ]; then
             echo "multidev_available=true" >> $GITHUB_OUTPUT

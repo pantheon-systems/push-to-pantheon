@@ -188,6 +188,14 @@ For example, to use version 0.4.1 of this action, the step would look like this:
     site: ${{ vars.PANTHEON_SITE }}
 ```
 
+### `push-to-pantheon` or [Integrated Composer](https://docs.pantheon.io/guides/integrated-composer)
+
+Integrated Composer is a feature of the Pantheon platform that runs Composer commands natively on Pantheon sites. Specifically, it integrates into the site update workflow (by running `composer update` in the background and alerting on the dashboard when updates are available) and into the code deployment workflow (by running `composer install` on code deployments to ensure that dependencies are installed).
+
+If you are using this action to push code to Pantheon, it is _not recommended_ to use Integrated Composer to manage your Composer dependencies. Instead, you should run Composer workflows in a GitHub Actions-based pipeline alongside this action. Using the `push-to-pantheon` action _alongside_ Integrated Composer can _greatly_ increase the time it takes to deploy code, which can lead to additional spend on GitHub Actions minutes and a poor developer experience due to long deployment times.
+
+See the [Composer example](#composer-example) below for an example of how to run Composer commands in GitHub Actions prior to pushing code to Pantheon.
+
 ## Pushing from a GitHub repository to a Pantheon-hosted repository
 
 Pantheon provides a Git repository for each site hosted on our platform.
@@ -208,6 +216,8 @@ By setting [`build_step: true` in the `pantheon.yml`](https://docs.pantheon.io/p
 However, some teams prefer to do these build steps in GitHub Actions before pushing to Pantheon.
 
 That use case can be accommodated by adding additional steps to the workflow before the step that uses this action.
+
+#### NPM example
 
 Here's an example from a real site that uses Tailwind to prepare CSS in the site's custom theme.
 
@@ -232,6 +242,37 @@ Here's an example from a real site that uses Tailwind to prepare CSS in the site
 ```
 
 By calling `npm run build` and modifying `gitignore` prior to calling `push-to-pantheon`, the Tailwind-generated CSS (which is not wanted in the GitHub repo) is available to be committed (and pushed) inside the `push-to-pantheon` step.
+
+#### Composer example
+
+The following example shows our recommended way to run `composer install` prior to pushing code to Pantheon. This workflow uses caching in GitHub Actions to speed up the Composer install step by reusing previously installed dependencies stored in the `vendor` directory as well as running `composer install` with the `--no-dev` flag to avoid installing development dependencies. The latter might not be desirable for workflows that deploy to Multidev environments for pull requests where development dependencies might be needed for testing.
+
+```yml
+  push-to-pantheon:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v6
+    - name: Fetch cached Composer dependencies
+      uses: actions/cache@v3
+      with:
+        path: vendor
+        key: ${{ runner.os }}-composer-${{ hashFiles('**/composer.lock') }}
+        restore-keys: ${{ runner.os }}-composer-
+    - name: Composer install
+      run: composer install --no-dev --optimize-autoloader
+    - name: Save Composer cache
+      uses: actions/cache@v3
+      with:
+        path: vendor
+        key: ${{ runner.os }}-composer-${{ hashFiles('**/composer.lock') }}
+        restore-keys: ${{ runner.os }}-composer-
+    - name: Push to Pantheon
+      uses: pantheon-systems/push-to-pantheon@0.7.0
+      with:
+        ssh_key: ${{ secrets.PANTHEON_SSH_KEY }}
+        machine_token: ${{ secrets.PANTHEON_MACHINE_TOKEN }}
+        site: ${{ vars.PANTHEON_SITE }}
+```
 
 ### Permissions
 

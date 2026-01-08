@@ -166,6 +166,14 @@ If set to true, the action will skip installing Terminus. This is useful if you 
    type: boolean
 ```
 
+#### `build_tools_version`
+The version of Pantheon Build Tools to install. By default, the latest stable version will be installed. This parameter is useful when using this action in a workflow that requires a specific version of Build Tools.
+
+```yml
+   default: ""
+   type: string
+```
+
 ## Additional recommendations
 
 ### Pin exact version of this action prior to the release of version 1.0.0

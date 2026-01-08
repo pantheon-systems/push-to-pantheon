@@ -153,7 +153,15 @@ runs:
 
       - name: Install Terminus Plugin
         shell: bash
-        run: terminus self:plugin:install "pantheon-systems/terminus-build-tools-plugin:3.x-dev"
+        run: |
+          BUILD_TOOLS_VERSION="${{ inputs.build_tools_version }}"
+          if [ -z "$BUILD_TOOLS_VERSION" ]; then
+            echo "Installing latest stable version of Terminus Build Tools plugin"
+            terminus self:plugin:install pantheon-systems/terminus-build-tools-plugin
+          else
+            echo "Installing specified version (${BUILD_TOOLS_VERSION}) of Terminus Build Tools plugin"
+            terminus self:plugin:install "pantheon-systems/terminus-build-tools-plugin:${BUILD_TOOLS_VERSION}"
+          fi
 
       - name: Configure Git User
         shell: bash

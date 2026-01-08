@@ -194,6 +194,8 @@ Integrated Composer is a feature of the Pantheon platform that runs Composer com
 
 If you are using this action to push code to Pantheon, it is _not recommended_ to use Integrated Composer to manage your Composer dependencies. Instead, you should run Composer workflows in a GitHub Actions-based pipeline alongside this action. Using the `push-to-pantheon` action _alongside_ Integrated Composer can _greatly_ increase the time it takes to deploy code, which can lead to additional spend on GitHub Actions minutes and a poor developer experience due to long deployment times.
 
+We have recorded **50% reductions in deployment times** using the `push-to-pantheon` action to compile Composer dependencies and deploy the code to your Pantheon site versus using Integrated Composer natively on Pantheon.
+
 See the [Composer example](#composer-example) below for an example of how to run Composer commands in GitHub Actions prior to pushing code to Pantheon.
 
 ## Pushing from a GitHub repository to a Pantheon-hosted repository

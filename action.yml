@@ -190,6 +190,7 @@ runs:
           CURRENT_MULTIDEVS=$(terminus multidev:list "${PANTHEON_SITE}" --format=list | grep -vE '^(dev|test|live)$' | wc -l)
 
           if [ "$CURRENT_MULTIDEVS" -lt "$MAX_MULTIDEVS" ]; then
+            echo "✅You have $((MAX_MULTIDEVS - CURRENT_MULTIDEVS)) multidev environments available."
             echo "multidev_available=true" >> $GITHUB_OUTPUT
           else
             echo "❌ Multidev limit reached."

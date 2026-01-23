@@ -174,6 +174,18 @@ The version of Pantheon's Terminus Build Tools Plugin to install. By default, th
    type: string
 ```
 
+**Example usage:**
+```yml
+    - name: Push to Pantheon
+      uses: pantheon-systems/push-to-pantheon@57-use-tagged-build-tools
+      with:
+        ssh_key: ${{ secrets.PANTHEON_SSH_KEY }}
+        machine_token: ${{ secrets.TERMINUS_MACHINE_TOKEN }}
+        site: ${{ vars.PANTHEON_SITE }}
+        clone_content: true
+        build_tools_version: "dev-cms-637-gitlab-infer"
+```
+
 ## Additional recommendations
 
 ### Pin exact version of this action prior to the release of version 1.0.0

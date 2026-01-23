@@ -167,7 +167,7 @@ If set to true, the action will skip installing Terminus. This is useful if you 
 ```
 
 #### `build_tools_version`
-The version of Pantheon's Terminus Build Tools Plugin to install. By default, the latest stable version will be installed. This parameter is used by Pantheon engineers to test changes between the Terminus plugin and this GitHub Action. Customer can also use it if they immediately need an alternate version of Build Tools. Open an issue if you find yourself regularly needing this parameter.
+The version of Pantheon's Terminus Build Tools Plugin to install. By default, the latest stable version will be installed. This parameter is primarily used to test changes between the Terminus plugin and this GitHub Action. Customers can also use it if they immediately need an alternate version of Build Tools. Open an issue if you find yourself regularly needing this parameter.
 
 ```yml
    default: ""

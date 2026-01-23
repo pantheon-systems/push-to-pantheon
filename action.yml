@@ -237,9 +237,28 @@ runs:
         with:
           pantheon-machine-token: ${{ inputs.machine_token }}
 
+      - name: Check live environment
+        if: ${{ inputs.skip_build_tools != 'true' }}
+        shell: bash
+        id: check_live_env
+        env:
+          PANTHEON_SITE: ${{ inputs.site }}
+        run: |
+          # Check if live environment exists
+          set +e
+          LIVE_INITIALIZED=$(terminus env:info ${PANTHEON_SITE}.live --field=initialized)
+          if [ "$LIVE_INITIALIZED" == "1" ]; then
+            echo "Live environment exists and is initialized."
+            echo "live_env_exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "Live environment is not initialized."
+            echo "[alert] Workflow will proceed without Build Tools operations that depend on live environment. You will need to clone content manually to the multidev if required."
+            echo "live_env_exists=false" >> $GITHUB_OUTPUT
+          fi
+
       - name: Install Terminus Plugin
         shell: bash
-        if: ${{ inputs.skip_build_tools != 'true' }}
+        if: ${{ inputs.skip_build_tools != 'true' }} && ${{ steps.check_live_env.outputs.live_env_exists == 'true' }}
         run: terminus self:plugin:install "pantheon-systems/terminus-build-tools-plugin:3.x-dev"
 
       - name: Configure Git User
@@ -284,43 +303,6 @@ runs:
             git fetch --unshallow origin
           fi
 
-      - name: Check multidev limit
-        id: check_multidev_limit
-        shell: bash
-        env:
-          PANTHEON_SITE: ${{ inputs.site }}
-        run: |
-          # Check multidev limit
-          set +e
-          MAX_MULTIDEVS=$(terminus site:info "${PANTHEON_SITE}" --field="Max Multidevs")
-          CURRENT_MULTIDEVS=$(terminus multidev:list "${PANTHEON_SITE}" --format=list | grep -vE '^(dev|test|live)$' | wc -l)
-
-          if [ "$CURRENT_MULTIDEVS" -lt "$MAX_MULTIDEVS" ]; then
-            echo "✅You have $((MAX_MULTIDEVS - CURRENT_MULTIDEVS)) multidev environments available."
-            echo "multidev_available=true" >> $GITHUB_OUTPUT
-          else
-            echo "❌ Multidev limit reached."
-            echo "multidev_available=false" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Comment on PR if multidev limit reached
-        if: ${{ inputs.target_env == '' && steps.check_multidev_limit.outputs.multidev_available == 'false' }}
-        shell: bash
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-        run: |
-          # Comment on PR if multidev limit reached
-          set +e
-          gh pr comment "${PR_NUMBER}" --body "⚠️ Unable to create a Multidev environment for this pull request because the Pantheon Multidev limit for the site has been reached. Please contact Pantheon Support to request an increase in the multidev limit or delete unused Multidev environments."
-          
-
-      - name: Abort deployment if multidev limit reached
-        if: ${{ inputs.target_env == '' && steps.check_multidev_limit.outputs.multidev_available == 'false' }}
-        shell: bash
-        run: |
-          echo "Aborting deployment due to multidev limit reached."
-          exit 1
 
       - name: Deployment Processing
         shell: bash
@@ -332,6 +314,7 @@ runs:
           PANTHEON_COMMIT_MESSAGE: ${{ inputs.git_commit_message }}
           GITHUB_TOKEN: ${{ github.token }}
           SKIP_BUILD_TOOLS: ${{ inputs.skip_build_tools }}
+          LIVE_ENV_EXISTS: ${{ steps.check_live_env.outputs.live_env_exists }}
           # todo, might need to make this configurable too.
           # the default in build tools is 180. But that's regularly failing
           # on a small personal site.
@@ -344,7 +327,7 @@ runs:
             cd ${SITE_ROOT}
           fi
 
-          if [ "$SKIP_BUILD_TOOLS" == "true" ]; then
+          if [ "$SKIP_BUILD_TOOLS" == "true" ] || [ "$LIVE_ENV_EXISTS" == "false" ]; then
             SITE_ID=$(terminus site:info ${PANTHEON_SITE} --field=id)
             # Check if a multidev already exists for this PR.
             if terminus multidev:list ${PANTHEON_SITE} --format=list | grep -q "^${PANTHEON_TARGET_ENV}$"; then

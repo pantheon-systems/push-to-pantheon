@@ -70,6 +70,12 @@ inputs:
     type: string
     default: ""
 
+  skip_build_tools:
+    description: "If set to true, the action will skip the installation of the Terminus Build Tools plugin and will not use it to create Multidev environments or push code. This is useful if you just want to push the code and are not interested in syncing the database and files as part of your deploy process. By default, the action will install and use the Build Tools plugin unless this is set to true."
+    required: false
+    default: false
+    type: boolean
+
   # todo checkout_repo:
   #   description: "A boolean for whether or not this composite step should checkout the git repo. Set to false if a checkout has already been perf"
 
@@ -258,6 +264,7 @@ runs:
 
       - name: Install Terminus Plugin
         shell: bash
+        if: ${{ inputs.skip_build_tools != 'true' }}
         env:
           BUILD_TOOLS_VERSION_INPUT: ${{ inputs.build_tools_version }}
         run: |

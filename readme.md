@@ -187,6 +187,14 @@ The version of Pantheon's Terminus Build Tools Plugin to install. By default, th
         build_tools_version: "dev-cms-637-gitlab-infer"
 ```
 
+#### `skip_build_tools`
+If set to true, the action will skip the installation of Pantheon's Terminus Build Tools plugin and will not use it to create Multidev environments or push code. This is useful if you _just_ want to push the code and are not interested in syncing the database and files as part of your deploy process or if you do not wish to clone the database from a live environment (for example, if a live environment does not exist).
+
+```yml
+   default: false
+   type: boolean
+```
+
 ## Additional recommendations
 
 ### Pin exact version of this action prior to the release of version 1.0.0

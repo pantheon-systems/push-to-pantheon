@@ -166,12 +166,24 @@ If set to true, the action will skip installing Terminus. This is useful if you 
    type: boolean
 ```
 
-#### `skip_build_tools`
-If set to true, the action will skip the installation of the Terminus Build Tools plugin and will not use it to create Multidev environments or push code. This is useful if you _just_ want to push the code and are not interested in syncing the database and files as part of your deploy process.
+#### `build_tools_version`
+The version of Pantheon's Terminus Build Tools Plugin to install. By default, the latest stable version will be installed. This parameter is primarily used to test changes between the Terminus plugin and this GitHub Action. Customers can also use it if they immediately need an alternate version of Build Tools. Open an issue if you find yourself regularly needing this parameter.
 
 ```yml
-   default: false
-   type: boolean
+   default: ""
+   type: string
+```
+
+**Example usage:**
+```yml
+    - name: Push to Pantheon
+      uses: pantheon-systems/push-to-pantheon@57-use-tagged-build-tools
+      with:
+        ssh_key: ${{ secrets.PANTHEON_SSH_KEY }}
+        machine_token: ${{ secrets.TERMINUS_MACHINE_TOKEN }}
+        site: ${{ vars.PANTHEON_SITE }}
+        clone_content: true
+        build_tools_version: "dev-cms-637-gitlab-infer"
 ```
 
 ## Additional recommendations

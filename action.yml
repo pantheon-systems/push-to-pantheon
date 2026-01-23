@@ -64,11 +64,11 @@ inputs:
     default: false
     type: boolean
 
-  skip_build_tools:
-    description: "If set to true, the action will skip the installation of the Terminus Build Tools plugin and will not use it to create Multidev environments or push code. This is useful if you just want to push the code and are not interested in syncing the database and files as part of your deploy process. By default, the action will install and use the Build Tools plugin unless this is set to true."
+  build_tools_version:
+    description: "The version of the Terminus Build Tools plugin to install. By default, the action will install the latest stable version. You can specify a specific version or branch if needed."
     required: false
-    default: false
-    type: boolean
+    type: string
+    default: ""
 
   # todo checkout_repo:
   #   description: "A boolean for whether or not this composite step should checkout the git repo. Set to false if a checkout has already been perf"
@@ -258,8 +258,17 @@ runs:
 
       - name: Install Terminus Plugin
         shell: bash
-        if: ${{ inputs.skip_build_tools != 'true' }} && ${{ steps.check_live_env.outputs.live_env_exists == 'true' }}
-        run: terminus self:plugin:install "pantheon-systems/terminus-build-tools-plugin:3.x-dev"
+        env:
+          BUILD_TOOLS_VERSION_INPUT: ${{ inputs.build_tools_version }}
+        run: |
+          BUILD_TOOLS_VERSION="${BUILD_TOOLS_VERSION_INPUT}"
+          if [ -z "$BUILD_TOOLS_VERSION" ]; then
+            echo "Installing latest stable version of Terminus Build Tools plugin"
+            terminus self:plugin:install pantheon-systems/terminus-build-tools-plugin
+          else
+            echo "Installing specified version (${BUILD_TOOLS_VERSION}) of Terminus Build Tools plugin"
+            terminus self:plugin:install "pantheon-systems/terminus-build-tools-plugin:${BUILD_TOOLS_VERSION}"
+          fi
 
       - name: Configure Git User
         shell: bash

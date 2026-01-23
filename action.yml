@@ -314,6 +314,7 @@ runs:
           PANTHEON_COMMIT_MESSAGE: ${{ inputs.git_commit_message }}
           GITHUB_TOKEN: ${{ github.token }}
           SKIP_BUILD_TOOLS: ${{ inputs.skip_build_tools }}
+          LIVE_ENV_EXISTS: ${{ steps.check_live_env.outputs.live_env_exists }}
           # todo, might need to make this configurable too.
           # the default in build tools is 180. But that's regularly failing
           # on a small personal site.
@@ -326,7 +327,7 @@ runs:
             cd ${SITE_ROOT}
           fi
 
-          if [ "$SKIP_BUILD_TOOLS" == "true" ] || [ "${{ steps.check_live_env.outputs.live_env_exists }}" == "false" ]; then
+          if [ "$SKIP_BUILD_TOOLS" == "true" ] || [ "$LIVE_ENV_EXISTS" == "false" ]; then
             SITE_ID=$(terminus site:info ${PANTHEON_SITE} --field=id)
             # Check if a multidev already exists for this PR.
             if terminus multidev:list ${PANTHEON_SITE} --format=list | grep -q "^${PANTHEON_TARGET_ENV}$"; then

@@ -166,6 +166,14 @@ If set to true, the action will skip installing Terminus. This is useful if you 
    type: boolean
 ```
 
+#### `skip_build_tools`
+If set to true, the action will skip the installation of the Terminus Build Tools plugin and will not use it to create Multidev environments or push code. This is useful if you _just_ want to push the code and are not interested in syncing the database and files as part of your deploy process.
+
+```yml
+   default: false
+   type: boolean
+```
+
 ## Additional recommendations
 
 ### Pin exact version of this action prior to the release of version 1.0.0

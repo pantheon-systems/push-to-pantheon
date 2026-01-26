@@ -30,7 +30,7 @@ jobs:
 
       - name: Create pull request
         if: steps.verify-changed-files.outputs.files_changed == 'true'
-        uses: peter-evans/create-pull-request@v8.0.0
+        uses: peter-evans/create-pull-request@v8.1.0
         with:
           token: ${{ secrets.GH_PAT }}
           base: "0.x"

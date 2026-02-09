@@ -44,7 +44,7 @@ jobs:
     steps:
     - uses: actions/checkout@v6
     - name: Push to Pantheon
-      uses: pantheon-systems/push-to-pantheon@0.7.0
+      uses: pantheon-systems/push-to-pantheon@0.8.0
       with:
         ssh_key: ${{ secrets.PANTHEON_SSH_KEY }}
         machine_token: ${{ secrets.PANTHEON_MACHINE_TOKEN }}
@@ -266,7 +266,7 @@ Here's an example from a real site that uses Tailwind to prepare CSS in the site
     # to Pantheon in the later "push-to-pantheon" step.
     - run: "cd web/themes/my_custom_theme/css && rm .gitignore"
     - name: Push to Pantheon
-      uses: pantheon-systems/push-to-pantheon@0.7.0
+      uses: pantheon-systems/push-to-pantheon@0.8.0
       with:
         ssh_key: ${{ secrets.PANTHEON_SSH_KEY }}
         machine_token: ${{ secrets.PANTHEON_MACHINE_TOKEN }}
@@ -285,7 +285,7 @@ The following example shows our recommended way to run `composer install` prior 
     steps:
     - uses: actions/checkout@v6
     - name: Fetch cached Composer dependencies
-      uses: actions/cache@v3
+      uses: actions/cache@v5
       with:
         path: vendor
         key: ${{ runner.os }}-composer-${{ hashFiles('**/composer.lock') }}
@@ -293,13 +293,13 @@ The following example shows our recommended way to run `composer install` prior 
     - name: Composer install
       run: composer install --no-dev --optimize-autoloader
     - name: Save Composer cache
-      uses: actions/cache@v3
+      uses: actions/cache@v5
       with:
         path: vendor
         key: ${{ runner.os }}-composer-${{ hashFiles('**/composer.lock') }}
         restore-keys: ${{ runner.os }}-composer-
     - name: Push to Pantheon
-      uses: pantheon-systems/push-to-pantheon@0.7.0
+      uses: pantheon-systems/push-to-pantheon@0.8.0
       with:
         ssh_key: ${{ secrets.PANTHEON_SSH_KEY }}
         machine_token: ${{ secrets.PANTHEON_MACHINE_TOKEN }}
@@ -364,7 +364,7 @@ jobs:
         ref: ${{ github.event.pull_request.head.ref }}
         path: pr-code
     - name: Push to Pantheon
-      uses: pantheon-systems/push-to-pantheon@0.7.0
+      uses: pantheon-systems/push-to-pantheon@0.8.0
       with:
         ssh_key: ${{ secrets.PANTHEON_SSH_KEY }}
         machine_token: ${{ secrets.MACHINE_TOKEN }}
@@ -416,7 +416,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: Deploy to Pantheon
-      uses: pantheon-systems/push-to-pantheon@0.7.0
+      uses: pantheon-systems/push-to-pantheon@0.8.0
       with:
         ssh_key: ${{ secrets.PANTHEON_SSH_KEY }}
         machine_token: ${{ secrets.PANTHEON_MACHINE_TOKEN }}
@@ -425,7 +425,7 @@ jobs:
   code_standards_check:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v6
     - name: Composer install
       run: composer install
     - name: Check coding standards
@@ -436,7 +436,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: Check out the repository
-      uses: actions/checkout@v2
+      uses: actions/checkout@v6
     - uses: ./.github/actions/playwright-against-pantheon
       with:
         ssh_key: ${{ secrets.PANTHEON_SSH_KEY }}

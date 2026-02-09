@@ -19,6 +19,7 @@ yellow=$(safe_tput setaf 3)
 function main() {
 	help_msg="Usage: bash ./scripts/main.sh <command>
 	Available commands:
+	- get_target_env: Determine the target environment based on the context of the GitHub Actions workflow.
 	"
 
 	if [ -z "$1" ]; then
@@ -33,7 +34,7 @@ function main() {
 	fi
 
 	# Check for a valid command.
-	if [ "$1" != 'some_command' ] && [ "$1" != 'another_command' ]; then
+	if [ "$1" != 'get_target_env' ] && [ "$1" != 'another_command' ]; then
 		echo -e "${red}Invalid command: $1${normal}"
 		echo -e "${help_msg}"
 		exit 1
@@ -41,6 +42,21 @@ function main() {
 
 	# Execute the command.
 	"$1"
+}
+
+# Function to determine the target environment based on the context of the GitHub Actions workflow.
+function get_target_env() {
+	if [ -n "${INPUT_TARGET_ENV}" ]; then
+		TARGET_ENV="${INPUT_TARGET_ENV}"
+	elif [ -n "${PR_NUM}" ]; then
+		TARGET_ENV="pr-${PR_NUM}"
+	elif [ "${GITHUB_REF}" == "refs/heads/main" ] || [ "${GITHUB_REF}" == "refs/heads/master" ]; then
+		TARGET_ENV='dev'
+	else
+		exit 1
+	fi
+
+	echo "${TARGET_ENV}"
 }
 
 main "$@"

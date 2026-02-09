@@ -91,18 +91,12 @@ runs:
           INPUT_TARGET_ENV: ${{ inputs.target_env }}
         run: |
           # Set target_env
-          set +e
-
-            if [ -n "${INPUT_TARGET_ENV}" ]; then
-              TARGET_ENV="${INPUT_TARGET_ENV}"
-            elif [ -n "${PR_NUM}" ]; then
-              TARGET_ENV="pr-${PR_NUM}"
-            elif [ "${GITHUB_REF}" == "refs/heads/main" ] || [ "${GITHUB_REF}" == "refs/heads/master" ]; then
-              TARGET_ENV='dev'
-            else
+          TARGET_ENV=$(${{ github.workspace }}/scripts/main.sh get_target_env)
+          # Check if the result of get_target_env was an exit 1 code.
+          if [ $? -ne 0 ]; then
               echo "Error: you must set the 'target_env' parameter when running this action on a branch that is not 'main' or 'master' or when not executing a workflow in a pull request."
               exit 1
-            fi
+          fi
 
           echo "PANTHEON_TARGET_ENV set to ${TARGET_ENV}"
           echo "PANTHEON_TARGET_ENV=${TARGET_ENV}" >> $GITHUB_ENV

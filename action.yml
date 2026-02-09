@@ -413,8 +413,17 @@ runs:
               git fetch --unshallow origin || git fetch --depth=1000000 origin
             fi
 
+            # Commit staged changes if any (from relative_site_root preparation)
+            if ! git diff --cached --quiet; then
+              git commit -m "${PANTHEON_COMMIT_MESSAGE}"
+            fi
+
+            # Add pantheon remote if it doesn't exist
+            if ! git remote | grep -q pantheon; then
+              git remote add pantheon ssh://codeserver.dev.${SITE_ID}@codeserver.dev.${SITE_ID}.drush.in:2222/~/repository.git
+            fi
+
             # Push code to Pantheon
-            git remote add pantheon ssh://codeserver.dev.${SITE_ID}@codeserver.dev.${SITE_ID}.drush.in:2222/~/repository.git
             git push pantheon HEAD:refs/heads/${PANTHEON_DESTINATION_BRANCH} --force
             exit 0
           fi

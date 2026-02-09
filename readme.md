@@ -285,7 +285,7 @@ The following example shows our recommended way to run `composer install` prior 
     steps:
     - uses: actions/checkout@v6
     - name: Fetch cached Composer dependencies
-      uses: actions/cache@v3
+      uses: actions/cache@v5
       with:
         path: vendor
         key: ${{ runner.os }}-composer-${{ hashFiles('**/composer.lock') }}
@@ -293,7 +293,7 @@ The following example shows our recommended way to run `composer install` prior 
     - name: Composer install
       run: composer install --no-dev --optimize-autoloader
     - name: Save Composer cache
-      uses: actions/cache@v3
+      uses: actions/cache@v5
       with:
         path: vendor
         key: ${{ runner.os }}-composer-${{ hashFiles('**/composer.lock') }}
@@ -425,7 +425,7 @@ jobs:
   code_standards_check:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v6
     - name: Composer install
       run: composer install
     - name: Check coding standards
@@ -436,7 +436,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: Check out the repository
-      uses: actions/checkout@v2
+      uses: actions/checkout@v6
     - uses: ./.github/actions/playwright-against-pantheon
       with:
         ssh_key: ${{ secrets.PANTHEON_SSH_KEY }}

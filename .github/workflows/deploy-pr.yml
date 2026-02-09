@@ -48,6 +48,6 @@ jobs:
         relative_site_root: "pr-code/.github/testing_fixtures/dtp-nearly-empty-site"
         git_user_name: "Test Name"
         git_user_email: "test@example.com"
-        git_commit_message: "This is an automated commit message from GitHub Actions."
+        git_commit_message: "This is an automated commit message from GitHub Actions for PR #${{ github.event.pull_request.number }}."
         delete_old_environments: true
         clone_content: true

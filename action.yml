@@ -383,8 +383,9 @@ runs:
           # Push to Pantheon
           set +e
 
-          if [ -n "$SITE_ROOT" ]; then
-            cd ${SITE_ROOT}
+          # If relative_site_root was used, change to the cloned Pantheon repo directory
+          if [ -n "$PANTHEON_REPO_DIR" ]; then
+            cd ${PANTHEON_REPO_DIR}
           fi
 
           if [ "$SKIP_BUILD_TOOLS" == "true" ] || [ "$LIVE_ENV_EXISTS" == "false" ]; then

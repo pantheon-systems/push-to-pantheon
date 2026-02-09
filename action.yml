@@ -129,63 +129,11 @@ runs:
           # This provides helpful error messages if permissions are missing
 
           echo "Checking GitHub workflow permissions..."
-          MISSING_PERMISSIONS=()
-
-          # Check deployments permission
-          DEPLOY_RESPONSE=$(curl -s -w "\n%{http_code}" \
-            -H "Authorization: token ${GITHUB_TOKEN}" \
-            -H "Accept: application/vnd.github.v3+json" \
-            "https://api.github.com/repos/${GITHUB_REPOSITORY}/deployments?per_page=1")
-          DEPLOY_HTTP_CODE=$(echo "$DEPLOY_RESPONSE" | tail -n1)
-
-          if [ "$DEPLOY_HTTP_CODE" = "403" ]; then
-            MISSING_PERMISSIONS+=("deployments: write")
-          fi
-
-          # Check contents permission
-          CONTENTS_RESPONSE=$(curl -s -w "\n%{http_code}" \
-            -H "Authorization: token ${GITHUB_TOKEN}" \
-            -H "Accept: application/vnd.github.v3+json" \
-            "https://api.github.com/repos/${GITHUB_REPOSITORY}")
-          CONTENTS_HTTP_CODE=$(echo "$CONTENTS_RESPONSE" | tail -n1)
-
-          if [ "$CONTENTS_HTTP_CODE" = "403" ]; then
-            MISSING_PERMISSIONS+=("contents: read")
-          fi
-
-          # Check pull-requests permission (only if this is a PR event)
-          if [ -n "${PR_NUMBER}" ]; then
-            PR_RESPONSE=$(curl -s -w "\n%{http_code}" \
-              -H "Authorization: token ${GITHUB_TOKEN}" \
-              -H "Accept: application/vnd.github.v3+json" \
-              "https://api.github.com/repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}")
-            PR_HTTP_CODE=$(echo "$PR_RESPONSE" | tail -n1)
-
-            if [ "$PR_HTTP_CODE" = "403" ]; then
-              MISSING_PERMISSIONS+=("pull-requests: read")
-            fi
-          fi
+          MISSING_PERMISSIONS=(${{ github.workspace }}/scripts/main.sh check_missing_permissions)
 
           # If any permissions are missing, show error and exit
           if [ ${#MISSING_PERMISSIONS[@]} -gt 0 ]; then
-            echo ""
-            echo "❌ ERROR: Missing required GitHub permissions"
-            echo ""
-            echo "The following permissions are missing:"
-            for perm in "${MISSING_PERMISSIONS[@]}"; do
-              echo "  - ${perm}"
-            done
-            echo ""
-            echo "Add the following to your workflow:"
-            echo ""
-            echo "    permissions:"
-            echo "      deployments: write"
-            echo "      contents: read"
-            echo "      pull-requests: read"
-            echo ""
-            echo "For more information, see:"
-            echo "https://github.com/pantheon-systems/push-to-pantheon#permissions"
-            echo ""
+            ${{ github.workspace }}/scripts/main.sh get_missing_permissions_help "${MISSING_PERMISSIONS[@]}"
             exit 1
           fi
 

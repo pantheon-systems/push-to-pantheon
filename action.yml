@@ -264,7 +264,7 @@ runs:
 
       - name: Install Terminus Plugin
         shell: bash
-        if: ${{ inputs.skip_build_tools != 'true' }}
+        if: ${{ inputs.skip_build_tools != 'true' && steps.check_live_env.outputs.live_env_exists == 'true' }}
         env:
           BUILD_TOOLS_VERSION_INPUT: ${{ inputs.build_tools_version }}
         run: |

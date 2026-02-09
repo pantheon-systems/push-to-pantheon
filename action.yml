@@ -345,12 +345,21 @@ runs:
 
           if [ "$SKIP_BUILD_TOOLS" == "true" ] || [ "$LIVE_ENV_EXISTS" == "false" ]; then
             SITE_ID=$(terminus site:info ${PANTHEON_SITE} --field=id)
-            # Check if a multidev already exists for this PR.
-            if terminus multidev:list ${PANTHEON_SITE} --format=list | grep -q "^${PANTHEON_TARGET_ENV}$"; then
-              echo "Multidev environment ${PANTHEON_TARGET_ENV} already exists. Pushing code to existing environment."
+
+            # Are we pushing to a multidev or to dev?
+            if [ "$PANTHEON_TARGET_ENV" == "dev" ]; then
+              PANTHEON_DESTINATION_BRANCH="master"
+              echo "Target environment is dev, pushing to 'master' branch on Pantheon."
             else
-              echo "Creating new multidev environment: ${PANTHEON_TARGET_ENV}"
-              terminus multidev:create ${PANTHEON_SITE}.${PANTHEON_SOURCE_ENV} ${PANTHEON_TARGET_ENV} --yes
+              PANTHEON_DESTINATION_BRANCH="${PANTHEON_TARGET_ENV}"
+              echo "Target environment is ${PANTHEON_TARGET_ENV}, pushing to branch with the same name on Pantheon."
+              # Check if a multidev already exists for this PR.
+              if terminus multidev:list ${PANTHEON_SITE} --format=list | grep -q "^${PANTHEON_TARGET_ENV}$"; then
+                echo "Multidev environment ${PANTHEON_TARGET_ENV} already exists. Pushing code to existing environment."
+              else
+                echo "Creating new multidev environment: ${PANTHEON_TARGET_ENV}"
+                terminus multidev:create ${PANTHEON_SITE}.${PANTHEON_SOURCE_ENV} ${PANTHEON_TARGET_ENV} --yes
+              fi
             fi
 
             # Ensure repo is not shallow; Pantheon rejects shallow pushes
@@ -361,7 +370,7 @@ runs:
 
             # Push code to Pantheon
             git remote add pantheon ssh://codeserver.dev.${SITE_ID}@codeserver.dev.${SITE_ID}.drush.in:2222/~/repository.git
-            git push pantheon HEAD:refs/heads/${PANTHEON_TARGET_ENV} --force
+            git push pantheon HEAD:refs/heads/${PANTHEON_DESTINATION_BRANCH} --force
             exit 0
           fi
 

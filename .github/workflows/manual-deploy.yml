@@ -59,7 +59,7 @@ jobs:
         ssh_key: ${{ secrets.PANTHEON_SSH_KEY }}
         machine_token: ${{ secrets.PANTHEON_MACHINE_TOKEN }}
         site: dtp-nearly-empty-site
-        target_env: "wd-${{ steps.vars.outputs.short_ref_name }}"
+        target_env: ${{ github.ref_name == '0.x' && 'dev' || format('wd-{0}', steps.vars.outputs.short_ref_name) }}
         relative_site_root: ".github/testing_fixtures/dtp-nearly-empty-site"
         git_user_name: "Test Name"
         git_user_email: "test@example.com"
@@ -88,7 +88,7 @@ jobs:
             ssh_key: ${{ secrets.PANTHEON_SSH_KEY }}
             machine_token: ${{ secrets.PANTHEON_MACHINE_TOKEN }}
             site: dtp-nearly-empty-site
-            target_env: "wd-${{ steps.vars.outputs.short_ref_name }}"
+            target_env: ${{ github.ref_name == '0.x' && 'dev' || format('wd-{0}', steps.vars.outputs.short_ref_name) }}
             relative_site_root: ".github/testing_fixtures/dtp-nearly-empty-site"
             git_user_name: "Test Name"
             git_user_email: "test@example.com"

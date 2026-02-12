@@ -328,12 +328,27 @@ function cleanup() {
 		exit 0
 	fi
 
+	# Age threshold in days - only delete environments older than this
+	# Default to 14 days if not specified
+	AGE_THRESHOLD_DAYS="${MULTIDEV_AGE_THRESHOLD_DAYS:-14}"
+	CURRENT_TIMESTAMP=$(date +%s)
+	AGE_THRESHOLD_SECONDS=$((AGE_THRESHOLD_DAYS * 86400))
+	echo -e "${yellow}Age threshold: ${normal}${bold}${AGE_THRESHOLD_DAYS} days${normal}"
+
 	# List all environments, filter out the standard dev/test/live, find the ones
 	# that match our deletion patterns (both legacy and new), and exclude the current target env.
 	# Built-in test suite patterns: *-std, *-cont, *-git, *-term, *-adv
 	# Legacy manual deploy pattern: wd-*
 	# User-specified pattern: $MULTIDEV_DELETE_PATTERN (optional)
 	ALL_ENVS=$(terminus env:list "$PANTHEON_SITE" --format=list)
+
+	# Extract the prefix from PANTHEON_TARGET_ENV to protect all concurrent suite environments
+	# e.g., "126-mo-std" -> "126-mo", "pr-123-git" -> "pr-123", "0x-term" -> "0x"
+	ENV_PREFIX=""
+	if [[ "$PANTHEON_TARGET_ENV" =~ ^(.+)-(std|cont|git|term|adv)$ ]]; then
+		ENV_PREFIX="${BASH_REMATCH[1]}"
+		echo -e "${yellow}Protecting all environments with prefix: ${normal}${bold}${ENV_PREFIX}-*${normal}"
+	fi
 
 	# Start with environments matching suite patterns or legacy wd- pattern
 	FILTERED_ENVS=$(echo "$ALL_ENVS" \
@@ -354,11 +369,35 @@ function cleanup() {
 		FILTERED_ENVS=$(echo -e "${FILTERED_ENVS}\n${PATTERN_ENVS}" | sort -u)
 	fi
 
-	# Exclude the current target environment and keep all but the most recent
-	OLDEST_ENVIRONMENTS=$(echo "$FILTERED_ENVS" \
-		| grep -v "^${PANTHEON_TARGET_ENV}$" \
-		| sort \
-		| sed -e '$d')
+	# Exclude the current target environment and all environments with the same prefix
+	CANDIDATE_ENVS=$(echo "$FILTERED_ENVS" \
+		| grep -v "^${PANTHEON_TARGET_ENV}$")
+
+	# If we have a prefix, exclude all environments starting with that prefix
+	if [ -n "$ENV_PREFIX" ]; then
+		CANDIDATE_ENVS=$(echo "$CANDIDATE_ENVS" | grep -v "^${ENV_PREFIX}-")
+	fi
+
+	# Filter by age and collect environments with their timestamps for sorting
+	OLDEST_ENVIRONMENTS=""
+	for ENV in $CANDIDATE_ENVS; do
+		# Get the last modified timestamp for this environment
+		CREATED_TIMESTAMP=$(terminus env:info "${PANTHEON_SITE}.${ENV}" --field=created 2>/dev/null || echo "0")
+
+		# Calculate age in seconds
+		AGE_SECONDS=$((CURRENT_TIMESTAMP - CREATED_TIMESTAMP))
+
+		# Only include if older than threshold
+		if [ "$AGE_SECONDS" -gt "$AGE_THRESHOLD_SECONDS" ]; then
+			AGE_DAYS=$((AGE_SECONDS / 86400))
+			echo -e "${yellow}Found old environment: ${normal}${bold}${ENV}${normal}${yellow} (${AGE_DAYS} days old)${normal}"
+			# Add to list with timestamp for sorting (format: timestamp env_name)
+			OLDEST_ENVIRONMENTS="${OLDEST_ENVIRONMENTS}${CREATED_TIMESTAMP} ${ENV}"$'\n'
+		fi
+	done
+
+	# Sort by timestamp (oldest first) and extract just the environment names
+	OLDEST_ENVIRONMENTS=$(echo "$OLDEST_ENVIRONMENTS" | grep -v '^$' | sort -n | awk '{print $2}')
 
 	# Exit if there are no environments to delete.
 	if [ -z "$OLDEST_ENVIRONMENTS" ] ; then

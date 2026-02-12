@@ -1,0 +1,286 @@
+name: Test Suites
+
+on:
+  workflow_call:
+    inputs:
+      suite:
+        description: 'Which suite(s) to run'
+        type: string
+        default: 'all'
+        required: false
+      env_prefix:
+        description: 'Environment name prefix (e.g., "123", "126mor", "0x")'
+        type: string
+        required: true
+    secrets:
+      PANTHEON_SSH_KEY:
+        required: true
+      PANTHEON_MACHINE_TOKEN:
+        required: true
+  workflow_dispatch:
+    inputs:
+      suite:
+        description: 'Which suite(s) to run'
+        type: choice
+        options:
+          - all
+          - standard
+          - content
+          - git
+          - terminus
+          - advanced
+        default: all
+      env_prefix:
+        description: 'Environment name prefix (e.g., "test", "demo")'
+        type: string
+        required: true
+
+permissions:
+  deployments: write
+  contents: write
+  pull-requests: read
+
+jobs:
+  standard:
+    name: Standard Deployment
+    if: inputs.suite == 'all' || inputs.suite == 'standard'
+    runs-on: ubuntu-latest
+    steps:
+      # Checkout base repository code (trusted)
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      # Checkout PR code to subdirectory (untrusted) - only for pull_request_target
+      - name: Checkout PR code
+        if: github.event_name == 'pull_request_target'
+        uses: actions/checkout@v6
+        with:
+          repository: ${{ github.event.pull_request.head.repo.full_name }}
+          ref: ${{ github.event.pull_request.head.ref }}
+          path: pr-code
+
+      - name: Deploy to Pantheon
+        uses: ./
+        with:
+          ssh_key: ${{ secrets.PANTHEON_SSH_KEY }}
+          machine_token: ${{ secrets.PANTHEON_MACHINE_TOKEN }}
+          site: dtp-nearly-empty-site
+          target_env: ${{ inputs.env_prefix }}-std
+          relative_site_root: ${{ github.event_name == 'pull_request_target' && 'pr-code/.github/testing_fixtures/dtp-nearly-empty-site' || '.github/testing_fixtures/dtp-nearly-empty-site' }}
+
+      - name: Verify deployment success
+        run: |
+          echo "Deployment completed successfully"
+          echo "Environment: ${{ inputs.env_prefix }}-std"
+
+      - name: Check environment URL accessibility
+        run: |
+          ENV_URL="https://${{ inputs.env_prefix }}-std-dtp-nearly-empty-site.pantheonsite.io"
+          echo "Checking accessibility of ${ENV_URL}"
+
+          # Wait a few seconds for environment to be fully ready
+          sleep 10
+
+          # Try to fetch the URL (fail if not accessible)
+          if curl -sSf "${ENV_URL}" > /dev/null; then
+            echo "::notice::✅ Environment URL is accessible"
+          else
+            echo "::error::❌ Environment URL is not accessible"
+            exit 1
+          fi
+
+  content:
+    name: Clone Content
+    if: inputs.suite == 'all' || inputs.suite == 'content'
+    runs-on: ubuntu-latest
+    steps:
+      # Checkout base repository code (trusted)
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      # Checkout PR code to subdirectory (untrusted) - only for pull_request_target
+      - name: Checkout PR code
+        if: github.event_name == 'pull_request_target'
+        uses: actions/checkout@v6
+        with:
+          repository: ${{ github.event.pull_request.head.repo.full_name }}
+          ref: ${{ github.event.pull_request.head.ref }}
+          path: pr-code
+
+      - name: Deploy to Pantheon
+        uses: ./
+        with:
+          ssh_key: ${{ secrets.PANTHEON_SSH_KEY }}
+          machine_token: ${{ secrets.PANTHEON_MACHINE_TOKEN }}
+          site: dtp-nearly-empty-site
+          target_env: ${{ inputs.env_prefix }}-cont
+          relative_site_root: ${{ github.event_name == 'pull_request_target' && 'pr-code/.github/testing_fixtures/dtp-nearly-empty-site' || '.github/testing_fixtures/dtp-nearly-empty-site' }}
+          clone_content: true
+          source_env: dev
+
+      - name: Verify deployment success
+        run: |
+          echo "Deployment completed successfully"
+          echo "Environment: ${{ inputs.env_prefix }}-cont"
+
+      - name: Check environment URL accessibility
+        run: |
+          ENV_URL="https://${{ inputs.env_prefix }}-cont-dtp-nearly-empty-site.pantheonsite.io"
+          echo "Checking accessibility of ${ENV_URL}"
+          sleep 10
+          if curl -sSf "${ENV_URL}" > /dev/null; then
+            echo "::notice::✅ Environment URL is accessible"
+          else
+            echo "::error::❌ Environment URL is not accessible"
+            exit 1
+          fi
+
+  git-only:
+    name: Git-Only Deployment
+    if: inputs.suite == 'all' || inputs.suite == 'git'
+    runs-on: ubuntu-latest
+    steps:
+      # Checkout base repository code (trusted)
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      # Checkout PR code to subdirectory (untrusted) - only for pull_request_target
+      - name: Checkout PR code
+        if: github.event_name == 'pull_request_target'
+        uses: actions/checkout@v6
+        with:
+          repository: ${{ github.event.pull_request.head.repo.full_name }}
+          ref: ${{ github.event.pull_request.head.ref }}
+          path: pr-code
+
+      - name: Deploy to Pantheon
+        uses: ./
+        with:
+          ssh_key: ${{ secrets.PANTHEON_SSH_KEY }}
+          machine_token: ${{ secrets.PANTHEON_MACHINE_TOKEN }}
+          site: dtp-nearly-empty-site
+          target_env: ${{ inputs.env_prefix }}-git
+          relative_site_root: ${{ github.event_name == 'pull_request_target' && 'pr-code/.github/testing_fixtures/dtp-nearly-empty-site' || '.github/testing_fixtures/dtp-nearly-empty-site' }}
+          skip_build_tools: true
+          git_user_name: "Git Deploy Test"
+          git_user_email: "git-deploy@example.com"
+          git_commit_message: "Git-only deployment test"
+
+      - name: Verify deployment success
+        run: |
+          echo "Deployment completed successfully"
+          echo "Environment: ${{ inputs.env_prefix }}-git"
+
+      - name: Check environment URL accessibility
+        run: |
+          ENV_URL="https://${{ inputs.env_prefix }}-git-dtp-nearly-empty-site.pantheonsite.io"
+          echo "Checking accessibility of ${ENV_URL}"
+          sleep 10
+          if curl -sSf "${ENV_URL}" > /dev/null; then
+            echo "::notice::✅ Environment URL is accessible"
+          else
+            echo "::error::❌ Environment URL is not accessible"
+            exit 1
+          fi
+
+  terminus-preinstalled:
+    name: Terminus Pre-installed
+    if: inputs.suite == 'all' || inputs.suite == 'terminus'
+    runs-on: ubuntu-latest
+    steps:
+      # Checkout base repository code (trusted)
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      # Checkout PR code to subdirectory (untrusted) - only for pull_request_target
+      - name: Checkout PR code
+        if: github.event_name == 'pull_request_target'
+        uses: actions/checkout@v6
+        with:
+          repository: ${{ github.event.pull_request.head.repo.full_name }}
+          ref: ${{ github.event.pull_request.head.ref }}
+          path: pr-code
+
+      - name: Pre-install Terminus
+        uses: pantheon-systems/terminus-github-actions@v1
+        with:
+          pantheon-machine-token: ${{ secrets.PANTHEON_MACHINE_TOKEN }}
+
+      - name: Verify Terminus installation
+        run: |
+          terminus --version
+          echo "::notice::Terminus is pre-installed"
+
+      - name: Deploy to Pantheon
+        uses: ./
+        with:
+          ssh_key: ${{ secrets.PANTHEON_SSH_KEY }}
+          machine_token: ${{ secrets.PANTHEON_MACHINE_TOKEN }}
+          site: dtp-nearly-empty-site
+          target_env: ${{ inputs.env_prefix }}-term
+          relative_site_root: ${{ github.event_name == 'pull_request_target' && 'pr-code/.github/testing_fixtures/dtp-nearly-empty-site' || '.github/testing_fixtures/dtp-nearly-empty-site' }}
+          skip_terminus_install: true
+          build_tools_version: 3.x-dev
+
+      - name: Verify deployment success
+        run: |
+          echo "Deployment completed successfully"
+          echo "Environment: ${{ inputs.env_prefix }}-term"
+
+      - name: Check environment URL accessibility
+        run: |
+          ENV_URL="https://${{ inputs.env_prefix }}-term-dtp-nearly-empty-site.pantheonsite.io"
+          echo "Checking accessibility of ${ENV_URL}"
+          sleep 10
+          if curl -sSf "${ENV_URL}" > /dev/null; then
+            echo "::notice::✅ Environment URL is accessible"
+          else
+            echo "::error::❌ Environment URL is not accessible"
+            exit 1
+          fi
+
+  advanced:
+    name: Advanced Deployment
+    if: inputs.suite == 'all' || inputs.suite == 'advanced'
+    runs-on: ubuntu-latest
+    steps:
+      # Checkout base repository code (trusted)
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      # Checkout PR code to subdirectory (untrusted) - only for pull_request_target
+      - name: Checkout PR code
+        if: github.event_name == 'pull_request_target'
+        uses: actions/checkout@v6
+        with:
+          repository: ${{ github.event.pull_request.head.repo.full_name }}
+          ref: ${{ github.event.pull_request.head.ref }}
+          path: pr-code
+
+      - name: Deploy to Pantheon
+        uses: ./
+        with:
+          ssh_key: ${{ secrets.PANTHEON_SSH_KEY }}
+          machine_token: ${{ secrets.PANTHEON_MACHINE_TOKEN }}
+          site: dtp-nearly-empty-site
+          target_env: ${{ inputs.env_prefix }}-adv
+          relative_site_root: ${{ github.event_name == 'pull_request_target' && 'pr-code/.github/testing_fixtures/dtp-nearly-empty-site' || '.github/testing_fixtures/dtp-nearly-empty-site' }}
+          delete_old_environments: true
+          clone_content: true
+
+      - name: Verify deployment success
+        run: |
+          echo "Deployment completed successfully"
+          echo "Environment: ${{ inputs.env_prefix }}-adv"
+
+      - name: Check environment URL accessibility
+        run: |
+          ENV_URL="https://${{ inputs.env_prefix }}-adv-dtp-nearly-empty-site.pantheonsite.io"
+          echo "Checking accessibility of ${ENV_URL}"
+          sleep 10
+          if curl -sSf "${ENV_URL}" > /dev/null; then
+            echo "::notice::✅ Environment URL is accessible"
+          else
+            echo "::error::❌ Environment URL is not accessible"
+            exit 1
+          fi

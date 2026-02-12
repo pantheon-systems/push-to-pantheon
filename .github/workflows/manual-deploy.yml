@@ -7,92 +7,52 @@ concurrency:
 on:
   workflow_dispatch:
     inputs:
-      install_terminus:
-        description: 'Install Terminus during deploy?'
-        required: true
-        default: 'Yes'
+      suite:
+        description: 'Which test suite(s) to run'
         type: choice
         options:
-          - 'Yes'
-          - 'No'
-      run_cleanup:
-        description: 'Run cleanup after successful deploy?'
-        required: true
-        default: 'No'
-        type: choice
-        options:
-          - 'Yes'
-          - 'No'
+          - all
+          - standard
+          - content
+          - git
+          - terminus
+          - advanced
+        default: all
 
 jobs:
-  test_workflow_no_terminus_install:
-    name: Test Deploy without Terminus Install
-    if: ${{ github.event.inputs.install_terminus == 'No' }}
+  compute_env_prefix:
+    name: Compute Environment Prefix
+    runs-on: ubuntu-latest
+    outputs:
+      env_prefix: ${{ steps.compute.outputs.env_prefix }}
+    steps:
+      - name: Compute environment prefix
+        id: compute
+        run: |
+          # For 0.x branch, use "0x" as prefix
+          # For other branches, use first 6 chars of sanitized branch name
+          if [ "${{ github.ref_name }}" == "0.x" ]; then
+            ENV_PREFIX="0x"
+          else
+            # Remove non-alphanumeric characters (except hyphens) and take first 6 chars
+            SHORT_REF=$(echo "${{ github.ref_name }}" | sed 's/[^a-zA-Z0-9-]//g' | cut -c1-6)
+            ENV_PREFIX="${SHORT_REF}"
+          fi
+
+          echo "Computed environment prefix: ${ENV_PREFIX}"
+          echo "env_prefix=${ENV_PREFIX}" >> $GITHUB_OUTPUT
+
+  run_test_suites:
+    name: Run Test Suites
+    needs: compute_env_prefix
     permissions:
       deployments: write
       contents: write
-    runs-on: ubuntu-latest
-    steps:
-    - name: Checkout Repository
-      uses: actions/checkout@v6
-
-    - name: Install Terminus
-      uses: pantheon-systems/terminus-github-actions@v1.2.7
-      with:
-        pantheon-machine-token: ${{ secrets.PANTHEON_MACHINE_TOKEN }}
-
-    - name: Run Terminus Command
-      run: |
-        terminus --version
-        terminus art
-        terminus auth:whoami
-        terminus site:info dtp-nearly-empty-site
-      shell: bash
-
-    - name: Set short branch name
-      id: vars
-      run: echo "short_ref_name=$(echo ${{ github.ref_name }} | sed 's/[^a-zA-Z0-9-]//g' | cut -c1-8)" >> $GITHUB_OUTPUT
-
-    - name: deploy to Pantheon
-      uses: ./
-      with:
-        ssh_key: ${{ secrets.PANTHEON_SSH_KEY }}
-        machine_token: ${{ secrets.PANTHEON_MACHINE_TOKEN }}
-        site: dtp-nearly-empty-site
-        target_env: ${{ github.ref_name == '0.x' && 'dev' || format('wd-{0}', steps.vars.outputs.short_ref_name) }}
-        relative_site_root: ".github/testing_fixtures/dtp-nearly-empty-site"
-        git_user_name: "Test Name"
-        git_user_email: "test@example.com"
-        git_commit_message: "This is a manual test deployment from GitHub Actions."
-        clone_content: true
-        delete_old_environments: ${{ github.event.inputs.run_cleanup == 'Yes' }}
-
-  test_workflow_with_terminus_install:
-    name: Test Deploy with Terminus Install
-    if: ${{ github.event.inputs.install_terminus == 'Yes' }}
-    permissions:
-        deployments: write
-        contents: write
-    runs-on: ubuntu-latest
-    steps:
-        - name: Checkout Repository
-          uses: actions/checkout@v6
-
-        - name: Set short branch name
-          id: vars
-          run: echo "short_ref_name=$(echo ${{ github.ref_name }} | sed 's/[^a-zA-Z0-9-]//g' | cut -c1-8)" >> $GITHUB_OUTPUT
-
-        - name: deploy to Pantheon
-          uses: ./
-          with:
-            ssh_key: ${{ secrets.PANTHEON_SSH_KEY }}
-            machine_token: ${{ secrets.PANTHEON_MACHINE_TOKEN }}
-            site: dtp-nearly-empty-site
-            target_env: ${{ github.ref_name == '0.x' && 'dev' || format('wd-{0}', steps.vars.outputs.short_ref_name) }}
-            relative_site_root: ".github/testing_fixtures/dtp-nearly-empty-site"
-            git_user_name: "Test Name"
-            git_user_email: "test@example.com"
-            git_commit_message: "This is a manual test deployment from GitHub Actions."
-            clone_content: true
-            delete_old_environments: ${{ github.event.inputs.run_cleanup == 'Yes' }}
-       
+      pull-requests: read
+    uses: ./.github/workflows/test-suites.yml
+    with:
+      env_prefix: ${{ needs.compute_env_prefix.outputs.env_prefix }}
+      suite: ${{ inputs.suite }}
+    secrets:
+      PANTHEON_SSH_KEY: ${{ secrets.PANTHEON_SSH_KEY }}
+      PANTHEON_MACHINE_TOKEN: ${{ secrets.PANTHEON_MACHINE_TOKEN }}

@@ -218,6 +218,15 @@ runs:
             terminus self:plugin:install "pantheon-systems/terminus-build-tools-plugin:${BUILD_TOOLS_VERSION}"
           fi
 
+      - name: Verify Build Tools Plugin Installation
+        shell: bash
+        if: ${{ inputs.skip_build_tools != 'true' && steps.check_live_env.outputs.live_env_exists == 'true' }}
+        env:
+          WORKSPACE: ${{ github.workspace }}
+        run: |
+          # Verify Build Tools plugin installation
+          ${WORKSPACE}/scripts/main.sh verify_build_tools
+
       - name: Configure Git User
         shell: bash
         env:
@@ -253,6 +262,10 @@ runs:
           SKIP_BUILD_TOOLS: ${{ inputs.skip_build_tools }}
           LIVE_ENV_EXISTS: ${{ steps.check_live_env.outputs.live_env_exists }}
           WORKSPACE: ${{ github.workspace }}
+          CI_COMMIT_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          CI_BUILD_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          CI_PROJECT_USERNAME: ${{ github.repository_owner }}
+          CI_PROJECT_REPONAME: ${{ github.event.repository.name }}
         run: |
           # Push to Pantheon
           ${WORKSPACE}/scripts/main.sh push_to_pantheon

@@ -22,6 +22,7 @@ function main() {
 	- get_target_env: Determine the target environment based on the context of the GitHub Actions workflow.
 	- check_missing_permissions: Check for missing GitHub permissions and return a list of any that are missing.
 	- get_missing_permissions_help: Print a help message with instructions for how to add the missing permissions to your workflow.
+	- setup_ssh_hostkeys: Set up SSH host keys for Pantheon.
 	"
 
 	if [ -z "$1" ]; then
@@ -36,7 +37,7 @@ function main() {
 	fi
 
 	# Check for a valid command.
-	if [ "$1" != 'get_target_env' ] && [ "$1" != 'check_missing_permissions' ] && [ "$1" != 'get_missing_permissions_help' ]; then
+	if [ "$1" != 'get_target_env' ] && [ "$1" != 'check_missing_permissions' ] && [ "$1" != 'get_missing_permissions_help' ] && [ "$1" != 'setup_ssh_hostkeys' ]; then
 		echo -e "${red}Invalid command: $1${normal}"
 		echo -e "${help_msg}"
 		exit 1
@@ -104,6 +105,7 @@ function check_missing_permissions() {
 	echo "${MISSING_PERMISSIONS[@]}"
 }
 
+# Function to print a help message with instructions for how to add the missing permissions to your workflow.
 function get_missing_permissions_help() {
 	echo ""
 	echo "❌ ERROR: Missing required GitHub permissions"
@@ -123,6 +125,18 @@ function get_missing_permissions_help() {
 	echo "For more information, see:"
 	echo "https://github.com/pantheon-systems/push-to-pantheon#permissions"
 	echo ""
+}
+
+# Set up SSH host keys for Pantheon.
+function setup_ssh_hostkeys() {
+	mkdir -p ~/.ssh
+	chmod 700 ~/.ssh
+	printf "%s" "$SSH_KEY" > ~/.ssh/id_rsa
+	chmod 600 ~/.ssh/id_rsa        
+	echo "Host *.pantheon.io *.drush.in *.getpantheon.com *.panth.io" >> "$HOME/.ssh/config"
+	echo "StrictHostKeyChecking no" >> "$HOME/.ssh/config"
+	echo "HostKeyAlgorithms +ssh-rsa" >> "$HOME/.ssh/config"
+	echo -e "${green}✅ SSH host keys configured.${normal}"	
 }
 
 main "$@"

@@ -6,7 +6,7 @@ IFS=$'\n\t'
 # Define some global variables for colors using ANSI escape codes.
 # These work reliably in GitHub Actions without requiring tput or a TTY.
 normal='\033[0m'      # Reset
-_bold='\033[1m'       # Bold (reserved for future use)
+bold='\033[1m'        # Bold
 red='\033[0;31m'      # Red
 green='\033[0;32m'    # Green
 yellow='\033[0;33m'   # Yellow
@@ -148,7 +148,7 @@ function setup_ssh_hostkeys() {
 # compatibility.
 function prepare_site_root() {
 	if [ -n "$SITE_ROOT" ]; then
-		echo "Preparing site from relative path: ${SITE_ROOT}"
+		echo -e "${yellow}Preparing site from relative path:${normal}${bold} ${SITE_ROOT}${normal}"
 
 		# Get the Pantheon site ID
 		SITE_ID=$(terminus site:info "${PANTHEON_SITE}" --field=id)
@@ -172,7 +172,7 @@ function prepare_site_root() {
 			fi # Multidev check
 		fi # Target env check
 
-		echo "Cloning Pantheon repository from branch: ${CLONE_BRANCH}"
+		echo -e "${yellow}Cloning Pantheon repository from branch: ${normal}${bold}${CLONE_BRANCH}${normal}"
 
 		# Create a temporary directory for the Pantheon repo
 		PANTHEON_REPO_DIR=$(mktemp -d)
@@ -183,25 +183,25 @@ function prepare_site_root() {
 			"${PANTHEON_REPO_DIR}"
 
 		# Copy files from SITE_ROOT to the Pantheon repo (overwriting)
-		echo "Copying files from ${SITE_ROOT} to Pantheon repository"
+		echo -e "${yellow}Copying files from ${normal}${bold}${SITE_ROOT}${normal}${yellow} to Pantheon repository${normal}"
 		rsync -av --delete --exclude='.git' "${SITE_ROOT}/" "${PANTHEON_REPO_DIR}/"
 
 		# Move into the Pantheon repo directory for subsequent steps
 		cd "${PANTHEON_REPO_DIR}" || exit
 
 		# Add the GitHub origin for Build Tools compatibility
-		echo "Setting GitHub origin for Build Tools compatibility"
+		echo -e "${yellow}Setting GitHub origin for Build Tools compatibility${normal}"
 		if git remote | grep origin; then
 			ORIGIN_URL=$(git remote get-url origin)
 			if [[ "$ORIGIN_URL" != https://github.com/* ]]; then
-				echo "Updating origin to GitHub URL"
+				echo -e "${yellow}Updating origin to GitHub URL${normal}"
 				git remote remove origin
 				if [ -n "${GITHUB_REPOSITORY}" ]; then
 					git remote add origin "https://github.com/${GITHUB_REPOSITORY}"
 				fi
 			fi
 		else
-			echo "Adding origin to GitHub URL"
+			echo -e "${yellow}Adding origin to GitHub URL${normal}"
 			if [ -n "${GITHUB_REPOSITORY}" ]; then
 				git remote add origin "https://github.com/${GITHUB_REPOSITORY}"
 			fi
@@ -233,23 +233,23 @@ function push_to_pantheon() {
 		# Are we pushing to a multidev or to dev?
 		if [ "$PANTHEON_TARGET_ENV" == "dev" ]; then
 			PANTHEON_DESTINATION_BRANCH="master"
-			echo "Target environment is dev, pushing to 'master' branch on Pantheon."
+			echo -e "${yellow}Target environment is dev, pushing to 'master' branch on Pantheon.${normal}"
 		else
 			PANTHEON_DESTINATION_BRANCH="${PANTHEON_TARGET_ENV}"
-			echo "Target environment is ${PANTHEON_TARGET_ENV}, pushing to branch with the same name on Pantheon."
+			echo -e "${yellow}Target environment is ${normal}${bold}${PANTHEON_TARGET_ENV}${normal}${yellow}, pushing to branch with the same name on Pantheon.${normal}"
 
 			# Check if a multidev already exists for this PR.
 			if terminus multidev:list "${PANTHEON_SITE}" --format=list | grep -q "^${PANTHEON_TARGET_ENV}$"; then
-				echo "Multidev environment ${PANTHEON_TARGET_ENV} already exists. Pushing code to existing environment."
+				echo -e "${yellow}Multidev environment ${normal}${bold}${PANTHEON_TARGET_ENV}${normal}${yellow} already exists. Pushing code to existing environment.${normal}"
 			else
-				echo "Creating new multidev environment: ${PANTHEON_TARGET_ENV}"
+				echo -e "${yellow}Creating new multidev environment: ${normal}${bold}${PANTHEON_TARGET_ENV}${normal}${yellow}${normal}"
 				terminus multidev:create "${PANTHEON_SITE}.${PANTHEON_SOURCE_ENV}" "${PANTHEON_TARGET_ENV}" --yes
 			fi
 		fi
 
 		# Ensure repo is not shallow; Pantheon rejects shallow pushes
 		if git rev-parse --is-shallow-repository >/dev/null 2>&1 && [ "$(git rev-parse --is-shallow-repository)" = "true" ]; then
-			echo "Repository is shallow; unshallowing before push."
+			echo -e "${bold}Repository is shallow; unshallowing before push.${normal}"
 			git fetch --unshallow origin || git fetch --depth=1000000 origin
 		fi
 
@@ -277,11 +277,11 @@ function push_to_pantheon() {
 # can be deleted.
 delete_github_environment() {
 	local ENV_NAME=$1
-	echo "Cleaning up GitHub environment: ${ENV_NAME}..."
+	echo -e "${yellow}Cleaning up GitHub environment: ${normal}${bold}${ENV_NAME}${normal}..."
 
 	# Check if the environment exists before trying to delete it.
 	if ! gh api "repos/${GITHUB_REPOSITORY}/environments/${ENV_NAME}" > /dev/null 2>&1; then
-		echo "GitHub environment ${ENV_NAME} does not exist, skipping deletion."
+		echo -e "${red}GitHub environment ${normal}${bold}${ENV_NAME}${normal}${red} does not exist, skipping deletion.${normal}"
 		return
 	fi
 
@@ -290,16 +290,16 @@ delete_github_environment() {
 
 	if [ -n "$DEPLOYMENT_IDS" ]; then
 		for DEPLOYMENT_ID in $DEPLOYMENT_IDS; do
-		echo "  - Deleting deployment ID ${DEPLOYMENT_ID}..."
+		echo -e "${yellow}  - Deleting deployment ID ${normal}${bold}${DEPLOYMENT_ID}${normal}${yellow}...${normal}"
 		gh api --method POST "repos/${GITHUB_REPOSITORY}/deployments/${DEPLOYMENT_ID}/statuses" -f state='inactive' -f description='Deployment is being deleted.' > /dev/null
 		gh api --method DELETE "repos/${GITHUB_REPOSITORY}/deployments/${DEPLOYMENT_ID}"
 		done
 	else
-		echo "  - No deployments found for environment ${ENV_NAME}."
+		echo -e "${red}  - No deployments found for environment ${normal}${bold}${ENV_NAME}${normal}${red}.${normal}"
 	fi
 
 	# Finally, delete the environment now that it is empty.
-	echo "  - Deleting environment ${ENV_NAME}..."
+	echo -e "${yellow}  - Deleting environment ${normal}${bold}${ENV_NAME}${normal}${yellow}...${normal}"
 	gh api --method DELETE "repos/${GITHUB_REPOSITORY}/environments/${ENV_NAME}"
 }
 
@@ -311,7 +311,7 @@ function cleanup() {
 		cd "${SITE_ROOT}" || return
 	fi
 
-	echo "Deleting stale Pantheon PR multidev environments..."
+	echo -e "${yellow}Deleting stale Pantheon PR multidev environments...${normal}"
 	# This command will find and delete multidev environments that are 
 	# associated with closed or merged pull requests.
 	terminus build:env:delete:pr "$PANTHEON_SITE" --yes
@@ -320,7 +320,7 @@ function cleanup() {
 	# associated with pull requests. This is useful for cleaning up 
 	# environments created by manual workflows or other automated processes.
 	if [ -z "$MULTIDEV_DELETE_PATTERN" ] || [ -z "$DELETE_OLD_MULTIDEVS" ] || [ "$DELETE_OLD_MULTIDEVS" != "true" ]; then
-		echo "No MULTIDEV_DELETE_PATTERN set or delete_old_environments was not set to true. Skipping deletion of old environments..."
+		echo -e "${red}No MULTIDEV_DELETE_PATTERN set or delete_old_environments was not set to true. Skipping deletion of old environments...${normal}"
 		exit 0
 	fi
 
@@ -338,19 +338,19 @@ function cleanup() {
 
 	# Exit if there are no environments to delete.
 	if [ -z "$OLDEST_ENVIRONMENTS" ] ; then
-		echo "No old environments matching the pattern found to delete."
+		echo -e "${red}No old environments matching the pattern found to delete.${normal}"
 		exit 0
 	fi
 
 	# Go ahead and delete the oldest environments.
 	for ENV_TO_DELETE in $OLDEST_ENVIRONMENTS; do
-		echo "Deleting Pantheon environment: ${ENV_TO_DELETE}..."
+		echo -e "${yellow}Deleting Pantheon environment: ${normal}${bold}${ENV_TO_DELETE}${normal}${yellow}...${normal}"
 		if terminus env:info "${PANTHEON_SITE}.${ENV_TO_DELETE}" > /dev/null 2>&1; then
 			terminus env:delete "${PANTHEON_SITE}.${ENV_TO_DELETE}" --delete-branch --yes
 			if [ -n "$GITHUB_REPOSITORY" ]; then
 				delete_github_environment "$ENV_TO_DELETE"
 			else
-				echo "Skipping GitHub deletion for ${ENV_TO_DELETE} — GITHUB_TOKEN or GITHUB_REPOSITORY not set."
+				echo -e "${red}Skipping GitHub deletion for ${normal}${bold}${ENV_TO_DELETE}${normal}${red} — GITHUB_TOKEN or GITHUB_REPOSITORY not set.${normal}"
 			fi
 		else
 			echo "Pantheon environment ${ENV_TO_DELETE} not found."

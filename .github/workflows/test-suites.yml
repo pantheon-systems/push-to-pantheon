@@ -220,7 +220,7 @@ jobs:
           target_env: ${{ inputs.env_prefix }}-term
           relative_site_root: ${{ github.event_name == 'pull_request_target' && 'pr-code/.github/testing_fixtures/dtp-nearly-empty-site' || '.github/testing_fixtures/dtp-nearly-empty-site' }}
           skip_terminus_install: true
-          build_tools_version: dev-main
+          build_tools_version: dev-3.x
 
       - name: Verify deployment success
         run: |

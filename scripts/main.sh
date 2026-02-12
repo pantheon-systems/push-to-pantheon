@@ -109,7 +109,7 @@ function check_missing_permissions() {
 # permissions to your workflow.
 function get_missing_permissions_help() {
 	echo ""
-	echo "❌ ERROR: Missing required GitHub permissions"
+	echo -e "❌ [error]: ${red}Missing required GitHub permissions${normal}"
 	echo ""
 	echo "The following permissions are missing:"
 	for perm in "$@"; do

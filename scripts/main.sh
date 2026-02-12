@@ -25,6 +25,7 @@ function main() {
 	- setup_ssh_hostkeys: Set up SSH host keys for Pantheon.
 	- prepare_site_root: Prepare the site root by cloning the Pantheon repository, copying files from the specified SITE_ROOT, and setting up the GitHub origin for Build Tools compatibility.
 	- push_to_pantheon: Push code to Pantheon, either via Git or Build Tools depending on configuration and environment state.
+	- cleanup: Clean up stale Pantheon multidev environments. This includes environments associated with closed PRs as well as old environments matching a specified pattern.
 	"
 
 	if [ -z "$1" ]; then
@@ -39,7 +40,7 @@ function main() {
 	fi
 
 	# Check for a valid command.
-	if [ "$1" != 'get_target_env' ] && [ "$1" != 'check_missing_permissions' ] && [ "$1" != 'get_missing_permissions_help' ] && [ "$1" != 'setup_ssh_hostkeys' ] && [ "$1" != 'prepare_site_root' ] && [ "$1" != 'push_to_pantheon' ]; then
+	if [ "$1" != 'get_target_env' ] && [ "$1" != 'check_missing_permissions' ] && [ "$1" != 'get_missing_permissions_help' ] && [ "$1" != 'setup_ssh_hostkeys' ] && [ "$1" != 'prepare_site_root' ] && [ "$1" != 'push_to_pantheon' ] && [ "$1" != 'cleanup' ]; then
 		echo -e "${red}Invalid command: $1${normal}"
 		echo -e "${help_msg}"
 		exit 1
@@ -267,6 +268,92 @@ function push_to_pantheon() {
 
 	# For all other pushes, use Build Tools.
 	terminus -n build:env:create ${PANTHEON_SITE}.${PANTHEON_SOURCE_ENV} ${PANTHEON_TARGET_ENV} --yes --message="${PANTHEON_COMMIT_MESSAGE}" ${PANTHEON_CLONE_CONTENT_FLAG}	
+}
+
+# Function to delete a GitHub environment and all of its associated deployments.
+# The GitHub API requires that all deployments be deleted before an environment
+# can be deleted.
+delete_github_environment() {
+	local ENV_NAME=$1
+	echo "Cleaning up GitHub environment: ${ENV_NAME}..."
+
+	# Check if the environment exists before trying to delete it.
+	if ! gh api "repos/${GITHUB_REPOSITORY}/environments/${ENV_NAME}" > /dev/null 2>&1; then
+		echo "GitHub environment ${ENV_NAME} does not exist, skipping deletion."
+		return
+	fi
+
+	# Get the list of deployment IDs for the environment.
+	DEPLOYMENT_IDS=$(gh api "repos/${GITHUB_REPOSITORY}/deployments?environment=${ENV_NAME}" --jq '.[].id')
+
+	if [ -n "$DEPLOYMENT_IDS" ]; then
+		for DEPLOYMENT_ID in $DEPLOYMENT_IDS; do
+		echo "  - Deleting deployment ID ${DEPLOYMENT_ID}..."
+		gh api --method POST "repos/${GITHUB_REPOSITORY}/deployments/${DEPLOYMENT_ID}/statuses" -f state='inactive' -f description='Deployment is being deleted.' > /dev/null
+		gh api --method DELETE "repos/${GITHUB_REPOSITORY}/deployments/${DEPLOYMENT_ID}"
+		done
+	else
+		echo "  - No deployments found for environment ${ENV_NAME}."
+	fi
+
+	# Finally, delete the environment now that it is empty.
+	echo "  - Deleting environment ${ENV_NAME}..."
+	gh api --method DELETE "repos/${GITHUB_REPOSITORY}/environments/${ENV_NAME}"
+}
+
+# Clean up stale Pantheon multidev environments. 
+# This includes environments associated with closed PRs as well as old 
+# environments matching a specified pattern.
+function cleanup() {
+	if [ -n "$SITE_ROOT" ]; then
+		cd "${SITE_ROOT}" || return
+	fi
+
+	echo "Deleting stale Pantheon PR multidev environments..."
+	# This command will find and delete multidev environments that are 
+	# associated with closed or merged pull requests.
+	terminus build:env:delete:pr "$PANTHEON_SITE" --yes
+
+	# The block below is intended to delete old environments that are not 
+	# associated with pull requests. This is useful for cleaning up 
+	# environments created by manual workflows or other automated processes.
+	if [ -z "$MULTIDEV_DELETE_PATTERN" ] || [ -z "$DELETE_OLD_MULTIDEVS" ] || [ "$DELETE_OLD_MULTIDEVS" != "true" ]; then
+		echo "No MULTIDEV_DELETE_PATTERN set or delete_old_environments was not set to true. Skipping deletion of old environments..."
+		exit 0
+	fi
+
+	# List all environments, filter out the standard dev/test/live, find the ones
+	# that match our deletion pattern, and then exclude the most recent one.
+	ALL_ENVS=$(terminus env:list "$PANTHEON_SITE" --format=list)
+	OLDEST_ENVIRONMENTS=$(echo "$ALL_ENVS" \
+		| grep -v dev \
+		| grep -v test \
+		| grep -v live \
+		| grep "$MULTIDEV_DELETE_PATTERN" \
+		| grep -v '^pr-' \
+		| sort \
+		| sed -e '$d')
+
+	# Exit if there are no environments to delete.
+	if [ -z "$OLDEST_ENVIRONMENTS" ] ; then
+		echo "No old environments matching the pattern found to delete."
+		exit 0
+	fi
+
+	# Go ahead and delete the oldest environments.
+	for ENV_TO_DELETE in $OLDEST_ENVIRONMENTS; do
+		echo "Deleting Pantheon environment: ${ENV_TO_DELETE}..."
+		if terminus env:info "${PANTHEON_SITE}.${ENV_TO_DELETE}" > /dev/null 2>&1; then
+			terminus env:delete "${PANTHEON_SITE}.${ENV_TO_DELETE}" --delete-branch --yes
+			if [ -n "$GITHUB_REPOSITORY" ]; then
+				delete_github_environment "$ENV_TO_DELETE"
+			else
+				echo "Skipping GitHub deletion for ${ENV_TO_DELETE} — GITHUB_TOKEN or GITHUB_REPOSITORY not set."
+			fi
+		else
+			echo "Pantheon environment ${ENV_TO_DELETE} not found."
+		fi
+	done
 }
 
 main "$@"

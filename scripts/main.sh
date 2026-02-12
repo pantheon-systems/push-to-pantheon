@@ -3,17 +3,13 @@ set -o pipefail
 
 IFS=$'\n\t'
 
-# Function to safely call tput
-safe_tput() {
-  tput "$@" 2>/dev/null
-}
-
-# Define some global variables for colors.
-normal=$(safe_tput sgr0)
-_bold=$(safe_tput bold)  # Reserved for future use
-red=$(safe_tput setaf 1)
-green=$(safe_tput setaf 2)
-yellow=$(safe_tput setaf 3)
+# Define some global variables for colors using ANSI escape codes.
+# These work reliably in GitHub Actions without requiring tput or a TTY.
+normal='\033[0m'      # Reset
+_bold='\033[1m'       # Bold (reserved for future use)
+red='\033[0;31m'      # Red
+green='\033[0;32m'    # Green
+yellow='\033[0;33m'   # Yellow
 
 # Main function to execute the script logic.
 function main() {

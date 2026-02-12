@@ -124,15 +124,16 @@ runs:
           GITHUB_TOKEN: ${{ github.token }}
           GITHUB_REPOSITORY: ${{ github.repository }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
+          WORKSPACE: ${{ github.workspace }}
         run: |
           # Check if we have the required workflow permissions
 
           echo "Checking GitHub workflow permissions..."
-          MISSING_PERMISSIONS=(${{ github.workspace }}/scripts/main.sh check_missing_permissions)
+          MISSING_PERMISSIONS=(${WORKSPACE}/scripts/main.sh check_missing_permissions)
 
           # If any permissions are missing, show error and exit
           if [ ${#MISSING_PERMISSIONS[@]} -gt 0 ]; then
-            ${{ github.workspace }}/scripts/main.sh get_missing_permissions_help "${MISSING_PERMISSIONS[@]}"
+            ${WORKSPACE}/scripts/main.sh get_missing_permissions_help "${MISSING_PERMISSIONS[@]}"
             exit 1
           fi
 
@@ -156,7 +157,8 @@ runs:
         shell: bash
         env:
           SSH_KEY: ${{ inputs.ssh_key }}
-        run: ${{ github.workspace }}/scripts/main.sh setup_ssh_hostkeys
+          WORKSPACE: ${{ github.workspace }}
+        run: ${WORKSPACE}/scripts/main.sh setup_ssh_hostkeys
 
       - name: Check for Terminus
         if: ${{ inputs.skip_terminus_install != 'true' }}
@@ -228,10 +230,10 @@ runs:
           SITE_ROOT: ${{ inputs.relative_site_root }}
           PANTHEON_SITE: ${{ inputs.site }}
           PANTHEON_SOURCE_ENV: ${{ inputs.source_env }}
-          GITHUB_WORKSPACE: ${{ github.workspace }}
+          WORKSPACE: ${{ github.workspace }}
         run: |
           # Prepare site root
-          ${{ github.workspace }}/scripts/main.sh prepare_site_root
+          ${WORKSPACE}/scripts/main.sh prepare_site_root
 
 
       - name: Deployment Processing
@@ -245,9 +247,10 @@ runs:
           GITHUB_TOKEN: ${{ github.token }}
           SKIP_BUILD_TOOLS: ${{ inputs.skip_build_tools }}
           LIVE_ENV_EXISTS: ${{ steps.check_live_env.outputs.live_env_exists }}
+          WORKSPACE: ${{ github.workspace }}
         run: |
           # Push to Pantheon
-          ${{ github.workspace }}/scripts/main.sh push_to_pantheon
+          ${WORKSPACE}/scripts/main.sh push_to_pantheon
 
       - name: Update deployment status
         uses: bobheadxi/deployments@v1
@@ -273,4 +276,4 @@ runs:
           MULTIDEV_DELETE_PATTERN: pr-
           PANTHEON_TARGET_ENV: ${{ env.PANTHEON_TARGET_ENV }}
           WORKSPACE: ${{ github.workspace }}
-        run: ${{ github.workspace }}/scripts/main.sh cleanup
+        run: ${WORKSPACE}/scripts/main.sh cleanup

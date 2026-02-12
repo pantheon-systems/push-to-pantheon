@@ -269,7 +269,11 @@ function push_to_pantheon() {
 	fi
 
 	# For all other pushes, use Build Tools.
-	terminus -n build:env:create "${PANTHEON_SITE}.${PANTHEON_SOURCE_ENV}" "${PANTHEON_TARGET_ENV}" --yes --message="${PANTHEON_COMMIT_MESSAGE}" "${PANTHEON_CLONE_CONTENT_FLAG}"
+	if [ -n "${PANTHEON_CLONE_CONTENT_FLAG}" ]; then
+		terminus -n build:env:create "${PANTHEON_SITE}.${PANTHEON_SOURCE_ENV}" "${PANTHEON_TARGET_ENV}" --yes --message="${PANTHEON_COMMIT_MESSAGE}" "${PANTHEON_CLONE_CONTENT_FLAG}"
+	else
+		terminus -n build:env:create "${PANTHEON_SITE}.${PANTHEON_SOURCE_ENV}" "${PANTHEON_TARGET_ENV}" --yes --message="${PANTHEON_COMMIT_MESSAGE}"
+	fi
 }
 
 # Function to delete a GitHub environment and all of its associated deployments.

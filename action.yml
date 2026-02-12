@@ -125,8 +125,7 @@ runs:
           GITHUB_REPOSITORY: ${{ github.repository }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
-          # Check if we have the required permissions by attempting API calls
-          # This provides helpful error messages if permissions are missing
+          # Check if we have the required workflow permissions
 
           echo "Checking GitHub workflow permissions..."
           MISSING_PERMISSIONS=(${{ github.workspace }}/scripts/main.sh check_missing_permissions)

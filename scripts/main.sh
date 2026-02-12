@@ -129,6 +129,7 @@ function get_missing_permissions_help() {
 
 # Set up SSH host keys for Pantheon.
 function setup_ssh_hostkeys() {
+	echo -e "${yellow}Adding *.pantheon.io *.drush.in *.getpantheon.com and *.panth.io to known hosts and configuring SSH...${normal}"
 	mkdir -p ~/.ssh
 	chmod 700 ~/.ssh
 	printf "%s" "$SSH_KEY" > ~/.ssh/id_rsa

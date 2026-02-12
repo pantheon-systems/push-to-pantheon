@@ -49,7 +49,8 @@ function main() {
 	"$1"
 }
 
-# Function to determine the target environment based on the context of the GitHub Actions workflow.
+# Function to determine the target environment based on the context of the
+# GitHub Actions workflow.
 function get_target_env() {
 	if [ -n "${INPUT_TARGET_ENV}" ]; then
 		TARGET_ENV="${INPUT_TARGET_ENV}"
@@ -107,7 +108,8 @@ function check_missing_permissions() {
 	echo "${MISSING_PERMISSIONS[@]}"
 }
 
-# Function to print a help message with instructions for how to add the missing permissions to your workflow.
+# Function to print a help message with instructions for how to add the missing 
+# permissions to your workflow.
 function get_missing_permissions_help() {
 	echo ""
 	echo "❌ ERROR: Missing required GitHub permissions"
@@ -142,7 +144,9 @@ function setup_ssh_hostkeys() {
 	echo -e "${green}✅ SSH host keys configured.${normal}"	
 }
 
-# Prepare the site root by cloning the Pantheon repository, copying files from the specified SITE_ROOT, and setting up the GitHub origin for Build Tools compatibility.
+# Prepare the site root by cloning the Pantheon repository, copying files from 
+# the specified SITE_ROOT, and setting up the GitHub origin for Build Tools 
+# compatibility.
 function prepare_site_root() {
 	if [ -n "$SITE_ROOT" ]; then
 		echo "Preparing site from relative path: ${SITE_ROOT}"
@@ -211,7 +215,8 @@ function prepare_site_root() {
 	fi	
 }
 
-# Push code to Pantheon, either via Git or Build Tools depending on configuration and environment state.
+# Push code to Pantheon, either via Git or Build Tools depending on 
+# configuration and environment state.
 function push_to_pantheon() {
 	# If relative_site_root was used, change to the cloned Pantheon repo directory
 	if [ -n "$PANTHEON_REPO_DIR" ]; then

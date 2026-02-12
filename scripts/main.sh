@@ -10,7 +10,7 @@ safe_tput() {
 
 # Define some global variables for colors.
 normal=$(safe_tput sgr0)
-bold=$(safe_tput bold)
+_bold=$(safe_tput bold)  # Reserved for future use
 red=$(safe_tput setaf 1)
 green=$(safe_tput setaf 2)
 yellow=$(safe_tput setaf 3)
@@ -109,14 +109,14 @@ function check_missing_permissions() {
 	echo "${MISSING_PERMISSIONS[@]}"
 }
 
-# Function to print a help message with instructions for how to add the missing 
+# Function to print a help message with instructions for how to add the missing
 # permissions to your workflow.
 function get_missing_permissions_help() {
 	echo ""
 	echo "❌ ERROR: Missing required GitHub permissions"
 	echo ""
 	echo "The following permissions are missing:"
-	for perm in "$1"; do
+	for perm in "$@"; do
 		echo "  - ${perm}"
 	done
 	echo ""
@@ -138,11 +138,13 @@ function setup_ssh_hostkeys() {
 	mkdir -p ~/.ssh
 	chmod 700 ~/.ssh
 	printf "%s" "$SSH_KEY" > ~/.ssh/id_rsa
-	chmod 600 ~/.ssh/id_rsa        
-	echo "Host *.pantheon.io *.drush.in *.getpantheon.com *.panth.io" >> "$HOME/.ssh/config"
-	echo "StrictHostKeyChecking no" >> "$HOME/.ssh/config"
-	echo "HostKeyAlgorithms +ssh-rsa" >> "$HOME/.ssh/config"
-	echo -e "${green}✅ SSH host keys configured.${normal}"	
+	chmod 600 ~/.ssh/id_rsa
+	{
+		echo "Host *.pantheon.io *.drush.in *.getpantheon.com *.panth.io"
+		echo "StrictHostKeyChecking no"
+		echo "HostKeyAlgorithms +ssh-rsa"
+	} >> "$HOME/.ssh/config"
+	echo -e "${green}✅ SSH host keys configured.${normal}"
 }
 
 # Prepare the site root by cloning the Pantheon repository, copying files from 
@@ -153,7 +155,7 @@ function prepare_site_root() {
 		echo "Preparing site from relative path: ${SITE_ROOT}"
 
 		# Get the Pantheon site ID
-		SITE_ID=$(terminus site:info ${PANTHEON_SITE} --field=id)
+		SITE_ID=$(terminus site:info "${PANTHEON_SITE}" --field=id)
 
 		# Determine which environment to clone from
 		# If target is dev, clone from master; otherwise clone from target or source env
@@ -161,7 +163,7 @@ function prepare_site_root() {
 			CLONE_BRANCH="master"
 		else
 			# For multidevs, check if it exists, otherwise use source env
-			if terminus multidev:list ${PANTHEON_SITE} --format=list | grep -q "^${PANTHEON_TARGET_ENV}$"; then
+			if terminus multidev:list "${PANTHEON_SITE}" --format=list | grep -q "^${PANTHEON_TARGET_ENV}$"; then
 				CLONE_BRANCH="${PANTHEON_TARGET_ENV}"
 			else
 				# Multidev doesn't exist yet, clone from source env
@@ -180,16 +182,16 @@ function prepare_site_root() {
 		PANTHEON_REPO_DIR=$(mktemp -d)
 
 		# Clone the Pantheon repository
-		git clone --branch ${CLONE_BRANCH} \
-			ssh://codeserver.dev.${SITE_ID}@codeserver.dev.${SITE_ID}.drush.in:2222/~/repository.git \
-			${PANTHEON_REPO_DIR}
+		git clone --branch "${CLONE_BRANCH}" \
+			"ssh://codeserver.dev.${SITE_ID}@codeserver.dev.${SITE_ID}.drush.in:2222/~/repository.git" \
+			"${PANTHEON_REPO_DIR}"
 
 		# Copy files from SITE_ROOT to the Pantheon repo (overwriting)
 		echo "Copying files from ${SITE_ROOT} to Pantheon repository"
-		rsync -av --delete --exclude='.git' ${SITE_ROOT}/ ${PANTHEON_REPO_DIR}/
+		rsync -av --delete --exclude='.git' "${SITE_ROOT}/" "${PANTHEON_REPO_DIR}/"
 
 		# Move into the Pantheon repo directory for subsequent steps
-		cd ${PANTHEON_REPO_DIR}
+		cd "${PANTHEON_REPO_DIR}" || exit
 
 		# Add the GitHub origin for Build Tools compatibility
 		echo "Setting GitHub origin for Build Tools compatibility"
@@ -198,35 +200,39 @@ function prepare_site_root() {
 			if [[ "$ORIGIN_URL" != https://github.com/* ]]; then
 				echo "Updating origin to GitHub URL"
 				git remote remove origin
-				git remote add origin https://github.com/${{ github.repository }}
+				if [ -n "${GITHUB_REPOSITORY}" ]; then
+					git remote add origin "https://github.com/${GITHUB_REPOSITORY}"
+				fi
 			fi
 		else
 			echo "Adding origin to GitHub URL"
-			git remote add origin https://github.com/${{ github.repository }}
+			if [ -n "${GITHUB_REPOSITORY}" ]; then
+				git remote add origin "https://github.com/${GITHUB_REPOSITORY}"
+			fi
 		fi
 
 		# Stage all changes
 		git add -A
 
 		# Export the Pantheon repo path for the next step
-		echo "PANTHEON_REPO_DIR=${PANTHEON_REPO_DIR}" >> $GITHUB_ENV
+		echo "PANTHEON_REPO_DIR=${PANTHEON_REPO_DIR}" >> "$GITHUB_ENV"
 
 	else
 		git fetch --unshallow origin
 	fi	
 }
 
-# Push code to Pantheon, either via Git or Build Tools depending on 
+# Push code to Pantheon, either via Git or Build Tools depending on
 # configuration and environment state.
 function push_to_pantheon() {
 	# If relative_site_root was used, change to the cloned Pantheon repo directory
 	if [ -n "$PANTHEON_REPO_DIR" ]; then
-		cd ${PANTHEON_REPO_DIR}
+		cd "${PANTHEON_REPO_DIR}" || exit
 	fi
 
 	# If SKIP_BUILD_TOOLS is true or live environment doesn't exist, push via Git. Otherwise, use Build Tools to create the environment.
 	if [ "$SKIP_BUILD_TOOLS" == "true" ] || [ "$LIVE_ENV_EXISTS" == "false" ]; then
-		SITE_ID=$(terminus site:info ${PANTHEON_SITE} --field=id)
+		SITE_ID=$(terminus site:info "${PANTHEON_SITE}" --field=id)
 
 		# Are we pushing to a multidev or to dev?
 		if [ "$PANTHEON_TARGET_ENV" == "dev" ]; then
@@ -237,11 +243,11 @@ function push_to_pantheon() {
 			echo "Target environment is ${PANTHEON_TARGET_ENV}, pushing to branch with the same name on Pantheon."
 
 			# Check if a multidev already exists for this PR.
-			if terminus multidev:list ${PANTHEON_SITE} --format=list | grep -q "^${PANTHEON_TARGET_ENV}$"; then
+			if terminus multidev:list "${PANTHEON_SITE}" --format=list | grep -q "^${PANTHEON_TARGET_ENV}$"; then
 				echo "Multidev environment ${PANTHEON_TARGET_ENV} already exists. Pushing code to existing environment."
 			else
 				echo "Creating new multidev environment: ${PANTHEON_TARGET_ENV}"
-				terminus multidev:create ${PANTHEON_SITE}.${PANTHEON_SOURCE_ENV} ${PANTHEON_TARGET_ENV} --yes
+				terminus multidev:create "${PANTHEON_SITE}.${PANTHEON_SOURCE_ENV}" "${PANTHEON_TARGET_ENV}" --yes
 			fi
 		fi
 
@@ -258,16 +264,16 @@ function push_to_pantheon() {
 
 		# Add pantheon remote if it doesn't exist
 		if ! git remote | grep -q pantheon; then
-			git remote add pantheon ssh://codeserver.dev.${SITE_ID}@codeserver.dev.${SITE_ID}.drush.in:2222/~/repository.git
+			git remote add pantheon "ssh://codeserver.dev.${SITE_ID}@codeserver.dev.${SITE_ID}.drush.in:2222/~/repository.git"
 		fi
 
 		# Push code to Pantheon
-		git push pantheon HEAD:refs/heads/${PANTHEON_DESTINATION_BRANCH} --force
+		git push pantheon "HEAD:refs/heads/${PANTHEON_DESTINATION_BRANCH}" --force
 		exit 0
 	fi
 
 	# For all other pushes, use Build Tools.
-	terminus -n build:env:create ${PANTHEON_SITE}.${PANTHEON_SOURCE_ENV} ${PANTHEON_TARGET_ENV} --yes --message="${PANTHEON_COMMIT_MESSAGE}" ${PANTHEON_CLONE_CONTENT_FLAG}	
+	terminus -n build:env:create "${PANTHEON_SITE}.${PANTHEON_SOURCE_ENV}" "${PANTHEON_TARGET_ENV}" --yes --message="${PANTHEON_COMMIT_MESSAGE}" "${PANTHEON_CLONE_CONTENT_FLAG}"
 }
 
 # Function to delete a GitHub environment and all of its associated deployments.

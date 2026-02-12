@@ -159,13 +159,16 @@ runs:
         env:
           SSH_KEY: ${{ inputs.ssh_key }}
           WORKSPACE: ${{ github.workspace }}
-        run: ${WORKSPACE}/scripts/main.sh setup_ssh_hostkeys
+        run: |
+          # Set up host keys for Pantheon
+          ${WORKSPACE}/scripts/main.sh setup_ssh_hostkeys
 
       - name: Check for Terminus
         if: ${{ inputs.skip_terminus_install != 'true' }}
         id: check_terminus
         shell: bash
         run: |
+          # Check if Terminus is already installed
           if command -v terminus &> /dev/null; then
             echo "Terminus detected. Skipping Terminus installation."
             echo "should_install_terminus=false" >> $GITHUB_OUTPUT
@@ -205,6 +208,7 @@ runs:
         env:
           BUILD_TOOLS_VERSION_INPUT: ${{ inputs.build_tools_version }}
         run: |
+          # Install Build Tools plugin
           BUILD_TOOLS_VERSION="${BUILD_TOOLS_VERSION_INPUT}"
           if [ -z "$BUILD_TOOLS_VERSION" ]; then
             echo "Installing latest stable version of Terminus Build Tools plugin"
@@ -277,4 +281,6 @@ runs:
           MULTIDEV_DELETE_PATTERN: pr-
           PANTHEON_TARGET_ENV: ${{ env.PANTHEON_TARGET_ENV }}
           WORKSPACE: ${{ github.workspace }}
-        run: ${WORKSPACE}/scripts/main.sh cleanup
+        run: |
+          # Clean up old multidev environments
+          ${WORKSPACE}/scripts/main.sh cleanup

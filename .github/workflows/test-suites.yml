@@ -201,23 +201,6 @@ jobs:
           ref: ${{ github.event.pull_request.head.ref }}
           path: pr-code
 
-      - name: Query Build Tools versions
-        id: build_tools_version
-        run: |
-          # Fetch the latest releases of the Build Tools plugin
-          VERSIONS=$(gh api repos/pantheon-systems/terminus-build-tools-plugin/releases --jq '.[].tag_name' | grep -v 'alpha\|beta\|rc' | head -n 3)
-
-          # Get the 2nd most recent stable version
-          SECOND_MOST_RECENT=$(echo "$VERSIONS" | sed -n '2p')
-
-          echo "Available stable versions (latest 3):"
-          echo "$VERSIONS"
-          echo "Selected version (2nd most recent): $SECOND_MOST_RECENT"
-
-          echo "BUILD_TOOLS_VERSION=$SECOND_MOST_RECENT" >> $GITHUB_OUTPUT
-        env:
-          GH_TOKEN: ${{ github.token }}
-
       - name: Pre-install Terminus
         uses: pantheon-systems/terminus-github-actions@v1
         with:
@@ -237,7 +220,7 @@ jobs:
           target_env: ${{ inputs.env_prefix }}-term
           relative_site_root: ${{ github.event_name == 'pull_request_target' && 'pr-code/.github/testing_fixtures/dtp-nearly-empty-site' || '.github/testing_fixtures/dtp-nearly-empty-site' }}
           skip_terminus_install: true
-          build_tools_version: ${{ steps.build_tools_version.outputs.BUILD_TOOLS_VERSION }}
+          build_tools_version: dev-main
 
       - name: Verify deployment success
         run: |

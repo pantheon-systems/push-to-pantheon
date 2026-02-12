@@ -90,7 +90,7 @@ jobs:
           fi
 
   content:
-    name: Content Management
+    name: Clone Content
     if: inputs.suite == 'all' || inputs.suite == 'content'
     runs-on: ubuntu-latest
     steps:

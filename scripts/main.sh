@@ -23,6 +23,8 @@ function main() {
 	- check_missing_permissions: Check for missing GitHub permissions and return a list of any that are missing.
 	- get_missing_permissions_help: Print a help message with instructions for how to add the missing permissions to your workflow.
 	- setup_ssh_hostkeys: Set up SSH host keys for Pantheon.
+	- prepare_site_root: Prepare the site root by cloning the Pantheon repository, copying files from the specified SITE_ROOT, and setting up the GitHub origin for Build Tools compatibility.
+	- push_to_pantheon: Push code to Pantheon, either via Git or Build Tools depending on configuration and environment state.
 	"
 
 	if [ -z "$1" ]; then
@@ -37,7 +39,7 @@ function main() {
 	fi
 
 	# Check for a valid command.
-	if [ "$1" != 'get_target_env' ] && [ "$1" != 'check_missing_permissions' ] && [ "$1" != 'get_missing_permissions_help' ] && [ "$1" != 'setup_ssh_hostkeys' ]; then
+	if [ "$1" != 'get_target_env' ] && [ "$1" != 'check_missing_permissions' ] && [ "$1" != 'get_missing_permissions_help' ] && [ "$1" != 'setup_ssh_hostkeys' ] && [ "$1" != 'prepare_site_root' ] && [ "$1" != 'push_to_pantheon' ]; then
 		echo -e "${red}Invalid command: $1${normal}"
 		echo -e "${help_msg}"
 		exit 1
@@ -207,6 +209,59 @@ function prepare_site_root() {
 	else
 		git fetch --unshallow origin
 	fi	
+}
+
+# Push code to Pantheon, either via Git or Build Tools depending on configuration and environment state.
+function push_to_pantheon() {
+	# If relative_site_root was used, change to the cloned Pantheon repo directory
+	if [ -n "$PANTHEON_REPO_DIR" ]; then
+		cd ${PANTHEON_REPO_DIR}
+	fi
+
+	# If SKIP_BUILD_TOOLS is true or live environment doesn't exist, push via Git. Otherwise, use Build Tools to create the environment.
+	if [ "$SKIP_BUILD_TOOLS" == "true" ] || [ "$LIVE_ENV_EXISTS" == "false" ]; then
+		SITE_ID=$(terminus site:info ${PANTHEON_SITE} --field=id)
+
+		# Are we pushing to a multidev or to dev?
+		if [ "$PANTHEON_TARGET_ENV" == "dev" ]; then
+			PANTHEON_DESTINATION_BRANCH="master"
+			echo "Target environment is dev, pushing to 'master' branch on Pantheon."
+		else
+			PANTHEON_DESTINATION_BRANCH="${PANTHEON_TARGET_ENV}"
+			echo "Target environment is ${PANTHEON_TARGET_ENV}, pushing to branch with the same name on Pantheon."
+
+			# Check if a multidev already exists for this PR.
+			if terminus multidev:list ${PANTHEON_SITE} --format=list | grep -q "^${PANTHEON_TARGET_ENV}$"; then
+				echo "Multidev environment ${PANTHEON_TARGET_ENV} already exists. Pushing code to existing environment."
+			else
+				echo "Creating new multidev environment: ${PANTHEON_TARGET_ENV}"
+				terminus multidev:create ${PANTHEON_SITE}.${PANTHEON_SOURCE_ENV} ${PANTHEON_TARGET_ENV} --yes
+			fi
+		fi
+
+		# Ensure repo is not shallow; Pantheon rejects shallow pushes
+		if git rev-parse --is-shallow-repository >/dev/null 2>&1 && [ "$(git rev-parse --is-shallow-repository)" = "true" ]; then
+			echo "Repository is shallow; unshallowing before push."
+			git fetch --unshallow origin || git fetch --depth=1000000 origin
+		fi
+
+		# Commit staged changes if any (from relative_site_root preparation)
+		if ! git diff --cached --quiet; then
+			git commit -m "${PANTHEON_COMMIT_MESSAGE}"
+		fi
+
+		# Add pantheon remote if it doesn't exist
+		if ! git remote | grep -q pantheon; then
+			git remote add pantheon ssh://codeserver.dev.${SITE_ID}@codeserver.dev.${SITE_ID}.drush.in:2222/~/repository.git
+		fi
+
+		# Push code to Pantheon
+		git push pantheon HEAD:refs/heads/${PANTHEON_DESTINATION_BRANCH} --force
+		exit 0
+	fi
+
+	# For all other pushes, use Build Tools.
+	terminus -n build:env:create ${PANTHEON_SITE}.${PANTHEON_SOURCE_ENV} ${PANTHEON_TARGET_ENV} --yes --message="${PANTHEON_COMMIT_MESSAGE}" ${PANTHEON_CLONE_CONTENT_FLAG}	
 }
 
 main "$@"

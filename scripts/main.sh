@@ -149,14 +149,10 @@ function verify_build_tools() {
 	echo -e "${yellow}Verifying Build Tools plugin installation...${normal}"
 
 	# Check if Build Tools plugin is installed
-	if terminus self:plugin:list | grep -q 'pantheon-systems/terminus-build-tools-plugin'; then
-		# Try to get version info
-		PLUGIN_INFO=$(terminus self:plugin:list --format=json 2>/dev/null | grep -A 5 'terminus-build-tools-plugin' | grep 'version' | head -1 || echo "")
-		if [ -n "$PLUGIN_INFO" ]; then
-			echo -e "${green}✅ Build Tools plugin is installed: ${PLUGIN_INFO}${normal}"
-		else
-			echo -e "${green}✅ Build Tools plugin is installed${normal}"
-		fi
+	if terminus self:plugin:list --format=list --field=name | grep -q '^terminus-build-tools-plugin$'; then
+		# Get version info
+		VERSION=$(terminus self:plugin:list --format=json | grep -A 3 '"name": "terminus-build-tools-plugin"' | grep '"installed_version"' | sed 's/.*": "\(.*\)".*/\1/')
+		echo -e "${green}✅ Build Tools plugin is installed (version: ${VERSION})${normal}"
 	else
 		echo -e "${red}❌ Build Tools plugin installation failed. Plugin not found in plugin list.${normal}"
 		echo -e "${red}This is required for deployment. Failing workflow.${normal}"

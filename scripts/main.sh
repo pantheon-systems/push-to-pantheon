@@ -20,6 +20,7 @@ function main() {
 	- get_missing_permissions_help: Print a help message with instructions for how to add the missing permissions to your workflow.
 	- setup_ssh_hostkeys: Set up SSH host keys for Pantheon.
 	- prepare_site_root: Prepare the site root by cloning the Pantheon repository, copying files from the specified SITE_ROOT, and setting up the GitHub origin for Build Tools compatibility.
+	- verify_build_tools: Verify that the Terminus Build Tools plugin is installed and available.
 	- push_to_pantheon: Push code to Pantheon, either via Git or Build Tools depending on configuration and environment state.
 	- cleanup: Clean up stale Pantheon multidev environments. This includes environments associated with closed PRs as well as old environments matching a specified pattern.
 	"
@@ -36,7 +37,7 @@ function main() {
 	fi
 
 	# Check for a valid command.
-	if [ "$1" != 'get_target_env' ] && [ "$1" != 'check_missing_permissions' ] && [ "$1" != 'get_missing_permissions_help' ] && [ "$1" != 'setup_ssh_hostkeys' ] && [ "$1" != 'prepare_site_root' ] && [ "$1" != 'push_to_pantheon' ] && [ "$1" != 'cleanup' ]; then
+	if [ "$1" != 'get_target_env' ] && [ "$1" != 'check_missing_permissions' ] && [ "$1" != 'get_missing_permissions_help' ] && [ "$1" != 'setup_ssh_hostkeys' ] && [ "$1" != 'prepare_site_root' ] && [ "$1" != 'push_to_pantheon' ] && [ "$1" != 'cleanup' ] && [ "$1" != 'verify_build_tools' ]; then
 		echo -e "${red}Invalid command: $1${normal}"
 		echo -e "${help_msg}"
 		exit 1
@@ -143,9 +144,29 @@ function setup_ssh_hostkeys() {
 	echo -e "${green}✅ SSH host keys configured.${normal}"
 }
 
-# Prepare the site root by cloning the Pantheon repository, copying files from 
-# the specified SITE_ROOT, and setting up the GitHub origin for Build Tools 
-# compatibility.
+# Verify that the Terminus Build Tools plugin is installed and available.
+function verify_build_tools() {
+	echo -e "${yellow}Verifying Build Tools plugin installation...${normal}"
+
+	# Check if Build Tools plugin is installed
+	if terminus self:plugin:list | grep -q 'pantheon-systems/terminus-build-tools-plugin'; then
+		# Try to get version info
+		PLUGIN_INFO=$(terminus self:plugin:list --format=json 2>/dev/null | grep -A 5 'terminus-build-tools-plugin' | grep 'version' | head -1 || echo "")
+		if [ -n "$PLUGIN_INFO" ]; then
+			echo -e "${green}✅ Build Tools plugin is installed: ${PLUGIN_INFO}${normal}"
+		else
+			echo -e "${green}✅ Build Tools plugin is installed${normal}"
+		fi
+	else
+		echo -e "${red}❌ Build Tools plugin installation failed. Plugin not found in plugin list.${normal}"
+		echo -e "${red}This is required for deployment. Failing workflow.${normal}"
+		exit 1
+	fi
+}
+
+# Prepare the site root by cloning the Pantheon repository, copying 
+# files from the specified SITE_ROOT, and setting up the GitHub origin 
+# for Build Tools compatibility.
 function prepare_site_root() {
 	if [ -n "$SITE_ROOT" ]; then
 		echo -e "${yellow}Preparing site from relative path:${normal}${bold} ${SITE_ROOT}${normal}"

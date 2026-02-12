@@ -228,74 +228,10 @@ runs:
           SITE_ROOT: ${{ inputs.relative_site_root }}
           PANTHEON_SITE: ${{ inputs.site }}
           PANTHEON_SOURCE_ENV: ${{ inputs.source_env }}
+          GITHUB_WORKSPACE: ${{ github.workspace }}
         run: |
           # Prepare site root
-          set +e
-          if [ -n "$SITE_ROOT" ]; then
-            echo "Preparing site from relative path: ${SITE_ROOT}"
-
-            # Get the Pantheon site ID
-            SITE_ID=$(terminus site:info ${PANTHEON_SITE} --field=id)
-
-            # Determine which environment to clone from
-            # If target is dev, clone from master; otherwise clone from target or source env
-            if [ "$PANTHEON_TARGET_ENV" == "dev" ]; then
-              CLONE_BRANCH="master"
-            else
-              # For multidevs, check if it exists, otherwise use source env
-              if terminus multidev:list ${PANTHEON_SITE} --format=list | grep -q "^${PANTHEON_TARGET_ENV}$"; then
-                CLONE_BRANCH="${PANTHEON_TARGET_ENV}"
-              else
-                # Multidev doesn't exist yet, clone from source env
-                # Map standard environments to master branch
-                if [ "${PANTHEON_SOURCE_ENV}" == "live" ] || [ "${PANTHEON_SOURCE_ENV}" == "dev" ] || [ "${PANTHEON_SOURCE_ENV}" == "test" ]; then
-                  CLONE_BRANCH="master"
-                else
-                  CLONE_BRANCH="${PANTHEON_SOURCE_ENV}"
-                fi
-              fi
-            fi
-
-            echo "Cloning Pantheon repository from branch: ${CLONE_BRANCH}"
-
-            # Create a temporary directory for the Pantheon repo
-            PANTHEON_REPO_DIR=$(mktemp -d)
-
-            # Clone the Pantheon repository
-            git clone --branch ${CLONE_BRANCH} \
-              ssh://codeserver.dev.${SITE_ID}@codeserver.dev.${SITE_ID}.drush.in:2222/~/repository.git \
-              ${PANTHEON_REPO_DIR}
-
-            # Copy files from SITE_ROOT to the Pantheon repo (overwriting)
-            echo "Copying files from ${SITE_ROOT} to Pantheon repository"
-            rsync -av --delete --exclude='.git' ${SITE_ROOT}/ ${PANTHEON_REPO_DIR}/
-
-            # Move into the Pantheon repo directory for subsequent steps
-            cd ${PANTHEON_REPO_DIR}
-
-            # Add the GitHub origin for Build Tools compatibility
-            echo "Setting GitHub origin for Build Tools compatibility"
-            if git remote | grep origin; then
-              ORIGIN_URL=$(git remote get-url origin)
-              if [[ "$ORIGIN_URL" != https://github.com/* ]]; then
-                echo "Updating origin to GitHub URL"
-                git remote remove origin
-                git remote add origin https://github.com/${{ github.repository }}
-              fi
-            else
-              echo "Adding origin to GitHub URL"
-              git remote add origin https://github.com/${{ github.repository }}
-            fi
-
-            # Stage all changes
-            git add -A
-
-            # Export the Pantheon repo path for the next step
-            echo "PANTHEON_REPO_DIR=${PANTHEON_REPO_DIR}" >> $GITHUB_ENV
-
-          else
-            git fetch --unshallow origin
-          fi
+          ${{ github.workspace }}/scripts/main.sh prepare_site_root
 
 
       - name: Deployment Processing

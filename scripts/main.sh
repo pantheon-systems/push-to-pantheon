@@ -316,23 +316,43 @@ function cleanup() {
 	# associated with closed or merged pull requests.
 	terminus build:env:delete:pr "$PANTHEON_SITE" --yes
 
-	# The block below is intended to delete old environments that are not 
-	# associated with pull requests. This is useful for cleaning up 
+	# The block below is intended to delete old environments that are not
+	# associated with pull requests. This is useful for cleaning up
 	# environments created by manual workflows or other automated processes.
-	if [ -z "$MULTIDEV_DELETE_PATTERN" ] || [ -z "$DELETE_OLD_MULTIDEVS" ] || [ "$DELETE_OLD_MULTIDEVS" != "true" ]; then
-		echo -e "${red}No MULTIDEV_DELETE_PATTERN set or delete_old_environments was not set to true. Skipping deletion of old environments...${normal}"
+	if [ -z "$DELETE_OLD_MULTIDEVS" ] || [ "$DELETE_OLD_MULTIDEVS" != "true" ]; then
+		echo -e "${red}delete_old_environments was not set to true. Skipping deletion of old environments...${normal}"
 		exit 0
 	fi
 
 	# List all environments, filter out the standard dev/test/live, find the ones
-	# that match our deletion pattern, and then exclude the most recent one.
+	# that match our deletion patterns (both legacy and new), and exclude the current target env.
+	# Built-in test suite patterns: *-std, *-cont, *-git, *-term, *-adv
+	# Legacy manual deploy pattern: wd-*
+	# User-specified pattern: $MULTIDEV_DELETE_PATTERN (optional)
 	ALL_ENVS=$(terminus env:list "$PANTHEON_SITE" --format=list)
-	OLDEST_ENVIRONMENTS=$(echo "$ALL_ENVS" \
-		| grep -v dev \
-		| grep -v test \
-		| grep -v live \
-		| grep "$MULTIDEV_DELETE_PATTERN" \
-		| grep -v '^pr-' \
+
+	# Start with environments matching suite patterns or legacy wd- pattern
+	FILTERED_ENVS=$(echo "$ALL_ENVS" \
+		| grep -v '^dev$' \
+		| grep -v '^test$' \
+		| grep -v '^live$' \
+		| grep -E '(^wd-|-std$|-cont$|-git$|-term$|-adv$)')
+
+	# If MULTIDEV_DELETE_PATTERN is set, also include environments matching that pattern
+	# (excluding pr- environments which are handled by build:env:delete:pr)
+	if [ -n "$MULTIDEV_DELETE_PATTERN" ]; then
+		PATTERN_ENVS=$(echo "$ALL_ENVS" \
+			| grep -v '^dev$' \
+			| grep -v '^test$' \
+			| grep -v '^live$' \
+			| grep "$MULTIDEV_DELETE_PATTERN" \
+			| grep -v '^pr-')
+		FILTERED_ENVS=$(echo -e "${FILTERED_ENVS}\n${PATTERN_ENVS}" | sort -u)
+	fi
+
+	# Exclude the current target environment and keep all but the most recent
+	OLDEST_ENVIRONMENTS=$(echo "$FILTERED_ENVS" \
+		| grep -v "^${PANTHEON_TARGET_ENV}$" \
 		| sort \
 		| sed -e '$d')
 

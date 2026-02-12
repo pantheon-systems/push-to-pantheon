@@ -130,7 +130,7 @@ runs:
           # Check if we have the required workflow permissions
 
           echo "Checking GitHub workflow permissions..."
-          MISSING_PERMISSIONS=(${WORKSPACE}/scripts/main.sh check_missing_permissions)
+          MISSING_PERMISSIONS=($(${WORKSPACE}/scripts/main.sh check_missing_permissions))
 
           # If any permissions are missing, show error and exit
           if [ ${#MISSING_PERMISSIONS[@]} -gt 0 ]; then

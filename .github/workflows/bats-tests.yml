@@ -57,6 +57,8 @@ jobs:
       - name: Install Terminus Build Tools
         run: |
           terminus self:plugin:install pantheon-systems/terminus-build-tools-plugin
+          # Verify installation
+          terminus self:plugin:list --fields=name,installed_version | grep terminus-build-tools-plugin
 
       - name: Create test environment
         id: test_env

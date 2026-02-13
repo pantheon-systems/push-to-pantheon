@@ -54,9 +54,7 @@ function main() {
 # This logic is reused across multiple workflows (BATS tests, deployments, etc.)
 # Requires environment variables:
 #   MULTIDEV_PREFIX: Prefix for the environment name (e.g., "bats-", "pr-")
-#   GITHUB_EVENT_NAME: Either "pull_request" or "push"
-#   GITHUB_PR_NUMBER: PR number (only for pull_request events)
-#   GITHUB_REF_NAME: Branch name (for push events)
+#   GITHUB_SHA: Git commit SHA (first 4 chars used for uniqueness)
 # Outputs the computed multidev name (respects 11-character Pantheon limit)
 function compute_multidev_name() {
 	if [ -z "${MULTIDEV_PREFIX}" ]; then
@@ -64,19 +62,19 @@ function compute_multidev_name() {
 		exit 1
 	fi
 
-	# Compute PR-specific multidev name (max 11 chars for Pantheon)
-	if [ "${GITHUB_EVENT_NAME}" == "pull_request" ]; then
-		# PR format: {prefix}{num} (e.g., bats-123, pr-456)
-		echo "${MULTIDEV_PREFIX}${GITHUB_PR_NUMBER}"
-	else
-		# Push format: {prefix}{6char branch} (e.g., bats-126mor for "126-more-testing")
-		# Calculate how many chars we have for the branch based on prefix length
-		local prefix_len=${#MULTIDEV_PREFIX}
-		local branch_max_len=$((11 - prefix_len))
-		local sanitized_branch
-		sanitized_branch=$(echo "${GITHUB_REF_NAME}" | sed 's/[^a-zA-Z0-9-]//g' | cut -c1-${branch_max_len})
-		echo "${MULTIDEV_PREFIX}${sanitized_branch}"
+	if [ -z "${GITHUB_SHA}" ]; then
+		echo -e "${red}Error: GITHUB_SHA environment variable is required${normal}"
+		exit 1
 	fi
+
+	# Use first 4 characters of commit SHA for uniqueness
+	# This prevents race conditions when workflows are canceled and restarted
+	# Different commits = different hash = different multidev
+	local commit_hash="${GITHUB_SHA:0:4}"
+
+	# Compute multidev name (max 11 chars for Pantheon)
+	# Format: {prefix}{hash} (e.g., bats-a1b2, pr-c3d4)
+	echo "${MULTIDEV_PREFIX}${commit_hash}"
 }
 
 # Function to determine the target environment based on the context of the

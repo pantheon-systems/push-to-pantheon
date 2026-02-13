@@ -45,11 +45,9 @@ jobs:
           PANTHEON_SITE: dtp-nearly-empty-site
           SOURCE_ENV: live
           MULTIDEV_PREFIX: bats-
-          GITHUB_EVENT_NAME: ${{ github.event_name }}
-          GITHUB_PR_NUMBER: ${{ github.event.pull_request.number }}
-          GITHUB_REF_NAME: ${{ github.ref_name }}
+          GITHUB_SHA: ${{ github.sha }}
         run: |
-          # Compute multidev name using helper function
+          # Compute multidev name using helper function (uses commit hash for uniqueness)
           TEST_ENV=$(bash scripts/main.sh compute_multidev_name)
           echo "TEST_ENV=${TEST_ENV}" >> $GITHUB_OUTPUT
 

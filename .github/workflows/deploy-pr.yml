@@ -10,6 +10,7 @@ on:
     paths:
       - '.github/testing_fixtures/**'
       - 'action.yml'
+      - 'scripts/**'
   workflow_dispatch:
     inputs:
       suite:

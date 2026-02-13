@@ -53,12 +53,10 @@ teardown_file() {
     assert_output_contains "Creating multidev"
 
     # Wait for environment to be fully created and accessible
-    echo "Waiting for ${TEST_MULTIDEV_NAME} to be fully accessible..." >&3
     local attempts=0
     local max_attempts=60
     while [ $attempts -lt $max_attempts ]; do
         if terminus env:info "${PANTHEON_SITE}.${TEST_MULTIDEV_NAME}" --field=id >/dev/null 2>&1; then
-            echo "${TEST_MULTIDEV_NAME} is accessible after $((attempts * 2)) seconds" >&3
             break
         fi
         sleep 2
@@ -67,7 +65,6 @@ teardown_file() {
 
     # Verify it's accessible
     if ! terminus env:info "${PANTHEON_SITE}.${TEST_MULTIDEV_NAME}" --field=id >/dev/null 2>&1; then
-        echo "ERROR: ${TEST_MULTIDEV_NAME} is not accessible after $((max_attempts * 2)) seconds!" >&3
         return 1
     fi
 

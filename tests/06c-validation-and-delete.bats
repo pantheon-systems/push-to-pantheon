@@ -81,18 +81,34 @@ teardown_file() {
 @test "delete_multidev: deletes existing multidev" {
     export MULTIDEV_NAME="${TEST_MULTIDEV_NAME}"
 
-    # Create environment first
+    # Ensure environment doesn't exist before creating
     terminus env:delete "${PANTHEON_SITE}.${MULTIDEV_NAME}" --delete-branch --yes 2>/dev/null || true
 
-    # Wait for delete to complete
-    for i in {1..30}; do
-        if ! terminus multidev:list "${PANTHEON_SITE}" --format=list | grep -q "^${MULTIDEV_NAME}$"; then
+    # Wait for delete to fully complete - poll env:info until it fails
+    local attempts=0
+    local max_attempts=60
+    while [ $attempts -lt $max_attempts ]; do
+        if ! terminus env:info "${PANTHEON_SITE}.${MULTIDEV_NAME}" >/dev/null 2>&1; then
+            # Environment doesn't exist, good to proceed
             break
         fi
         sleep 2
+        attempts=$((attempts + 1))
     done
 
+    # Create the environment
     terminus multidev:create "${PANTHEON_SITE}.live" "${MULTIDEV_NAME}" --yes
+
+    # Wait for creation to complete before testing deletion
+    local attempts=0
+    local max_attempts=60
+    while [ $attempts -lt $max_attempts ]; do
+        if terminus env:info "${PANTHEON_SITE}.${MULTIDEV_NAME}" --field=id >/dev/null 2>&1; then
+            break
+        fi
+        sleep 2
+        attempts=$((attempts + 1))
+    done
 
     run delete_multidev
     assert_success

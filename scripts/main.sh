@@ -73,7 +73,8 @@ function compute_multidev_name() {
 		# Calculate how many chars we have for the branch based on prefix length
 		local prefix_len=${#MULTIDEV_PREFIX}
 		local branch_max_len=$((11 - prefix_len))
-		local sanitized_branch=$(echo "${GITHUB_REF_NAME}" | sed 's/[^a-zA-Z0-9-]//g' | cut -c1-${branch_max_len})
+		local sanitized_branch
+		sanitized_branch=$(echo "${GITHUB_REF_NAME}" | sed 's/[^a-zA-Z0-9-]//g' | cut -c1-${branch_max_len})
 		echo "${MULTIDEV_PREFIX}${sanitized_branch}"
 	fi
 }

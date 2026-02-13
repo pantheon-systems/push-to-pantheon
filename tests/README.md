@@ -88,9 +88,10 @@ bats tests/02-get_target_env.bats
 bats tests/03-permissions.bats
 bats tests/04-ssh_setup.bats
 bats tests/05-build_tools.bats
-bats tests/06-site_root.bats
-bats tests/07-push_pantheon.bats
-bats tests/08-cleanup.bats
+bats tests/06-multidev.bats
+bats tests/07-site_root.bats
+bats tests/08-push_pantheon.bats
+bats tests/09-cleanup.bats
 ```
 
 ### Run Specific Test
@@ -114,9 +115,10 @@ Tests are numbered to run in a specific order, progressing from simple to comple
 3. **03-permissions.bats** - GitHub API permission validation
 4. **04-ssh_setup.bats** - Local SSH configuration
 5. **05-build_tools.bats** - Terminus plugin detection
-6. **06-site_root.bats** - Pantheon repo operations
-7. **07-push_pantheon.bats** - Full deployment logic
-8. **08-cleanup.bats** - Environment cleanup
+6. **06-multidev.bats** - Multidev create/delete operations
+7. **07-site_root.bats** - Pantheon repo operations
+8. **08-push_pantheon.bats** - Full deployment logic
+9. **09-cleanup.bats** - Environment cleanup
 
 This ordering ensures:
 - Simple tests run first (fast feedback)
@@ -158,21 +160,27 @@ This ordering ensures:
   - Version extraction
   - Not installed handling
 
+- **06-multidev.bats** - Tests multidev management
+  - create_multidev function
+  - delete_multidev function
+  - Error handling
+  - Idempotent operations
+
 ### Complex Integration Tests (Phase 4)
 
-- **06-site_root.bats** - Tests Pantheon repo preparation
+- **07-site_root.bats** - Tests Pantheon repo preparation
   - Branch selection logic
   - File copying
   - GitHub origin setup
   - PANTHEON_REPO_DIR export
 
-- **07-push_pantheon.bats** - Tests deployment logic
-  - Git-only mode
+- **08-push_pantheon.bats** - Tests deployment logic
+  - Git-only mode (now uses create_multidev)
   - Build Tools mode
   - Branch targeting
   - Multidev creation
 
-- **08-cleanup.bats** - Tests environment cleanup
+- **09-cleanup.bats** - Tests environment cleanup
   - DELETE_OLD_MULTIDEVS flag
   - Age threshold filtering
   - Prefix protection

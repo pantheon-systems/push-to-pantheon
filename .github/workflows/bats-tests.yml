@@ -38,6 +38,8 @@ jobs:
         id: test_env
         env:
           PANTHEON_MACHINE_TOKEN: ${{ secrets.PANTHEON_MACHINE_TOKEN }}
+          PANTHEON_SITE: dtp-nearly-empty-site
+          SOURCE_ENV: live
         run: |
           # Compute PR-specific multidev name (max 11 chars for Pantheon)
           if [ "${{ github.event_name }}" == "pull_request" ]; then
@@ -51,12 +53,10 @@ jobs:
           fi
 
           echo "TEST_ENV=${TEST_ENV}" >> $GITHUB_OUTPUT
-          echo "Creating test environment: ${TEST_ENV}"
 
-          # Create multidev from live if it doesn't exist, or use existing
-          if ! terminus multidev:list dtp-nearly-empty-site --format=list | grep -q "^${TEST_ENV}$"; then
-            terminus multidev:create dtp-nearly-empty-site.live "${TEST_ENV}" --yes
-          fi
+          # Create multidev using main.sh function
+          export MULTIDEV_NAME="${TEST_ENV}"
+          bash scripts/main.sh create_multidev
 
       - name: Run BATS tests
         env:
@@ -73,7 +73,8 @@ jobs:
         if: always()
         env:
           PANTHEON_MACHINE_TOKEN: ${{ secrets.PANTHEON_MACHINE_TOKEN }}
-          TEST_ENV: ${{ steps.test_env.outputs.TEST_ENV }}
+          PANTHEON_SITE: dtp-nearly-empty-site
+          MULTIDEV_NAME: ${{ steps.test_env.outputs.TEST_ENV }}
         run: |
-          # Delete the test multidev
-          terminus env:delete dtp-nearly-empty-site.${TEST_ENV} --delete-branch --yes || true
+          # Delete the test multidev using main.sh function
+          bash scripts/main.sh delete_multidev || true

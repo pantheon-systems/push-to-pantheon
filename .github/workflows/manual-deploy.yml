@@ -23,6 +23,8 @@ jobs:
   compute_env_prefix:
     name: Compute Environment Prefix
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     outputs:
       env_prefix: ${{ steps.compute.outputs.env_prefix }}
     steps:

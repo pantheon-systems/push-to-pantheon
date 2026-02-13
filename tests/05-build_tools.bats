@@ -50,12 +50,21 @@ teardown() {
         skip "Terminus not installed"
     fi
 
-    # Only run if Build Tools is actually not installed
+    # Save whether Build Tools was originally installed
+    BUILD_TOOLS_WAS_INSTALLED=false
     if terminus self:plugin:list --format=list --field=name | grep -q '^terminus-build-tools-plugin$'; then
-        skip "Build Tools is installed, cannot test not-installed case"
+        BUILD_TOOLS_WAS_INSTALLED=true
+        # Temporarily uninstall it
+        terminus self:plugin:uninstall pantheon-systems/terminus-build-tools-plugin
     fi
 
+    # Test that verify_build_tools fails when plugin not installed
     run verify_build_tools
     assert_failure
     assert_output_contains "Build Tools plugin installation failed"
+
+    # Reinstall if it was originally installed
+    if [ "$BUILD_TOOLS_WAS_INSTALLED" = true ]; then
+        terminus self:plugin:install pantheon-systems/terminus-build-tools-plugin
+    fi
 }

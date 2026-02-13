@@ -51,23 +51,22 @@ teardown_file() {
     assert_success
     assert_output_contains "Creating multidev"
 
-    # Wait for environment to appear in multidev list (for next test)
-    echo "Waiting for ${TEST_MULTIDEV_NAME} to appear in multidev list..." >&3
-    local found=false
-    for i in {1..60}; do
-        if terminus multidev:list "${PANTHEON_SITE}" --format=list | grep -q "^${TEST_MULTIDEV_NAME}$"; then
-            echo "${TEST_MULTIDEV_NAME} found in list after ${i} attempts ($(($i * 2)) seconds)" >&3
-            found=true
+    # Wait for environment to be fully created and accessible
+    echo "Waiting for ${TEST_MULTIDEV_NAME} to be fully accessible..." >&3
+    local attempts=0
+    local max_attempts=60
+    while [ $attempts -lt $max_attempts ]; do
+        if terminus env:info "${PANTHEON_SITE}.${TEST_MULTIDEV_NAME}" --field=id >/dev/null 2>&1; then
+            echo "${TEST_MULTIDEV_NAME} is accessible after $((attempts * 2)) seconds" >&3
             break
         fi
         sleep 2
+        attempts=$((attempts + 1))
     done
 
-    # Verify it's actually in the list
-    if [ "$found" = "false" ]; then
-        echo "ERROR: ${TEST_MULTIDEV_NAME} not found in list after 120 seconds!" >&3
-        echo "Current multidev list:" >&3
-        terminus multidev:list "${PANTHEON_SITE}" --format=list >&3
+    # Final verification
+    if ! terminus env:info "${PANTHEON_SITE}.${TEST_MULTIDEV_NAME}" --field=id >/dev/null 2>&1; then
+        echo "ERROR: ${TEST_MULTIDEV_NAME} is not accessible after $((max_attempts * 2)) seconds!" >&3
         return 1
     fi
 }

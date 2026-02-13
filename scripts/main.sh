@@ -423,16 +423,15 @@ function cleanup() {
 
 	# Go ahead and delete the oldest environments.
 	for ENV_TO_DELETE in $OLDEST_ENVIRONMENTS; do
-		echo -e "${yellow}Deleting Pantheon environment: ${normal}${bold}${ENV_TO_DELETE}${normal}${yellow}...${normal}"
-		if terminus env:info "${PANTHEON_SITE}.${ENV_TO_DELETE}" > /dev/null 2>&1; then
-			terminus env:delete "${PANTHEON_SITE}.${ENV_TO_DELETE}" --delete-branch --yes
-			if [ -n "$GITHUB_REPOSITORY" ]; then
-				delete_github_environment "$ENV_TO_DELETE"
-			else
-				echo -e "${red}Skipping GitHub deletion for ${normal}${bold}${ENV_TO_DELETE}${normal}${red} — GITHUB_TOKEN or GITHUB_REPOSITORY not set.${normal}"
-			fi
+		# Use delete_multidev helper function
+		export MULTIDEV_NAME="${ENV_TO_DELETE}"
+		delete_multidev
+
+		# Also delete GitHub environment if applicable
+		if [ -n "$GITHUB_REPOSITORY" ]; then
+			delete_github_environment "$ENV_TO_DELETE"
 		else
-			echo "Pantheon environment ${ENV_TO_DELETE} not found."
+			echo -e "${red}Skipping GitHub deletion for ${normal}${bold}${ENV_TO_DELETE}${normal}${red} — GITHUB_TOKEN or GITHUB_REPOSITORY not set.${normal}"
 		fi
 	done
 }

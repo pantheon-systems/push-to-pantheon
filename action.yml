@@ -202,6 +202,41 @@ runs:
             echo "live_env_exists=false" >> $GITHUB_OUTPUT
           fi
 
+      - name: Check multidev limit
+        if: ${{ inputs.target_env == '' }}
+        id: check_multidev_limit
+        shell: bash
+        env:
+          PANTHEON_SITE: ${{ inputs.site }}
+          WORKSPACE: ${{ github.workspace }}
+        run: |
+          ${WORKSPACE}/scripts/main.sh check_multidev_limit
+
+      - name: Comment on PR if multidev limit reached
+        if: ${{ inputs.target_env == '' && steps.check_multidev_limit.outputs.multidev_available == 'false' }}
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          gh pr comment "${PR_NUMBER}" --body "⚠️ **Unable to create a Multidev environment**
+
+          Your Pantheon site has reached its Multidev limit. No environments are available for this deployment.
+
+          **Next steps:**
+          1. Delete unused Multidev environments via the Pantheon dashboard
+          2. Contact your Pantheon account team to increase your Multidev limit
+          3. Re-run this workflow once environments are available
+
+          For more information, see the [Pantheon Multidev documentation](https://pantheon.io/docs/multidev)."
+
+      - name: Abort deployment if multidev limit reached
+        if: ${{ inputs.target_env == '' && steps.check_multidev_limit.outputs.multidev_available == 'false' }}
+        shell: bash
+        run: |
+          echo "::error::Aborting deployment: Multidev limit reached. Delete unused environments or contact Pantheon to increase your limit."
+          exit 1
+
       - name: Install Terminus Plugin
         shell: bash
         if: ${{ inputs.skip_build_tools != 'true' && steps.check_live_env.outputs.live_env_exists == 'true' }}

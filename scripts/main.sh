@@ -19,6 +19,7 @@ function main() {
 	- get_target_env: Determine the target environment based on the context of the GitHub Actions workflow.
 	- check_missing_permissions: Check for missing GitHub permissions and return a list of any that are missing.
 	- get_missing_permissions_help: Print a help message with instructions for how to add the missing permissions to your workflow.
+	- check_multidev_limit: Check if there are available multidev slots and output availability status.
 	- setup_ssh_hostkeys: Set up SSH host keys for Pantheon.
 	- prepare_site_root: Prepare the site root by cloning the Pantheon repository, copying files from the specified SITE_ROOT, and setting up the GitHub origin for Build Tools compatibility.
 	- verify_build_tools: Verify that the Terminus Build Tools plugin is installed and available.
@@ -40,7 +41,7 @@ function main() {
 	fi
 
 	# Check for a valid command.
-	if [ "$1" != 'compute_multidev_name' ] && [ "$1" != 'get_target_env' ] && [ "$1" != 'check_missing_permissions' ] && [ "$1" != 'get_missing_permissions_help' ] && [ "$1" != 'setup_ssh_hostkeys' ] && [ "$1" != 'prepare_site_root' ] && [ "$1" != 'push_to_pantheon' ] && [ "$1" != 'cleanup' ] && [ "$1" != 'verify_build_tools' ] && [ "$1" != 'create_multidev' ] && [ "$1" != 'delete_multidev' ]; then
+	if [ "$1" != 'compute_multidev_name' ] && [ "$1" != 'get_target_env' ] && [ "$1" != 'check_missing_permissions' ] && [ "$1" != 'get_missing_permissions_help' ] && [ "$1" != 'check_multidev_limit' ] && [ "$1" != 'setup_ssh_hostkeys' ] && [ "$1" != 'prepare_site_root' ] && [ "$1" != 'push_to_pantheon' ] && [ "$1" != 'cleanup' ] && [ "$1" != 'verify_build_tools' ] && [ "$1" != 'create_multidev' ] && [ "$1" != 'delete_multidev' ]; then
 		echo -e "${red}Invalid command: $1${normal}"
 		echo -e "${help_msg}"
 		exit 1
@@ -134,6 +135,57 @@ function check_missing_permissions() {
 	fi
 
 	echo "${MISSING_PERMISSIONS[@]}"
+}
+
+# Check if there are available multidev environment slots.
+# Requires environment variables:
+#   PANTHEON_SITE: The Pantheon site name
+# Outputs to GITHUB_OUTPUT:
+#   multidev_available: true/false
+#   available_count: number of available slots
+# Exit codes:
+#   0: Check completed successfully (regardless of availability)
+#   1: Error checking multidev limit
+function check_multidev_limit() {
+	if [ -z "${PANTHEON_SITE}" ]; then
+		echo -e "${red}Error: PANTHEON_SITE environment variable is required${normal}"
+		exit 1
+	fi
+
+	echo -e "${yellow}Checking multidev environment availability...${normal}"
+
+	# Get max multidevs allowed for this site
+	local max_multidevs
+	if ! max_multidevs=$(terminus site:info "${PANTHEON_SITE}" --field="Max Multidevs" 2>&1); then
+		echo -e "${red}Error: Failed to get max multidevs for site${normal}"
+		echo -e "${red}${max_multidevs}${normal}"
+		exit 1
+	fi
+
+	# Count current multidevs (exclude dev, test, live)
+	local current_multidevs
+	if ! current_multidevs=$(terminus multidev:list "${PANTHEON_SITE}" --format=list 2>&1 | grep -cE -v '^(dev|test|live)$'); then
+		echo -e "${red}Error: Failed to count current multidevs${normal}"
+		exit 1
+	fi
+
+	# Calculate available slots
+	local available_count=$((max_multidevs - current_multidevs))
+
+	# Output results
+	if [ "$available_count" -gt 0 ]; then
+		echo -e "${green}✅ You have ${available_count} multidev environment(s) available.${normal}"
+		if [ -n "${GITHUB_OUTPUT}" ]; then
+			echo "multidev_available=true" >> "${GITHUB_OUTPUT}"
+			echo "available_count=${available_count}" >> "${GITHUB_OUTPUT}"
+		fi
+	else
+		echo -e "${red}❌ Multidev limit reached (${current_multidevs}/${max_multidevs}).${normal}"
+		if [ -n "${GITHUB_OUTPUT}" ]; then
+			echo "multidev_available=false" >> "${GITHUB_OUTPUT}"
+			echo "available_count=0" >> "${GITHUB_OUTPUT}"
+		fi
+	fi
 }
 
 # Function to print a help message with instructions for how to add the missing

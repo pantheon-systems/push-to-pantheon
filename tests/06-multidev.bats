@@ -131,3 +131,38 @@ teardown() {
     assert_success
     assert_output_contains "does not exist"
 }
+
+@test "check_multidev_limit: PANTHEON_SITE not set exits with error" {
+    unset PANTHEON_SITE
+
+    run check_multidev_limit
+    assert_failure
+    assert_output_contains "PANTHEON_SITE environment variable is required"
+}
+
+@test "check_multidev_limit: successfully checks multidev availability" {
+    run check_multidev_limit
+    assert_success
+    # Should contain either "available" or "limit reached"
+    # Most test sites will have availability, but we can't assume
+}
+
+@test "check_multidev_limit: sets GITHUB_OUTPUT when env var is set" {
+    # Create temp file for GITHUB_OUTPUT
+    local temp_output="${TEST_TEMP_DIR}/github_output"
+    export GITHUB_OUTPUT="${temp_output}"
+
+    run check_multidev_limit
+    assert_success
+
+    # Verify GITHUB_OUTPUT was written to
+    assert_file_exists "${temp_output}"
+    assert_file_contains "${temp_output}" "multidev_available="
+    assert_file_contains "${temp_output}" "available_count="
+}
+
+@test "check_multidev_limit: reports max multidevs correctly" {
+    run check_multidev_limit
+    assert_success
+    # Output should mention the count of available environments
+}

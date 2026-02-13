@@ -42,8 +42,8 @@ teardown() {
 }
 
 @test "create_multidev: creates multidev if it doesn't exist" {
-    # Use a temporary multidev name
-    export MULTIDEV_NAME="bats-temp-$$"
+    # Use a short, predictable name (11 char limit)
+    export MULTIDEV_NAME="bats-tmp1"
     export SOURCE_ENV="live"
 
     # Ensure it doesn't exist first
@@ -68,7 +68,7 @@ teardown() {
 }
 
 @test "create_multidev: uses custom SOURCE_ENV when specified" {
-    export MULTIDEV_NAME="bats-temp-$$"
+    export MULTIDEV_NAME="bats-tmp2"
     export SOURCE_ENV="dev"
 
     # Cleanup first
@@ -101,8 +101,11 @@ teardown() {
 }
 
 @test "delete_multidev: deletes existing multidev" {
-    # Create a temporary multidev first
-    export MULTIDEV_NAME="bats-temp-$$"
+    # Use a short, predictable name (11 char limit)
+    export MULTIDEV_NAME="bats-tmp3"
+
+    # Ensure it doesn't exist first, then create it
+    terminus env:delete "${PANTHEON_SITE}.${MULTIDEV_NAME}" --delete-branch --yes 2>/dev/null || true
     terminus multidev:create "${PANTHEON_SITE}.live" "${MULTIDEV_NAME}" --yes
 
     run delete_multidev
@@ -117,7 +120,10 @@ teardown() {
 }
 
 @test "delete_multidev: gracefully handles non-existent multidev" {
-    export MULTIDEV_NAME="nonexistent-env-$$"
+    export MULTIDEV_NAME="bats-tmp4"
+
+    # Make sure it doesn't exist
+    terminus env:delete "${PANTHEON_SITE}.${MULTIDEV_NAME}" --delete-branch --yes 2>/dev/null || true
 
     run delete_multidev
     assert_success

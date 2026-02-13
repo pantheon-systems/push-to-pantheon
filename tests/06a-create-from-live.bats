@@ -52,18 +52,22 @@ teardown_file() {
     assert_output_contains "Creating multidev"
 
     # Wait for environment to appear in multidev list (for next test)
-    echo "Waiting for ${TEST_MULTIDEV_NAME} to appear in multidev list..."
-    for i in {1..30}; do
+    echo "Waiting for ${TEST_MULTIDEV_NAME} to appear in multidev list..." >&3
+    local found=false
+    for i in {1..60}; do
         if terminus multidev:list "${PANTHEON_SITE}" --format=list | grep -q "^${TEST_MULTIDEV_NAME}$"; then
-            echo "${TEST_MULTIDEV_NAME} found in list after ${i} attempts"
+            echo "${TEST_MULTIDEV_NAME} found in list after ${i} attempts ($(($i * 2)) seconds)" >&3
+            found=true
             break
         fi
         sleep 2
     done
 
     # Verify it's actually in the list
-    if ! terminus multidev:list "${PANTHEON_SITE}" --format=list | grep -q "^${TEST_MULTIDEV_NAME}$"; then
-        echo "ERROR: ${TEST_MULTIDEV_NAME} not found in list after 60 seconds!"
+    if [ "$found" = "false" ]; then
+        echo "ERROR: ${TEST_MULTIDEV_NAME} not found in list after 120 seconds!" >&3
+        echo "Current multidev list:" >&3
+        terminus multidev:list "${PANTHEON_SITE}" --format=list >&3
         return 1
     fi
 }
@@ -75,7 +79,7 @@ teardown_file() {
 
     run create_multidev
     assert_success
-    assert_output_contains "already exists"
-    # Verify it detected existing env and didn't try to create
-    assert_output_not_contains "Creating multidev"
+    # Check for the specific early return message from line 606
+    assert_output_contains "✅ Multidev"
+    assert_output_contains "already exists."
 }

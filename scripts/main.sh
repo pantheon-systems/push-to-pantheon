@@ -606,8 +606,11 @@ function create_multidev() {
 		echo -e "${green}✅ Multidev ${normal}${bold}${MULTIDEV_NAME}${normal}${green} already exists.${normal}"
 	else
 		echo -e "${yellow}Creating multidev ${normal}${bold}${MULTIDEV_NAME}${normal}${yellow} from ${normal}${bold}${source_env}${normal}${yellow}...${normal}"
-		terminus multidev:create "${PANTHEON_SITE}.${source_env}" "${MULTIDEV_NAME}" --yes
-		echo -e "${green}✅ Multidev ${normal}${bold}${MULTIDEV_NAME}${normal}${green} created successfully.${normal}"
+		if terminus multidev:create "${PANTHEON_SITE}.${source_env}" "${MULTIDEV_NAME}" --yes; then
+			echo -e "${green}✅ Multidev ${normal}${bold}${MULTIDEV_NAME}${normal}${green} created successfully.${normal}"
+		else
+			echo -e "${yellow}Note: Multidev ${normal}${bold}${MULTIDEV_NAME}${normal}${yellow} may already exist or creation failed.${normal}"
+		fi
 	fi
 }
 

@@ -445,7 +445,7 @@ function cleanup() {
 	terminus build:env:delete:pr "$PANTHEON_SITE" --yes
 
 	# Get all multidevs for cleanup operations
-	ALL_ENVS=$(terminus multidev:list ${PANTHEON_SITE} --format=list 2>/dev/null || echo "")
+	ALL_ENVS=$(terminus multidev:list "${PANTHEON_SITE}" --format=list 2>/dev/null || echo "")
 
 	# Always delete test suite environments from the current run when ENV_PREFIX is set
 	if [ -n "$ENV_PREFIX" ]; then

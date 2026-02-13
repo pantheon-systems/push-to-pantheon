@@ -365,11 +365,39 @@ function push_to_pantheon() {
 	fi
 
 	# For all other pushes, use Build Tools.
-	if [ -n "${PANTHEON_CLONE_CONTENT_FLAG}" ]; then
-		terminus -n build:env:create "${PANTHEON_SITE}.${PANTHEON_SOURCE_ENV}" "${PANTHEON_TARGET_ENV}" --yes --message="${PANTHEON_COMMIT_MESSAGE}" "${PANTHEON_CLONE_CONTENT_FLAG}"
-	else
-		terminus -n build:env:create "${PANTHEON_SITE}.${PANTHEON_SOURCE_ENV}" "${PANTHEON_TARGET_ENV}" --yes --message="${PANTHEON_COMMIT_MESSAGE}"
+	# If using relative_site_root, commit staged changes first so Build Tools
+	# reads the correct commit instead of old Pantheon repo history
+	if [ -n "$PANTHEON_REPO_DIR" ] && ! git diff --cached --quiet; then
+		echo -e "${yellow}Committing staged changes before Build Tools deployment${normal}"
+		git commit -m "${PANTHEON_COMMIT_MESSAGE}"
 	fi
+
+	# Debug: Show CI variables that Build Tools should use
+	echo -e "${yellow}CI Environment Variables:${normal}"
+	echo "CI_COMMIT_SHA=${CI_COMMIT_SHA}"
+	echo "CIRCLE_SHA1=${CIRCLE_SHA1}"
+	echo "GITHUB_SHA=${GITHUB_SHA}"
+	echo "CI_BUILD_URL=${CI_BUILD_URL}"
+	echo "CI_PROJECT_USERNAME=${CI_PROJECT_USERNAME}"
+	echo "CI_PROJECT_REPONAME=${CI_PROJECT_REPONAME}"
+	echo "PR_NUM=${PR_NUM}"
+	echo "Current git HEAD SHA: $(git rev-parse HEAD)"
+
+	# Build the terminus command with optional --pr-id flag
+	TERMINUS_CMD="terminus -n build:env:create \"${PANTHEON_SITE}.${PANTHEON_SOURCE_ENV}\" \"${PANTHEON_TARGET_ENV}\" --yes --message=\"${PANTHEON_COMMIT_MESSAGE}\""
+
+	# Add --pr-id if PR_NUM is set (makes Build Tools comment on PR instead of commit)
+	if [ -n "${PR_NUM}" ]; then
+		TERMINUS_CMD="${TERMINUS_CMD} --pr-id=\"${PR_NUM}\""
+	fi
+
+	# Add clone-content flag if set
+	if [ -n "${PANTHEON_CLONE_CONTENT_FLAG}" ]; then
+		TERMINUS_CMD="${TERMINUS_CMD} ${PANTHEON_CLONE_CONTENT_FLAG}"
+	fi
+
+	# Execute the command
+	eval "${TERMINUS_CMD}"
 }
 
 # Function to delete a GitHub environment and all of its associated deployments.

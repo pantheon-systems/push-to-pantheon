@@ -94,10 +94,10 @@ assert_output_not_contains() {
     fi
 }
 
-# Assert that file exists
+# Assert that file or directory exists
 assert_file_exists() {
     local file="$1"
-    if [ ! -f "$file" ]; then
+    if [ ! -e "$file" ]; then
         echo "Expected file to exist: $file"
         return 1
     fi
@@ -107,7 +107,17 @@ assert_file_exists() {
 assert_file_perms() {
     local file="$1"
     local expected_perms="$2"
-    local actual_perms=$(stat -f "%OLp" "$file" 2>/dev/null || stat -c "%a" "$file" 2>/dev/null)
+
+    # Try macOS stat first, then Linux stat
+    local actual_perms
+    if actual_perms=$(stat -f "%OLp" "$file" 2>/dev/null); then
+        : # macOS succeeded
+    elif actual_perms=$(stat -c "%a" "$file" 2>/dev/null); then
+        : # Linux succeeded
+    else
+        echo "Failed to get permissions for $file"
+        return 1
+    fi
 
     if [ "$actual_perms" != "$expected_perms" ]; then
         echo "Expected file $file to have permissions $expected_perms but got $actual_perms"

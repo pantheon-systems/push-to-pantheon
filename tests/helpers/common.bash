@@ -4,12 +4,13 @@
 # Load the main.sh script for testing
 # This sources all functions without executing main()
 load_main_script() {
-    # Get the absolute path to scripts/main.sh
-    SCRIPT_DIR="$(cd "$(dirname "${BATS_TEST_DIRNAME}")/.." && pwd)"
+    # BATS_TEST_DIRNAME is the tests/ directory
+    # Go up one level to get to the repo root
+    SCRIPT_DIR="$(cd "${BATS_TEST_DIRNAME}/.." && pwd)"
     MAIN_SCRIPT="${SCRIPT_DIR}/scripts/main.sh"
 
     # Source the script but prevent main() from executing
-    # We'll source the file but trap the main() call at the end
+    # We remove the last line which calls main "$@"
     source <(sed '$ d' "${MAIN_SCRIPT}")
 }
 

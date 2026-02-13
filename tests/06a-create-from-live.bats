@@ -40,7 +40,7 @@ teardown_file() {
     fi
 }
 
-@test "create_multidev: creates multidev if it doesn't exist, then detects it exists" {
+@test "create_multidev and delete_multidev: create, detect existing, and delete" {
     export MULTIDEV_NAME="${TEST_MULTIDEV_NAME}"
     export SOURCE_ENV="live"
 

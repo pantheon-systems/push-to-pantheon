@@ -13,7 +13,14 @@ authenticate_terminus() {
     fi
 
     # Authenticate with machine token
-    terminus auth:login --machine-token="${PANTHEON_MACHINE_TOKEN}" >/dev/null 2>&1
+    # Don't hide errors - we need to see if this fails
+    terminus auth:login --machine-token="${PANTHEON_MACHINE_TOKEN}"
+
+    # Verify authentication succeeded
+    if ! terminus auth:whoami >/dev/null 2>&1; then
+        echo "ERROR: Terminus authentication failed"
+        return 1
+    fi
 }
 
 # Get the test site name from environment or default

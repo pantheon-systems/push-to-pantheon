@@ -26,6 +26,13 @@ common_setup() {
 
     # Use test temp dir as HOME for SSH config isolation
     export HOME="${TEST_TEMP_DIR}"
+
+    # Preserve Terminus cache directory for authentication
+    # The workflow authenticated Terminus, we need to keep that session
+    if [ -d "${ORIGINAL_HOME}/.terminus" ]; then
+        mkdir -p "${HOME}/.terminus"
+        cp -r "${ORIGINAL_HOME}/.terminus"/* "${HOME}/.terminus/" 2>/dev/null || true
+    fi
 }
 
 # Teardown function to run after each test

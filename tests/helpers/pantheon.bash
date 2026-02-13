@@ -1,6 +1,21 @@
 #!/bin/bash
 # Pantheon-specific test helpers
 
+# Authenticate Terminus if not already authenticated
+authenticate_terminus() {
+    if [ -z "${PANTHEON_MACHINE_TOKEN}" ]; then
+        return 0  # Skip if no token available
+    fi
+
+    # Check if already authenticated
+    if terminus auth:whoami >/dev/null 2>&1; then
+        return 0
+    fi
+
+    # Authenticate with machine token
+    terminus auth:login --machine-token="${PANTHEON_MACHINE_TOKEN}" >/dev/null 2>&1
+}
+
 # Get the test site name from environment or default
 get_test_site() {
     echo "${PANTHEON_TEST_SITE:-dtp-nearly-empty-site}"
@@ -15,12 +30,14 @@ get_test_env() {
 multidev_exists() {
     local site="$1"
     local env="$2"
+    authenticate_terminus
     terminus multidev:list "${site}" --format=list | grep -q "^${env}$"
 }
 
 # Get Pantheon site ID
 get_site_id() {
     local site="$1"
+    authenticate_terminus
     terminus site:info "${site}" --field=id
 }
 

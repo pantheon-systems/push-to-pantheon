@@ -13,6 +13,9 @@ setup() {
         skip "Pantheon credentials not available"
     fi
 
+    # Authenticate Terminus for tests that call terminus commands
+    authenticate_terminus
+
     # Set up required environment variables
     export PANTHEON_SITE="$(get_test_site)"
     export PANTHEON_TARGET_ENV="$(get_test_env)"

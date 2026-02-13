@@ -1,0 +1,77 @@
+name: BATS Tests
+
+on:
+  push:
+    paths:
+      - 'scripts/**'
+      - 'tests/**'
+      - '.github/workflows/bats-tests.yml'
+
+concurrency:
+  group: bats-tests-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  deployments: write
+  pull-requests: read
+
+jobs:
+  bats:
+    name: Run BATS Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install BATS
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y bats
+
+      - name: Install Terminus
+        uses: pantheon-systems/terminus-github-actions@v1
+        with:
+          pantheon-machine-token: ${{ secrets.PANTHEON_MACHINE_TOKEN }}
+
+      - name: Install Terminus Build Tools
+        run: |
+          terminus self:plugin:install pantheon-systems/terminus-build-tools-plugin
+
+      - name: Create test environment
+        id: test_env
+        env:
+          PANTHEON_MACHINE_TOKEN: ${{ secrets.PANTHEON_MACHINE_TOKEN }}
+          PANTHEON_SITE: dtp-nearly-empty-site
+          SOURCE_ENV: live
+          MULTIDEV_PREFIX: bats-
+          GITHUB_SHA: ${{ github.sha }}
+        run: |
+          # Compute multidev name using helper function (uses commit hash for uniqueness)
+          TEST_ENV=$(bash scripts/main.sh compute_multidev_name)
+          echo "TEST_ENV=${TEST_ENV}" >> $GITHUB_OUTPUT
+
+          # Create multidev using main.sh function
+          export MULTIDEV_NAME="${TEST_ENV}"
+          bash scripts/main.sh create_multidev
+
+      - name: Run BATS tests
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          PANTHEON_MACHINE_TOKEN: ${{ secrets.PANTHEON_MACHINE_TOKEN }}
+          PANTHEON_SSH_KEY: ${{ secrets.PANTHEON_SSH_KEY }}
+          PANTHEON_TEST_SITE: dtp-nearly-empty-site
+          PANTHEON_TEST_ENV: ${{ steps.test_env.outputs.TEST_ENV }}
+        run: |
+          bats tests/*.bats
+
+      - name: Cleanup test environment
+        if: always()
+        env:
+          PANTHEON_MACHINE_TOKEN: ${{ secrets.PANTHEON_MACHINE_TOKEN }}
+          PANTHEON_SITE: dtp-nearly-empty-site
+          MULTIDEV_NAME: ${{ steps.test_env.outputs.TEST_ENV }}
+        run: |
+          # Delete the test multidev using main.sh function
+          bash scripts/main.sh delete_multidev || true

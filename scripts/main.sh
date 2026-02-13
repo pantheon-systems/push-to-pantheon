@@ -15,6 +15,7 @@ yellow='\033[0;33m'   # Yellow
 function main() {
 	help_msg="Usage: bash ./scripts/main.sh <command>
 	Available commands:
+	- compute_multidev_name: Compute a multidev name for PR or branch-based workflows (respects 11-char limit).
 	- get_target_env: Determine the target environment based on the context of the GitHub Actions workflow.
 	- check_missing_permissions: Check for missing GitHub permissions and return a list of any that are missing.
 	- get_missing_permissions_help: Print a help message with instructions for how to add the missing permissions to your workflow.
@@ -23,6 +24,8 @@ function main() {
 	- verify_build_tools: Verify that the Terminus Build Tools plugin is installed and available.
 	- push_to_pantheon: Push code to Pantheon, either via Git or Build Tools depending on configuration and environment state.
 	- cleanup: Clean up stale Pantheon multidev environments. This includes environments associated with closed PRs as well as old environments matching a specified pattern.
+	- create_multidev: Create a multidev environment from a source environment if it doesn't already exist.
+	- delete_multidev: Delete a specific multidev environment and its Git branch.
 	"
 
 	if [ -z "$1" ]; then
@@ -37,7 +40,7 @@ function main() {
 	fi
 
 	# Check for a valid command.
-	if [ "$1" != 'get_target_env' ] && [ "$1" != 'check_missing_permissions' ] && [ "$1" != 'get_missing_permissions_help' ] && [ "$1" != 'setup_ssh_hostkeys' ] && [ "$1" != 'prepare_site_root' ] && [ "$1" != 'push_to_pantheon' ] && [ "$1" != 'cleanup' ] && [ "$1" != 'verify_build_tools' ]; then
+	if [ "$1" != 'compute_multidev_name' ] && [ "$1" != 'get_target_env' ] && [ "$1" != 'check_missing_permissions' ] && [ "$1" != 'get_missing_permissions_help' ] && [ "$1" != 'setup_ssh_hostkeys' ] && [ "$1" != 'prepare_site_root' ] && [ "$1" != 'push_to_pantheon' ] && [ "$1" != 'cleanup' ] && [ "$1" != 'verify_build_tools' ] && [ "$1" != 'create_multidev' ] && [ "$1" != 'delete_multidev' ]; then
 		echo -e "${red}Invalid command: $1${normal}"
 		echo -e "${help_msg}"
 		exit 1
@@ -45,6 +48,33 @@ function main() {
 
 	# Execute the command.
 	"$1"
+}
+
+# Compute a multidev name for PR or branch-based workflows.
+# This logic is reused across multiple workflows (BATS tests, deployments, etc.)
+# Requires environment variables:
+#   MULTIDEV_PREFIX: Prefix for the environment name (e.g., "bats-", "pr-")
+#   GITHUB_SHA: Git commit SHA (first 4 chars used for uniqueness)
+# Outputs the computed multidev name (respects 11-character Pantheon limit)
+function compute_multidev_name() {
+	if [ -z "${MULTIDEV_PREFIX}" ]; then
+		echo -e "${red}Error: MULTIDEV_PREFIX environment variable is required${normal}"
+		exit 1
+	fi
+
+	if [ -z "${GITHUB_SHA}" ]; then
+		echo -e "${red}Error: GITHUB_SHA environment variable is required${normal}"
+		exit 1
+	fi
+
+	# Use first 4 characters of commit SHA for uniqueness
+	# This prevents race conditions when workflows are canceled and restarted
+	# Different commits = different hash = different multidev
+	local commit_hash="${GITHUB_SHA:0:4}"
+
+	# Compute multidev name (max 11 chars for Pantheon)
+	# Format: {prefix}{hash} (e.g., bats-a1b2, pr-c3d4)
+	echo "${MULTIDEV_PREFIX}${commit_hash}"
 }
 
 # Function to determine the target environment based on the context of the
@@ -255,13 +285,10 @@ function push_to_pantheon() {
 			PANTHEON_DESTINATION_BRANCH="${PANTHEON_TARGET_ENV}"
 			echo -e "${yellow}Target environment is ${normal}${bold}${PANTHEON_TARGET_ENV}${normal}${yellow}, pushing to branch with the same name on Pantheon.${normal}"
 
-			# Check if a multidev already exists for this PR.
-			if terminus multidev:list "${PANTHEON_SITE}" --format=list | grep -q "^${PANTHEON_TARGET_ENV}$"; then
-				echo -e "${yellow}Multidev environment ${normal}${bold}${PANTHEON_TARGET_ENV}${normal}${yellow} already exists. Pushing code to existing environment.${normal}"
-			else
-				echo -e "${yellow}Creating new multidev environment: ${normal}${bold}${PANTHEON_TARGET_ENV}${normal}${yellow}${normal}"
-				terminus multidev:create "${PANTHEON_SITE}.${PANTHEON_SOURCE_ENV}" "${PANTHEON_TARGET_ENV}" --yes
-			fi
+			# Create multidev if it doesn't exist (reuse create_multidev logic)
+			export MULTIDEV_NAME="${PANTHEON_TARGET_ENV}"
+			export SOURCE_ENV="${PANTHEON_SOURCE_ENV}"
+			create_multidev
 		fi
 
 		# Ensure repo is not shallow; Pantheon rejects shallow pushes
@@ -424,18 +451,73 @@ function cleanup() {
 
 	# Go ahead and delete the oldest environments.
 	for ENV_TO_DELETE in $OLDEST_ENVIRONMENTS; do
-		echo -e "${yellow}Deleting Pantheon environment: ${normal}${bold}${ENV_TO_DELETE}${normal}${yellow}...${normal}"
-		if terminus env:info "${PANTHEON_SITE}.${ENV_TO_DELETE}" > /dev/null 2>&1; then
-			terminus env:delete "${PANTHEON_SITE}.${ENV_TO_DELETE}" --delete-branch --yes
-			if [ -n "$GITHUB_REPOSITORY" ]; then
-				delete_github_environment "$ENV_TO_DELETE"
-			else
-				echo -e "${red}Skipping GitHub deletion for ${normal}${bold}${ENV_TO_DELETE}${normal}${red} — GITHUB_TOKEN or GITHUB_REPOSITORY not set.${normal}"
-			fi
+		# Use delete_multidev helper function
+		export MULTIDEV_NAME="${ENV_TO_DELETE}"
+		delete_multidev
+
+		# Also delete GitHub environment if applicable
+		if [ -n "$GITHUB_REPOSITORY" ]; then
+			delete_github_environment "$ENV_TO_DELETE"
 		else
-			echo "Pantheon environment ${ENV_TO_DELETE} not found."
+			echo -e "${red}Skipping GitHub deletion for ${normal}${bold}${ENV_TO_DELETE}${normal}${red} — GITHUB_TOKEN or GITHUB_REPOSITORY not set.${normal}"
 		fi
 	done
+}
+
+# Create a multidev environment from a source environment if it doesn't already exist.
+# Requires environment variables:
+#   PANTHEON_SITE: The Pantheon site name
+#   MULTIDEV_NAME: The name of the multidev to create
+#   SOURCE_ENV: The source environment to clone from (default: live)
+function create_multidev() {
+	if [ -z "${PANTHEON_SITE}" ]; then
+		echo -e "${red}Error: PANTHEON_SITE environment variable is required${normal}"
+		exit 1
+	fi
+
+	if [ -z "${MULTIDEV_NAME}" ]; then
+		echo -e "${red}Error: MULTIDEV_NAME environment variable is required${normal}"
+		exit 1
+	fi
+
+	local source_env="${SOURCE_ENV:-live}"
+
+	echo -e "${yellow}Checking if multidev ${normal}${bold}${MULTIDEV_NAME}${normal}${yellow} exists on site ${normal}${bold}${PANTHEON_SITE}${normal}${yellow}...${normal}"
+
+	# Check if multidev already exists
+	if terminus multidev:list "${PANTHEON_SITE}" --format=list | grep -q "^${MULTIDEV_NAME}$"; then
+		echo -e "${green}✅ Multidev ${normal}${bold}${MULTIDEV_NAME}${normal}${green} already exists.${normal}"
+	else
+		echo -e "${yellow}Creating multidev ${normal}${bold}${MULTIDEV_NAME}${normal}${yellow} from ${normal}${bold}${source_env}${normal}${yellow}...${normal}"
+		terminus multidev:create "${PANTHEON_SITE}.${source_env}" "${MULTIDEV_NAME}" --yes
+		echo -e "${green}✅ Multidev ${normal}${bold}${MULTIDEV_NAME}${normal}${green} created successfully.${normal}"
+	fi
+}
+
+# Delete a specific multidev environment and its Git branch.
+# Requires environment variables:
+#   PANTHEON_SITE: The Pantheon site name
+#   MULTIDEV_NAME: The name of the multidev to delete
+function delete_multidev() {
+	if [ -z "${PANTHEON_SITE}" ]; then
+		echo -e "${red}Error: PANTHEON_SITE environment variable is required${normal}"
+		exit 1
+	fi
+
+	if [ -z "${MULTIDEV_NAME}" ]; then
+		echo -e "${red}Error: MULTIDEV_NAME environment variable is required${normal}"
+		exit 1
+	fi
+
+	echo -e "${yellow}Deleting multidev ${normal}${bold}${MULTIDEV_NAME}${normal}${yellow} from site ${normal}${bold}${PANTHEON_SITE}${normal}${yellow}...${normal}"
+
+	# Check if multidev exists before trying to delete
+	if terminus env:info "${PANTHEON_SITE}.${MULTIDEV_NAME}" > /dev/null 2>&1; then
+		terminus env:delete "${PANTHEON_SITE}.${MULTIDEV_NAME}" --delete-branch --yes
+		echo -e "${green}✅ Multidev ${normal}${bold}${MULTIDEV_NAME}${normal}${green} deleted successfully.${normal}"
+	else
+		echo -e "${yellow}Multidev ${normal}${bold}${MULTIDEV_NAME}${normal}${yellow} does not exist, skipping deletion.${normal}"
+	fi
 }
 
 main "$@"

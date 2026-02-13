@@ -440,9 +440,42 @@ function cleanup() {
 	fi
 
 	echo -e "${yellow}Deleting stale Pantheon PR multidev environments...${normal}"
-	# This command will find and delete multidev environments that are 
+	# This command will find and delete multidev environments that are
 	# associated with closed or merged pull requests.
 	terminus build:env:delete:pr "$PANTHEON_SITE" --yes
+
+	# Get all multidevs for cleanup operations
+	ALL_ENVS=$(terminus multidev:list ${PANTHEON_SITE} --format=list 2>/dev/null || echo "")
+
+	# Always delete test suite environments from the current run when ENV_PREFIX is set
+	if [ -n "$ENV_PREFIX" ]; then
+		echo ""
+		echo -e "${yellow}Cleaning up test environments from current run...${normal}"
+
+		if [ -z "${ALL_ENVS}" ]; then
+			echo -e "${yellow}No multidevs found${normal}"
+		else
+			# Find test suite environments (ending in -std, -cont, -git, -term, -adv)
+			TEST_SUITE_ENVS=$(echo "${ALL_ENVS}" | grep -E '-(std|cont|git|term|adv)$' || true)
+
+			# Delete environments from this run (regardless of age)
+			CURRENT_RUN_ENVS=$(echo "${TEST_SUITE_ENVS}" | grep "^${ENV_PREFIX}-" || true)
+
+			if [ -n "${CURRENT_RUN_ENVS}" ]; then
+				echo ""
+				echo -e "${yellow}Deleting environments from current run (${ENV_PREFIX}-*):${normal}"
+				echo "${CURRENT_RUN_ENVS}" | while read -r env; do
+					if [ -n "${env}" ]; then
+						echo -e "${yellow}  Deleting ${normal}${bold}${env}${normal}${yellow}...${normal}"
+						export MULTIDEV_NAME="${env}"
+						delete_multidev || true
+					fi
+				done
+			else
+				echo -e "${yellow}No current run environments found matching ${ENV_PREFIX}-*${normal}"
+			fi
+		fi
+	fi
 
 	# The block below is intended to delete old environments that are not
 	# associated with pull requests. This is useful for cleaning up
@@ -450,6 +483,11 @@ function cleanup() {
 	if [ -z "$DELETE_OLD_MULTIDEVS" ] || [ "$DELETE_OLD_MULTIDEVS" != "true" ]; then
 		echo -e "${red}delete_old_environments was not set to true. Skipping deletion of old environments...${normal}"
 		exit 0
+	fi
+
+	# Re-use ALL_ENVS if available, otherwise fetch again
+	if [ -z "${ALL_ENVS}" ]; then
+		ALL_ENVS=$(terminus env:list "$PANTHEON_SITE" --format=list)
 	fi
 
 	# Age threshold in days - only delete environments older than this
@@ -464,7 +502,6 @@ function cleanup() {
 	# Built-in test suite patterns: *-std, *-cont, *-git, *-term, *-adv
 	# Legacy manual deploy pattern: wd-*
 	# User-specified pattern: $MULTIDEV_DELETE_PATTERN (optional)
-	ALL_ENVS=$(terminus env:list "$PANTHEON_SITE" --format=list)
 
 	# Extract the prefix from PANTHEON_TARGET_ENV to protect all concurrent suite environments
 	# e.g., "126-mo-std" -> "126-mo", "pr-123-git" -> "pr-123", "0x-term" -> "0x"
@@ -599,5 +636,6 @@ function delete_multidev() {
 		echo -e "${yellow}Multidev ${normal}${bold}${MULTIDEV_NAME}${normal}${yellow} does not exist, skipping deletion.${normal}"
 	fi
 }
+
 
 main "$@"

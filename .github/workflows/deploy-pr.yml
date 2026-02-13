@@ -43,3 +43,28 @@ jobs:
     secrets:
       PANTHEON_SSH_KEY: ${{ secrets.PANTHEON_SSH_KEY }}
       PANTHEON_MACHINE_TOKEN: ${{ secrets.PANTHEON_MACHINE_TOKEN }}
+
+  cleanup:
+    name: Cleanup Test Environments
+    needs: run_test_suites
+    if: always()
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Install Terminus
+        uses: pantheon-systems/terminus-github-actions@v1
+        with:
+          pantheon-machine-token: ${{ secrets.PANTHEON_MACHINE_TOKEN }}
+
+      - name: Cleanup environments
+        env:
+          PANTHEON_MACHINE_TOKEN: ${{ secrets.PANTHEON_MACHINE_TOKEN }}
+          PANTHEON_SITE: dtp-nearly-empty-site
+          ENV_PREFIX: ${{ github.event.pull_request.number || 'manual' }}
+          DELETE_OLD_MULTIDEVS: true
+          WORKSPACE: ${{ github.workspace }}
+        run: bash ${WORKSPACE}/scripts/main.sh cleanup

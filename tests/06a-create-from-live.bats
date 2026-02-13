@@ -53,6 +53,9 @@ teardown_file() {
 }
 
 @test "create_multidev: skips creation if multidev already exists" {
+    # Wait for the previous test's creation workflow to complete
+    terminus workflow:wait "${PANTHEON_SITE}.${TEST_MULTIDEV_NAME}" "Create a Multidev environment" --max=300
+
     # Reuse the environment created in the previous test
     export MULTIDEV_NAME="${TEST_MULTIDEV_NAME}"
     export SOURCE_ENV="live"

@@ -1,0 +1,88 @@
+name: BATS Tests
+
+on:
+  push:
+    paths:
+      - 'scripts/**'
+      - 'tests/**'
+      - '.github/workflows/bats-tests.yml'
+  pull_request:
+    paths:
+      - 'scripts/**'
+      - 'tests/**'
+      - '.github/workflows/bats-tests.yml'
+
+permissions:
+  contents: read
+  deployments: write
+  pull-requests: read
+
+jobs:
+  bats:
+    name: Run BATS Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install BATS
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y bats
+
+      - name: Install Terminus
+        uses: pantheon-systems/terminus-github-actions@v1
+        with:
+          pantheon-machine-token: ${{ secrets.PANTHEON_MACHINE_TOKEN }}
+
+      - name: Install Terminus Build Tools
+        run: |
+          terminus self:plugin:install pantheon-systems/terminus-build-tools-plugin
+
+      - name: Install gh CLI
+        run: |
+          sudo apt-get install -y gh
+
+      - name: Create test environment
+        id: test_env
+        env:
+          PANTHEON_MACHINE_TOKEN: ${{ secrets.PANTHEON_MACHINE_TOKEN }}
+        run: |
+          # Compute PR-specific multidev name (max 11 chars for Pantheon)
+          if [ "${{ github.event_name }}" == "pull_request" ]; then
+            # PR format: bats-{num} (e.g., bats-123)
+            TEST_ENV="bats-${{ github.event.pull_request.number }}"
+          else
+            # Push format: bats-{6char branch} (e.g., bats-126mor for "126-more-testing")
+            # Limit branch to 6 chars: 11 total - 5 for "bats-" = 6 for branch
+            BRANCH=$(echo "${{ github.ref_name }}" | sed 's/[^a-zA-Z0-9-]//g' | cut -c1-6)
+            TEST_ENV="bats-${BRANCH}"
+          fi
+
+          echo "TEST_ENV=${TEST_ENV}" >> $GITHUB_OUTPUT
+          echo "Creating test environment: ${TEST_ENV}"
+
+          # Create multidev from live if it doesn't exist, or use existing
+          if ! terminus multidev:list dtp-nearly-empty-site --format=list | grep -q "^${TEST_ENV}$"; then
+            terminus multidev:create dtp-nearly-empty-site.live "${TEST_ENV}" --yes
+          fi
+
+      - name: Run BATS tests
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          PANTHEON_MACHINE_TOKEN: ${{ secrets.PANTHEON_MACHINE_TOKEN }}
+          PANTHEON_SSH_KEY: ${{ secrets.PANTHEON_SSH_KEY }}
+          PANTHEON_TEST_SITE: dtp-nearly-empty-site
+          PANTHEON_TEST_ENV: ${{ steps.test_env.outputs.TEST_ENV }}
+        run: |
+          bats tests/*.bats
+
+      - name: Cleanup test environment
+        if: always()
+        env:
+          PANTHEON_MACHINE_TOKEN: ${{ secrets.PANTHEON_MACHINE_TOKEN }}
+          TEST_ENV: ${{ steps.test_env.outputs.TEST_ENV }}
+        run: |
+          # Delete the test multidev
+          terminus env:delete dtp-nearly-empty-site.${TEST_ENV} --delete-branch --yes || true

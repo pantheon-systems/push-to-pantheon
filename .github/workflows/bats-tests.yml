@@ -7,6 +7,10 @@ on:
       - 'tests/**'
       - '.github/workflows/bats-tests.yml'
 
+concurrency:
+  group: bats-tests-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
   deployments: write

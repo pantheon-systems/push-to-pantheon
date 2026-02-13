@@ -16,6 +16,7 @@ function main() {
 	help_msg="Usage: bash ./scripts/main.sh <command>
 	Available commands:
 	- compute_multidev_name: Compute a multidev name for PR or branch-based workflows (respects 11-char limit).
+	- get_commit_message: Generate a context-appropriate commit message for Pantheon deployments.
 	- get_target_env: Determine the target environment based on the context of the GitHub Actions workflow.
 	- check_missing_permissions: Check for missing GitHub permissions and return a list of any that are missing.
 	- get_missing_permissions_help: Print a help message with instructions for how to add the missing permissions to your workflow.
@@ -41,7 +42,7 @@ function main() {
 	fi
 
 	# Check for a valid command.
-	if [ "$1" != 'compute_multidev_name' ] && [ "$1" != 'get_target_env' ] && [ "$1" != 'check_missing_permissions' ] && [ "$1" != 'get_missing_permissions_help' ] && [ "$1" != 'check_multidev_limit' ] && [ "$1" != 'setup_ssh_hostkeys' ] && [ "$1" != 'prepare_site_root' ] && [ "$1" != 'push_to_pantheon' ] && [ "$1" != 'cleanup' ] && [ "$1" != 'verify_build_tools' ] && [ "$1" != 'create_multidev' ] && [ "$1" != 'delete_multidev' ]; then
+	if [ "$1" != 'compute_multidev_name' ] && [ "$1" != 'get_commit_message' ] && [ "$1" != 'get_target_env' ] && [ "$1" != 'check_missing_permissions' ] && [ "$1" != 'get_missing_permissions_help' ] && [ "$1" != 'check_multidev_limit' ] && [ "$1" != 'setup_ssh_hostkeys' ] && [ "$1" != 'prepare_site_root' ] && [ "$1" != 'push_to_pantheon' ] && [ "$1" != 'cleanup' ] && [ "$1" != 'verify_build_tools' ] && [ "$1" != 'create_multidev' ] && [ "$1" != 'delete_multidev' ]; then
 		echo -e "${red}Invalid command: $1${normal}"
 		echo -e "${help_msg}"
 		exit 1
@@ -76,6 +77,30 @@ function compute_multidev_name() {
 	# Compute multidev name (max 11 chars for Pantheon)
 	# Format: {prefix}{hash} (e.g., bats-a1b2, pr-c3d4)
 	echo "${MULTIDEV_PREFIX}${commit_hash}"
+}
+
+# Generate a context-appropriate commit message for Pantheon deployments.
+# Uses PANTHEON_COMMIT_MESSAGE if set, otherwise generates a message based on
+# the deployment context (PR number or branch name).
+# Requires environment variables:
+#   PANTHEON_COMMIT_MESSAGE: Custom commit message (optional)
+#   PR_NUM: Pull request number (optional, for PR-based deployments)
+#   GITHUB_REF: Git reference (optional, for branch-based deployments)
+# Outputs the commit message to use for the Pantheon deployment.
+function get_commit_message() {
+	# Use custom message if provided
+	if [ -n "${PANTHEON_COMMIT_MESSAGE}" ]; then
+		echo "${PANTHEON_COMMIT_MESSAGE}"
+		return 0
+	fi
+
+	# Generate default message based on context
+	if [ -n "${PR_NUM}" ]; then
+		echo "Deploy PR #${PR_NUM} to Pantheon"
+	else
+		local branch_name="${GITHUB_REF#refs/heads/}"
+		echo "Deploy ${branch_name} to Pantheon"
+	fi
 }
 
 # Function to determine the target environment based on the context of the

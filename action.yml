@@ -285,6 +285,18 @@ runs:
           ${WORKSPACE}/scripts/main.sh prepare_site_root
 
 
+      - name: Set commit message
+        id: commit_message
+        shell: bash
+        env:
+          PANTHEON_COMMIT_MESSAGE: ${{ inputs.git_commit_message }}
+          PR_NUM: ${{ github.event.pull_request.number }}
+          GITHUB_REF: ${{ github.ref }}
+          WORKSPACE: ${{ github.workspace }}
+        run: |
+          MESSAGE=$(${WORKSPACE}/scripts/main.sh get_commit_message)
+          echo "message=${MESSAGE}" >> $GITHUB_OUTPUT
+
       - name: Deployment Processing
         shell: bash
         id: deploy_to_pantheon
@@ -292,7 +304,7 @@ runs:
           PANTHEON_SITE: ${{ inputs.site }}
           PANTHEON_SOURCE_ENV: ${{ inputs.source_env }}
           SITE_ROOT: ${{ inputs.relative_site_root }}
-          PANTHEON_COMMIT_MESSAGE: ${{ inputs.git_commit_message }}
+          PANTHEON_COMMIT_MESSAGE: ${{ steps.commit_message.outputs.message }}
           GITHUB_TOKEN: ${{ github.token }}
           SKIP_BUILD_TOOLS: ${{ inputs.skip_build_tools }}
           LIVE_ENV_EXISTS: ${{ steps.check_live_env.outputs.live_env_exists }}

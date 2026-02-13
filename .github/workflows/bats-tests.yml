@@ -35,7 +35,7 @@ jobs:
           GITHUB_REPOSITORY: ${{ github.repository }}
         run: |
           # Run tests that don't require Pantheon infrastructure
-          bats --jobs 4 tests/01-main.bats tests/02-get_target_env.bats tests/03-permissions.bats tests/04-ssh_setup.bats
+          bats --jobs 4 tests/01-main.bats tests/02-get_target_env.bats tests/02b-commit_message.bats tests/03-permissions.bats tests/04-ssh_setup.bats
 
   integration-tests:
     name: Integration Tests

@@ -1,0 +1,63 @@
+#!/usr/bin/env bats
+# Tests for create_multidev() - creation from live environment
+
+load helpers/common
+load helpers/pantheon
+
+TEST_MULTIDEV_NAME=""
+
+setup() {
+    common_setup
+    load_main_script
+
+    # Skip all tests if required env vars not available
+    if [ -z "${PANTHEON_MACHINE_TOKEN}" ] || [ -z "${PANTHEON_TEST_SITE}" ]; then
+        skip "Pantheon credentials not available"
+    fi
+
+    # Authenticate Terminus for tests that call terminus commands
+    authenticate_terminus
+
+    # Set up required environment variables
+    export PANTHEON_SITE="$(get_test_site)"
+
+    # Use unique name for this test file: tmp1-{hash}
+    local test_env="$(get_test_env)"
+    local hash="${test_env#bats-}"
+    TEST_MULTIDEV_NAME="tmp1-${hash}"
+}
+
+teardown() {
+    common_teardown
+}
+
+teardown_file() {
+    # Cleanup: delete test environment
+    if [ -n "${PANTHEON_MACHINE_TOKEN}" ] && [ -n "${TEST_MULTIDEV_NAME}" ]; then
+        authenticate_terminus
+        PANTHEON_SITE="$(get_test_site)"
+        terminus env:delete "${PANTHEON_SITE}.${TEST_MULTIDEV_NAME}" --delete-branch --yes 2>/dev/null || true
+    fi
+}
+
+@test "create_multidev: creates multidev if it doesn't exist" {
+    export MULTIDEV_NAME="${TEST_MULTIDEV_NAME}"
+    export SOURCE_ENV="live"
+
+    # Ensure it doesn't exist first
+    terminus env:delete "${PANTHEON_SITE}.${MULTIDEV_NAME}" --delete-branch --yes 2>/dev/null || true
+
+    run create_multidev
+    assert_success
+    assert_output_contains "Creating multidev"
+}
+
+@test "create_multidev: skips creation if multidev already exists" {
+    # Reuse the environment created in the previous test
+    export MULTIDEV_NAME="${TEST_MULTIDEV_NAME}"
+    export SOURCE_ENV="live"
+
+    run create_multidev
+    assert_success
+    assert_output_contains "already exists"
+}

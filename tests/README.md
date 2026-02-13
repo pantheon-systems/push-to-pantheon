@@ -20,11 +20,18 @@ The test suite provides comprehensive coverage of all 9 core functions in `scrip
 
 **Integration tests over mocks**: Tests run against real Pantheon and GitHub APIs for maximum confidence. This means tests require valid credentials and may be slower, but catch real-world issues.
 
-**Test isolation**: Each workflow run creates a dedicated PR-specific multidev environment (e.g., `bats-123` for PR #123, `bats-126mor` for branch "126-more-testing"). The multidev is:
+**Concurrent execution**: Tests are split into two GitHub Actions jobs that run in parallel:
+- **Fast Tests**: Tests 01-04 (no Pantheon infrastructure needed, ~30 seconds)
+- **Integration Tests**: Tests 05-09 (requires Terminus and test multidevs, ~2-3 minutes)
+
+Within each job, BATS runs test files concurrently using `--jobs 4`.
+
+**Test isolation**: Each workflow run creates dedicated multidev environments using commit hash for uniqueness:
+- Main test environment: `bats-{hash}` (e.g., `bats-a1b2` from commit a1b2...)
+- Temp test environments: `tmp1-{hash}`, `tmp2-{hash}`, `tmp3-{hash}`
 - Created fresh from live at test start
-- Shared by all tests in the workflow run
-- Deleted in the workflow's cleanup step (runs even if tests fail)
-- Unique per PR/branch to allow concurrent test runs
+- Deleted in the workflow's cleanup step (pattern-based, runs even if tests fail)
+- Unique per commit to prevent race conditions when workflows are canceled
 
 ## Running Tests Locally
 
@@ -83,12 +90,17 @@ bats tests/*.bats
 ### Run Specific Test File
 
 ```bash
+# Fast tests (no Pantheon infrastructure)
 bats tests/01-main.bats
 bats tests/02-get_target_env.bats
 bats tests/03-permissions.bats
 bats tests/04-ssh_setup.bats
+
+# Integration tests (requires Pantheon)
 bats tests/05-build_tools.bats
-bats tests/06-multidev.bats
+bats tests/06a-create-from-live.bats
+bats tests/06b-create-from-dev.bats
+bats tests/06c-validation-and-delete.bats
 bats tests/07-site_root.bats
 bats tests/08-push_pantheon.bats
 bats tests/09-cleanup.bats
@@ -108,23 +120,28 @@ bats tests/*.bats -t
 
 ## Test Execution Order
 
-Tests are numbered to run in a specific order, progressing from simple to complex:
+Tests are split into two concurrent jobs:
 
-1. **01-main.bats** - Command dispatcher (no external dependencies)
-2. **02-get_target_env.bats** - Environment logic (no external dependencies)
+**Fast Tests** (no Pantheon infrastructure):
+1. **01-main.bats** - Command dispatcher
+2. **02-get_target_env.bats** - Environment logic
 3. **03-permissions.bats** - GitHub API permission validation
-4. **04-ssh_setup.bats** - Local SSH configuration
-5. **05-build_tools.bats** - Terminus plugin detection
-6. **06-multidev.bats** - Multidev create/delete operations
-7. **07-site_root.bats** - Pantheon repo operations
-8. **08-push_pantheon.bats** - Full deployment logic
-9. **09-cleanup.bats** - Environment cleanup
+4. **04-ssh_setup.bats** - SSH configuration
 
-This ordering ensures:
-- Simple tests run first (fast feedback)
-- Tests with external dependencies run after local tests
-- Complex integration tests run last
-- Each test is isolated via setup/teardown
+**Integration Tests** (Pantheon infrastructure required, run concurrently with `--jobs 4`):
+5. **05-build_tools.bats** - Terminus plugin detection
+6. **06a-create-from-live.bats** - Create multidev from live (uses `tmp1-{hash}`)
+7. **06b-create-from-dev.bats** - Create multidev from dev (uses `tmp2-{hash}`)
+8. **06c-validation-and-delete.bats** - Validation and delete tests (uses `tmp3-{hash}`)
+9. **07-site_root.bats** - Pantheon repo operations
+10. **08-push_pantheon.bats** - Full deployment logic
+11. **09-cleanup.bats** - Environment cleanup
+
+This structure ensures:
+- Fast feedback from simple tests (~30 seconds)
+- Concurrent multidev creation for speed (06a, 06b, 06c run simultaneously)
+- Total test time reduced by parallel execution
+- Each test file is isolated via setup/teardown
 
 ## Test Files
 
@@ -160,11 +177,21 @@ This ordering ensures:
   - Version extraction
   - Not installed handling
 
-- **06-multidev.bats** - Tests multidev management
-  - create_multidev function
-  - delete_multidev function
-  - Error handling
-  - Idempotent operations
+- **06a-create-from-live.bats** - Tests multidev creation from live
+  - Creates `tmp1-{hash}` from live environment
+  - Tests creation and "already exists" logic
+  - Runs concurrently with 06b and 06c
+
+- **06b-create-from-dev.bats** - Tests multidev creation from custom source
+  - Creates `tmp2-{hash}` from dev environment
+  - Tests custom SOURCE_ENV parameter
+  - Runs concurrently with 06a and 06c
+
+- **06c-validation-and-delete.bats** - Tests validation and deletion
+  - Validation tests for create_multidev and delete_multidev
+  - Delete tests using `tmp3-{hash}`
+  - check_multidev_limit tests
+  - Runs concurrently with 06a and 06b
 
 ### Complex Integration Tests (Phase 4)
 
@@ -218,8 +245,12 @@ Minimal test site for `prepare_site_root()` testing:
 Tests run automatically via `.github/workflows/bats-tests.yml`:
 
 - **Triggers**: Pushes/PRs affecting `scripts/**` or `tests/**`
-- **Environment**: Creates PR-specific multidev (e.g., `bats-123`)
-- **Cleanup**: Deletes multidev in `always()` step
+- **Jobs**: Two concurrent jobs (Fast Tests and Integration Tests)
+- **Environment**: Creates commit hash-based multidevs:
+  - Main: `bats-{hash}` (e.g., `bats-a1b2`)
+  - Temp: `tmp1-{hash}`, `tmp2-{hash}`, `tmp3-{hash}`
+- **Parallelism**: `--jobs 4` for concurrent test file execution
+- **Cleanup**: Pattern-based cleanup in `always()` step (backstop only)
 - **Required**: Tests must pass before merging to `0.x` branch
 
 ## Writing New Tests

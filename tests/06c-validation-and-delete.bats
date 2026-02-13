@@ -1,8 +1,10 @@
 #!/usr/bin/env bats
-# Tests for create_multidev() and delete_multidev() functions
+# Tests for validation and delete_multidev() functions
 
 load helpers/common
 load helpers/pantheon
+
+TEST_MULTIDEV_NAME=""
 
 setup() {
     common_setup
@@ -18,11 +20,27 @@ setup() {
 
     # Set up required environment variables
     export PANTHEON_SITE="$(get_test_site)"
+
+    # Use unique name for this test file: tmp3-{hash}
+    local test_env="$(get_test_env)"
+    local hash="${test_env#bats-}"
+    TEST_MULTIDEV_NAME="tmp3-${hash}"
 }
 
 teardown() {
     common_teardown
 }
+
+teardown_file() {
+    # Cleanup: delete test environment
+    if [ -n "${PANTHEON_MACHINE_TOKEN}" ] && [ -n "${TEST_MULTIDEV_NAME}" ]; then
+        authenticate_terminus
+        PANTHEON_SITE="$(get_test_site)"
+        terminus env:delete "${PANTHEON_SITE}.${TEST_MULTIDEV_NAME}" --delete-branch --yes 2>/dev/null || true
+    fi
+}
+
+# Validation tests (no environment creation needed)
 
 @test "create_multidev: PANTHEON_SITE not set exits with error" {
     unset PANTHEON_SITE
@@ -39,49 +57,6 @@ teardown() {
     run create_multidev
     assert_failure
     assert_output_contains "MULTIDEV_NAME environment variable is required"
-}
-
-@test "create_multidev: creates multidev if it doesn't exist" {
-    # Use helper to get unique temporary multidev name
-    export MULTIDEV_NAME="$(get_temp_multidev_name 1)"
-    export SOURCE_ENV="live"
-
-    # Ensure it doesn't exist first
-    terminus env:delete "${PANTHEON_SITE}.${MULTIDEV_NAME}" --delete-branch --yes 2>/dev/null || true
-
-    run create_multidev
-    assert_success
-    assert_output_contains "Creating multidev"
-
-    # Cleanup
-    terminus env:delete "${PANTHEON_SITE}.${MULTIDEV_NAME}" --delete-branch --yes || true
-}
-
-@test "create_multidev: skips creation if multidev already exists" {
-    # Use the test environment which should already exist
-    export MULTIDEV_NAME="$(get_test_env)"
-    export SOURCE_ENV="live"
-
-    run create_multidev
-    assert_success
-    assert_output_contains "already exists"
-}
-
-@test "create_multidev: uses custom SOURCE_ENV when specified" {
-    # Use helper to get unique temporary multidev name
-    export MULTIDEV_NAME="$(get_temp_multidev_name 2)"
-    export SOURCE_ENV="dev"
-
-    # Cleanup first
-    terminus env:delete "${PANTHEON_SITE}.${MULTIDEV_NAME}" --delete-branch --yes 2>/dev/null || true
-
-    run create_multidev
-    assert_success
-    assert_output_contains "from"
-    assert_output_contains "dev"
-
-    # Cleanup
-    terminus env:delete "${PANTHEON_SITE}.${MULTIDEV_NAME}" --delete-branch --yes || true
 }
 
 @test "delete_multidev: PANTHEON_SITE not set exits with error" {
@@ -101,11 +76,12 @@ teardown() {
     assert_output_contains "MULTIDEV_NAME environment variable is required"
 }
 
-@test "delete_multidev: deletes existing multidev" {
-    # Use helper to get unique temporary multidev name
-    export MULTIDEV_NAME="$(get_temp_multidev_name 3)"
+# Delete tests (need an environment to exist)
 
-    # Ensure it doesn't exist first, then create it
+@test "delete_multidev: deletes existing multidev" {
+    export MULTIDEV_NAME="${TEST_MULTIDEV_NAME}"
+
+    # Create environment first
     terminus env:delete "${PANTHEON_SITE}.${MULTIDEV_NAME}" --delete-branch --yes 2>/dev/null || true
     terminus multidev:create "${PANTHEON_SITE}.live" "${MULTIDEV_NAME}" --yes
 
@@ -121,8 +97,7 @@ teardown() {
 }
 
 @test "delete_multidev: gracefully handles non-existent multidev" {
-    # Use helper to get unique temporary multidev name
-    export MULTIDEV_NAME="$(get_temp_multidev_name 4)"
+    export MULTIDEV_NAME="${TEST_MULTIDEV_NAME}"
 
     # Make sure it doesn't exist
     terminus env:delete "${PANTHEON_SITE}.${MULTIDEV_NAME}" --delete-branch --yes 2>/dev/null || true
@@ -131,6 +106,8 @@ teardown() {
     assert_success
     assert_output_contains "does not exist"
 }
+
+# Check limit tests (no environment creation needed)
 
 @test "check_multidev_limit: PANTHEON_SITE not set exits with error" {
     unset PANTHEON_SITE

@@ -34,10 +34,6 @@ jobs:
         run: |
           terminus self:plugin:install pantheon-systems/terminus-build-tools-plugin
 
-      - name: Install gh CLI
-        run: |
-          sudo apt-get install -y gh
-
       - name: Create test environment
         id: test_env
         env:

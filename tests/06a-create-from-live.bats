@@ -40,13 +40,14 @@ teardown_file() {
     fi
 }
 
-@test "create_multidev: creates multidev if it doesn't exist" {
+@test "create_multidev: creates multidev if it doesn't exist, then detects it exists" {
     export MULTIDEV_NAME="${TEST_MULTIDEV_NAME}"
     export SOURCE_ENV="live"
 
     # Ensure it doesn't exist first
     terminus env:delete "${PANTHEON_SITE}.${MULTIDEV_NAME}" --delete-branch --yes 2>/dev/null || true
 
+    # First call: create the environment
     run create_multidev
     assert_success
     assert_output_contains "Creating multidev"
@@ -64,21 +65,15 @@ teardown_file() {
         attempts=$((attempts + 1))
     done
 
-    # Final verification
+    # Verify it's accessible
     if ! terminus env:info "${PANTHEON_SITE}.${TEST_MULTIDEV_NAME}" --field=id >/dev/null 2>&1; then
         echo "ERROR: ${TEST_MULTIDEV_NAME} is not accessible after $((max_attempts * 2)) seconds!" >&3
         return 1
     fi
-}
 
-@test "create_multidev: skips creation if multidev already exists" {
-    # Reuse the environment created in the previous test
-    export MULTIDEV_NAME="${TEST_MULTIDEV_NAME}"
-    export SOURCE_ENV="live"
-
+    # Second call: verify it detects the existing environment and returns early
     run create_multidev
     assert_success
-    # Check for the specific early return message from line 606
     assert_output_contains "✅ Multidev"
     assert_output_contains "already exists."
 }

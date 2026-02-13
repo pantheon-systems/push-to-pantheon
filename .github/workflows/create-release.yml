@@ -36,23 +36,26 @@ jobs:
 
       - name: Extract version from PR title or input
         id: version
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          MANUAL_VERSION: ${{ github.event.inputs.version }}
         run: |
           if [ "${{ github.event_name }}" = "pull_request_target" ]; then
             # Extract version from "Release X.Y.Z" PR title
-            VERSION=$(echo "${{ github.event.pull_request.title }}" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')
+            VERSION=$(echo "$PR_TITLE" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')
             if [ -z "$VERSION" ]; then
-              echo "Error: Could not extract version from PR title '${{ github.event.pull_request.title }}'"
+              echo "Error: Could not extract version from PR title"
               exit 1
             fi
             echo "source=pr_title" >> $GITHUB_OUTPUT
           else
             # Use manual input
-            VERSION="${{ github.event.inputs.version }}"
+            VERSION="$MANUAL_VERSION"
             echo "source=manual" >> $GITHUB_OUTPUT
           fi
 
           echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "Will create release for version: $VERSION (from ${{ steps.version.outputs.source }})"
+          echo "Will create release for version: $VERSION"
 
       - name: Get previous version tag
         id: get_version
@@ -104,9 +107,11 @@ jobs:
         if: github.event_name == 'pull_request_target'
         env:
           GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
         run: |
           VERSION="${{ steps.version.outputs.version }}"
-          gh pr comment ${{ github.event.pull_request.number }} \
-            --body "🎉 Draft release [\`$VERSION\`](https://github.com/${{ github.repository }}/releases/tag/$VERSION) has been created automatically.
+          gh pr comment "$PR_NUMBER" \
+            --body "🎉 Draft release [\`$VERSION\`](https://github.com/${REPO}/releases/tag/$VERSION) has been created automatically.
 
-          Review and publish the release at: https://github.com/${{ github.repository }}/releases"
+          Review and publish the release at: https://github.com/${REPO}/releases"

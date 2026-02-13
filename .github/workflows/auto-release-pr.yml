@@ -255,20 +255,23 @@ jobs:
 
       - name: Comment on trigger PR
         if: github.event_name == 'pull_request_target' && github.event.pull_request.merged == true
-        run: |
-          NEW_VERSION="${{ steps.version.outputs.new_version }}"
-          gh pr comment ${{ github.event.pull_request.number }} \
-            --body "🤖 A release PR for version \`$NEW_VERSION\` has been created/updated automatically."
         env:
           GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          NEW_VERSION="${{ steps.version.outputs.new_version }}"
+          gh pr comment "$PR_NUMBER" \
+            --body "🤖 A release PR for version \`$NEW_VERSION\` has been created/updated automatically."
 
       - name: React to version override comment
         if: github.event_name == 'issue_comment' && steps.check_comment.outputs.has_override == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          COMMENT_ID: ${{ github.event.comment.id }}
         run: |
           gh api \
             --method POST \
             -H "Accept: application/vnd.github+json" \
-            "/repos/${{ github.repository }}/issues/comments/${{ github.event.comment.id }}/reactions" \
+            "/repos/${REPO}/issues/comments/${COMMENT_ID}/reactions" \
             -f content='rocket'
-        env:
-          GH_TOKEN: ${{ github.token }}

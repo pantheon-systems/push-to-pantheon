@@ -89,20 +89,15 @@ runs:
         env:
           PR_NUM: ${{ github.event.pull_request.number }}
           INPUT_TARGET_ENV: ${{ inputs.target_env }}
+          WORKSPACE: ${{ github.workspace }}
         run: |
           # Set target_env
-          set +e
-
-            if [ -n "${INPUT_TARGET_ENV}" ]; then
-              TARGET_ENV="${INPUT_TARGET_ENV}"
-            elif [ -n "${PR_NUM}" ]; then
-              TARGET_ENV="pr-${PR_NUM}"
-            elif [ "${GITHUB_REF}" == "refs/heads/main" ] || [ "${GITHUB_REF}" == "refs/heads/master" ]; then
-              TARGET_ENV='dev'
-            else
-              echo "Error: you must set the 'target_env' parameter when running this action on a branch that is not 'main' or 'master' or when not executing a workflow in a pull request."
+          TARGET_ENV=$("$WORKSPACE/scripts/main.sh" get_target_env)
+          # Check if the result of get_target_env was an exit 1 code.
+          if [ $? -ne 0 ]; then
+              echo "::error::[error]: You must set the 'target_env' parameter when running this action on a branch that is not 'main' or 'master' or when not executing a workflow in a pull request."
               exit 1
-            fi
+          fi
 
           echo "PANTHEON_TARGET_ENV set to ${TARGET_ENV}"
           echo "PANTHEON_TARGET_ENV=${TARGET_ENV}" >> $GITHUB_ENV
@@ -116,10 +111,10 @@ runs:
           set +e
           if [ "$CLONE_CONTENT" == "true" ]; then
             export CLONE_CONTENT_FLAG="--clone-content"
-            echo "Content will be cloned again if the target environment already exists"
+            echo "::notice::Content will be cloned again if the target environment already exists"
           else
             export CLONE_CONTENT_FLAG=""
-            echo "Content will NOT be cloned again if the target environment already exists"
+            echo "::notice::Content will NOT be cloned again if the target environment already exists"
           fi
 
           echo "PANTHEON_CLONE_CONTENT_FLAG=${CLONE_CONTENT_FLAG}" >> $GITHUB_ENV
@@ -130,72 +125,20 @@ runs:
           GITHUB_TOKEN: ${{ github.token }}
           GITHUB_REPOSITORY: ${{ github.repository }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
+          WORKSPACE: ${{ github.workspace }}
         run: |
-          # Check if we have the required permissions by attempting API calls
-          # This provides helpful error messages if permissions are missing
+          # Check if we have the required workflow permissions
 
-          echo "Checking GitHub workflow permissions..."
-          MISSING_PERMISSIONS=()
-
-          # Check deployments permission
-          DEPLOY_RESPONSE=$(curl -s -w "\n%{http_code}" \
-            -H "Authorization: token ${GITHUB_TOKEN}" \
-            -H "Accept: application/vnd.github.v3+json" \
-            "https://api.github.com/repos/${GITHUB_REPOSITORY}/deployments?per_page=1")
-          DEPLOY_HTTP_CODE=$(echo "$DEPLOY_RESPONSE" | tail -n1)
-
-          if [ "$DEPLOY_HTTP_CODE" = "403" ]; then
-            MISSING_PERMISSIONS+=("deployments: write")
-          fi
-
-          # Check contents permission
-          CONTENTS_RESPONSE=$(curl -s -w "\n%{http_code}" \
-            -H "Authorization: token ${GITHUB_TOKEN}" \
-            -H "Accept: application/vnd.github.v3+json" \
-            "https://api.github.com/repos/${GITHUB_REPOSITORY}")
-          CONTENTS_HTTP_CODE=$(echo "$CONTENTS_RESPONSE" | tail -n1)
-
-          if [ "$CONTENTS_HTTP_CODE" = "403" ]; then
-            MISSING_PERMISSIONS+=("contents: read")
-          fi
-
-          # Check pull-requests permission (only if this is a PR event)
-          if [ -n "${PR_NUMBER}" ]; then
-            PR_RESPONSE=$(curl -s -w "\n%{http_code}" \
-              -H "Authorization: token ${GITHUB_TOKEN}" \
-              -H "Accept: application/vnd.github.v3+json" \
-              "https://api.github.com/repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}")
-            PR_HTTP_CODE=$(echo "$PR_RESPONSE" | tail -n1)
-
-            if [ "$PR_HTTP_CODE" = "403" ]; then
-              MISSING_PERMISSIONS+=("pull-requests: read")
-            fi
-          fi
+          echo "::notice::Checking GitHub workflow permissions..."
+          MISSING_PERMISSIONS=($(${WORKSPACE}/scripts/main.sh check_missing_permissions))
 
           # If any permissions are missing, show error and exit
           if [ ${#MISSING_PERMISSIONS[@]} -gt 0 ]; then
-            echo ""
-            echo "❌ ERROR: Missing required GitHub permissions"
-            echo ""
-            echo "The following permissions are missing:"
-            for perm in "${MISSING_PERMISSIONS[@]}"; do
-              echo "  - ${perm}"
-            done
-            echo ""
-            echo "Add the following to your workflow:"
-            echo ""
-            echo "    permissions:"
-            echo "      deployments: write"
-            echo "      contents: read"
-            echo "      pull-requests: read"
-            echo ""
-            echo "For more information, see:"
-            echo "https://github.com/pantheon-systems/push-to-pantheon#permissions"
-            echo ""
+            ${WORKSPACE}/scripts/main.sh get_missing_permissions_help "${MISSING_PERMISSIONS[@]}"
             exit 1
           fi
 
-          echo "✅ All required permissions are properly configured"
+          echo "::notice::✅ All required permissions are properly configured"
 
       - name: Start deployment
         uses: bobheadxi/deployments@v1
@@ -215,25 +158,22 @@ runs:
         shell: bash
         env:
           SSH_KEY: ${{ inputs.ssh_key }}
+          WORKSPACE: ${{ github.workspace }}
         run: |
-          mkdir -p ~/.ssh
-          chmod 700 ~/.ssh
-          printf "%s" "$SSH_KEY" > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa        
-          echo "Host *.pantheon.io *.drush.in *.getpantheon.com *.panth.io" >> "$HOME/.ssh/config"
-          echo "StrictHostKeyChecking no" >> "$HOME/.ssh/config"
-          echo "HostKeyAlgorithms +ssh-rsa" >> "$HOME/.ssh/config"
+          # Set up host keys for Pantheon
+          ${WORKSPACE}/scripts/main.sh setup_ssh_hostkeys
 
       - name: Check for Terminus
         if: ${{ inputs.skip_terminus_install != 'true' }}
         id: check_terminus
         shell: bash
         run: |
+          # Check if Terminus is already installed
           if command -v terminus &> /dev/null; then
-            echo "Terminus detected. Skipping Terminus installation."
+            echo "::notice::Terminus detected. Skipping Terminus installation."
             echo "should_install_terminus=false" >> $GITHUB_OUTPUT
           else
-            echo "Terminus not installed, proceeding to install."
+            echo "::warning::Terminus not installed, proceeding to install."
             echo "should_install_terminus=true" >> $GITHUB_OUTPUT
           fi
 
@@ -254,13 +194,48 @@ runs:
           set +e
           LIVE_INITIALIZED=$(terminus env:info ${PANTHEON_SITE}.live --field=initialized)
           if [ "$LIVE_INITIALIZED" == "1" ]; then
-            echo "Live environment exists and is initialized."
+            echo "::notice::Live environment exists and is initialized."
             echo "live_env_exists=true" >> $GITHUB_OUTPUT
           else
             echo "Live environment is not initialized."
-            echo "[alert] Workflow will proceed without Build Tools operations that depend on live environment. You will need to clone content manually to the multidev if required."
+            echo "::warning::[alert] Workflow will proceed without Build Tools operations that depend on live environment. You will need to clone content manually to the multidev if required."
             echo "live_env_exists=false" >> $GITHUB_OUTPUT
           fi
+
+      - name: Check multidev limit
+        if: ${{ inputs.target_env == '' }}
+        id: check_multidev_limit
+        shell: bash
+        env:
+          PANTHEON_SITE: ${{ inputs.site }}
+          WORKSPACE: ${{ github.workspace }}
+        run: |
+          ${WORKSPACE}/scripts/main.sh check_multidev_limit
+
+      - name: Comment on PR if multidev limit reached
+        if: ${{ inputs.target_env == '' && steps.check_multidev_limit.outputs.multidev_available == 'false' }}
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          gh pr comment "${PR_NUMBER}" --body "⚠️ **Unable to create a Multidev environment**
+
+          Your Pantheon site has reached its Multidev limit. No environments are available for this deployment.
+
+          **Next steps:**
+          1. Delete unused Multidev environments via the Pantheon dashboard
+          2. Contact your Pantheon account team to increase your Multidev limit
+          3. Re-run this workflow once environments are available
+
+          For more information, see the [Pantheon Multidev documentation](https://pantheon.io/docs/multidev)."
+
+      - name: Abort deployment if multidev limit reached
+        if: ${{ inputs.target_env == '' && steps.check_multidev_limit.outputs.multidev_available == 'false' }}
+        shell: bash
+        run: |
+          echo "::error::Aborting deployment: Multidev limit reached. Delete unused environments or contact Pantheon to increase your limit."
+          exit 1
 
       - name: Install Terminus Plugin
         shell: bash
@@ -268,14 +243,24 @@ runs:
         env:
           BUILD_TOOLS_VERSION_INPUT: ${{ inputs.build_tools_version }}
         run: |
+          # Install Build Tools plugin
           BUILD_TOOLS_VERSION="${BUILD_TOOLS_VERSION_INPUT}"
           if [ -z "$BUILD_TOOLS_VERSION" ]; then
-            echo "Installing latest stable version of Terminus Build Tools plugin"
+            echo "::notice::Installing latest stable version of Terminus Build Tools plugin"
             terminus self:plugin:install pantheon-systems/terminus-build-tools-plugin
           else
-            echo "Installing specified version (${BUILD_TOOLS_VERSION}) of Terminus Build Tools plugin"
+            echo "::warning::Installing specified version (${BUILD_TOOLS_VERSION}) of Terminus Build Tools plugin"
             terminus self:plugin:install "pantheon-systems/terminus-build-tools-plugin:${BUILD_TOOLS_VERSION}"
           fi
+
+      - name: Verify Build Tools Plugin Installation
+        shell: bash
+        if: ${{ inputs.skip_build_tools != 'true' && steps.check_live_env.outputs.live_env_exists == 'true' }}
+        env:
+          WORKSPACE: ${{ github.workspace }}
+        run: |
+          # Verify Build Tools plugin installation
+          ${WORKSPACE}/scripts/main.sh verify_build_tools
 
       - name: Configure Git User
         shell: bash
@@ -294,75 +279,23 @@ runs:
           SITE_ROOT: ${{ inputs.relative_site_root }}
           PANTHEON_SITE: ${{ inputs.site }}
           PANTHEON_SOURCE_ENV: ${{ inputs.source_env }}
+          WORKSPACE: ${{ github.workspace }}
         run: |
           # Prepare site root
-          set +e
-          if [ -n "$SITE_ROOT" ]; then
-            echo "Preparing site from relative path: ${SITE_ROOT}"
+          ${WORKSPACE}/scripts/main.sh prepare_site_root
 
-            # Get the Pantheon site ID
-            SITE_ID=$(terminus site:info ${PANTHEON_SITE} --field=id)
 
-            # Determine which environment to clone from
-            # If target is dev, clone from master; otherwise clone from target or source env
-            if [ "$PANTHEON_TARGET_ENV" == "dev" ]; then
-              CLONE_BRANCH="master"
-            else
-              # For multidevs, check if it exists, otherwise use source env
-              if terminus multidev:list ${PANTHEON_SITE} --format=list | grep -q "^${PANTHEON_TARGET_ENV}$"; then
-                CLONE_BRANCH="${PANTHEON_TARGET_ENV}"
-              else
-                # Multidev doesn't exist yet, clone from source env
-                # Map standard environments to master branch
-                if [ "${PANTHEON_SOURCE_ENV}" == "live" ] || [ "${PANTHEON_SOURCE_ENV}" == "dev" ] || [ "${PANTHEON_SOURCE_ENV}" == "test" ]; then
-                  CLONE_BRANCH="master"
-                else
-                  CLONE_BRANCH="${PANTHEON_SOURCE_ENV}"
-                fi
-              fi
-            fi
-
-            echo "Cloning Pantheon repository from branch: ${CLONE_BRANCH}"
-
-            # Create a temporary directory for the Pantheon repo
-            PANTHEON_REPO_DIR=$(mktemp -d)
-
-            # Clone the Pantheon repository
-            git clone --branch ${CLONE_BRANCH} \
-              ssh://codeserver.dev.${SITE_ID}@codeserver.dev.${SITE_ID}.drush.in:2222/~/repository.git \
-              ${PANTHEON_REPO_DIR}
-
-            # Copy files from SITE_ROOT to the Pantheon repo (overwriting)
-            echo "Copying files from ${SITE_ROOT} to Pantheon repository"
-            rsync -av --delete --exclude='.git' ${SITE_ROOT}/ ${PANTHEON_REPO_DIR}/
-
-            # Move into the Pantheon repo directory for subsequent steps
-            cd ${PANTHEON_REPO_DIR}
-
-            # Add the GitHub origin for Build Tools compatibility
-            echo "Setting GitHub origin for Build Tools compatibility"
-            if git remote | grep origin; then
-              ORIGIN_URL=$(git remote get-url origin)
-              if [[ "$ORIGIN_URL" != https://github.com/* ]]; then
-                echo "Updating origin to GitHub URL"
-                git remote remove origin
-                git remote add origin https://github.com/${{ github.repository }}
-              fi
-            else
-              echo "Adding origin to GitHub URL"
-              git remote add origin https://github.com/${{ github.repository }}
-            fi
-
-            # Stage all changes
-            git add -A
-
-            # Export the Pantheon repo path for the next step
-            echo "PANTHEON_REPO_DIR=${PANTHEON_REPO_DIR}" >> $GITHUB_ENV
-
-          else
-            git fetch --unshallow origin
-          fi
-
+      - name: Set commit message
+        id: commit_message
+        shell: bash
+        env:
+          PANTHEON_COMMIT_MESSAGE: ${{ inputs.git_commit_message }}
+          PR_NUM: ${{ github.event.pull_request.number }}
+          GITHUB_REF: ${{ github.ref }}
+          WORKSPACE: ${{ github.workspace }}
+        run: |
+          MESSAGE=$(${WORKSPACE}/scripts/main.sh get_commit_message)
+          echo "message=${MESSAGE}" >> $GITHUB_OUTPUT
 
       - name: Deployment Processing
         shell: bash
@@ -371,64 +304,21 @@ runs:
           PANTHEON_SITE: ${{ inputs.site }}
           PANTHEON_SOURCE_ENV: ${{ inputs.source_env }}
           SITE_ROOT: ${{ inputs.relative_site_root }}
-          PANTHEON_COMMIT_MESSAGE: ${{ inputs.git_commit_message }}
+          PANTHEON_COMMIT_MESSAGE: ${{ steps.commit_message.outputs.message }}
           GITHUB_TOKEN: ${{ github.token }}
           SKIP_BUILD_TOOLS: ${{ inputs.skip_build_tools }}
           LIVE_ENV_EXISTS: ${{ steps.check_live_env.outputs.live_env_exists }}
-          # todo, might need to make this configurable too.
-          # the default in build tools is 180. But that's regularly failing
-          # on a small personal site.
-          TERMINUS_BUILD_TOOLS_WORKFLOW_TIMEOUT: 300
+          WORKSPACE: ${{ github.workspace }}
+          PR_NUM: ${{ github.event.pull_request.number }}
+          CI_COMMIT_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          CI_BUILD_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          CI_PROJECT_USERNAME: ${{ github.repository_owner }}
+          CI_PROJECT_REPONAME: ${{ github.event.repository.name }}
+          CIRCLE_SHA1: ${{ github.event.pull_request.head.sha || github.sha }}
+          GITHUB_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
           # Push to Pantheon
-          set +e
-
-          # If relative_site_root was used, change to the cloned Pantheon repo directory
-          if [ -n "$PANTHEON_REPO_DIR" ]; then
-            cd ${PANTHEON_REPO_DIR}
-          fi
-
-          if [ "$SKIP_BUILD_TOOLS" == "true" ] || [ "$LIVE_ENV_EXISTS" == "false" ]; then
-            SITE_ID=$(terminus site:info ${PANTHEON_SITE} --field=id)
-
-            # Are we pushing to a multidev or to dev?
-            if [ "$PANTHEON_TARGET_ENV" == "dev" ]; then
-              PANTHEON_DESTINATION_BRANCH="master"
-              echo "Target environment is dev, pushing to 'master' branch on Pantheon."
-            else
-              PANTHEON_DESTINATION_BRANCH="${PANTHEON_TARGET_ENV}"
-              echo "Target environment is ${PANTHEON_TARGET_ENV}, pushing to branch with the same name on Pantheon."
-              # Check if a multidev already exists for this PR.
-              if terminus multidev:list ${PANTHEON_SITE} --format=list | grep -q "^${PANTHEON_TARGET_ENV}$"; then
-                echo "Multidev environment ${PANTHEON_TARGET_ENV} already exists. Pushing code to existing environment."
-              else
-                echo "Creating new multidev environment: ${PANTHEON_TARGET_ENV}"
-                terminus multidev:create ${PANTHEON_SITE}.${PANTHEON_SOURCE_ENV} ${PANTHEON_TARGET_ENV} --yes
-              fi
-            fi
-
-            # Ensure repo is not shallow; Pantheon rejects shallow pushes
-            if git rev-parse --is-shallow-repository >/dev/null 2>&1 && [ "$(git rev-parse --is-shallow-repository)" = "true" ]; then
-              echo "Repository is shallow; unshallowing before push."
-              git fetch --unshallow origin || git fetch --depth=1000000 origin
-            fi
-
-            # Commit staged changes if any (from relative_site_root preparation)
-            if ! git diff --cached --quiet; then
-              git commit -m "${PANTHEON_COMMIT_MESSAGE}"
-            fi
-
-            # Add pantheon remote if it doesn't exist
-            if ! git remote | grep -q pantheon; then
-              git remote add pantheon ssh://codeserver.dev.${SITE_ID}@codeserver.dev.${SITE_ID}.drush.in:2222/~/repository.git
-            fi
-
-            # Push code to Pantheon
-            git push pantheon HEAD:refs/heads/${PANTHEON_DESTINATION_BRANCH} --force
-            exit 0
-          fi
-
-          terminus -n build:env:create ${PANTHEON_SITE}.${PANTHEON_SOURCE_ENV} ${PANTHEON_TARGET_ENV} --yes --message="${PANTHEON_COMMIT_MESSAGE}" ${PANTHEON_CLONE_CONTENT_FLAG}
+          ${WORKSPACE}/scripts/main.sh push_to_pantheon
 
       - name: Update deployment status
         uses: bobheadxi/deployments@v1
@@ -438,7 +328,6 @@ runs:
           token: ${{ github.token }}
           status: ${{ job.status }}
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
-          # todo, how does this work when there is a step above with the id of "deployment" not "deployment_id"
           deployment_id: ${{ steps.deployment.outputs.deployment_id }}
           env: ${{ env.PANTHEON_TARGET_ENV }}
           env_url: https://${{ env.PANTHEON_TARGET_ENV }}-${{ inputs.site }}.pantheonsite.io
@@ -454,4 +343,6 @@ runs:
           MULTIDEV_DELETE_PATTERN: pr-
           PANTHEON_TARGET_ENV: ${{ env.PANTHEON_TARGET_ENV }}
           WORKSPACE: ${{ github.workspace }}
-        run: $GITHUB_ACTION_PATH/scripts/cleanup.sh
+        run: |
+          # Clean up old multidev environments
+          ${WORKSPACE}/scripts/main.sh cleanup

@@ -1,0 +1,121 @@
+name: BATS Tests
+
+on:
+  push:
+    paths:
+      - 'scripts/**'
+      - 'tests/**'
+      - '.github/workflows/bats-tests.yml'
+
+concurrency:
+  group: bats-tests-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  deployments: write
+  pull-requests: read
+
+jobs:
+  fast-tests:
+    name: Fast Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install BATS
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y bats
+
+      - name: Run fast tests
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: |
+          # Run tests that don't require Pantheon infrastructure
+          bats --jobs 4 tests/01-main.bats tests/02-get_target_env.bats tests/02b-commit_message.bats tests/03-permissions.bats tests/04-ssh_setup.bats
+
+  integration-tests:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install BATS
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y bats
+
+      - name: Install Terminus
+        uses: pantheon-systems/terminus-github-actions@v1
+        with:
+          pantheon-machine-token: ${{ secrets.PANTHEON_MACHINE_TOKEN }}
+
+      - name: Install Terminus Build Tools
+        run: |
+          terminus self:plugin:install pantheon-systems/terminus-build-tools-plugin
+          # Verify installation
+          terminus self:plugin:list --fields=name,installed_version | grep terminus-build-tools-plugin
+
+      - name: Create test environment
+        id: test_env
+        env:
+          PANTHEON_MACHINE_TOKEN: ${{ secrets.PANTHEON_MACHINE_TOKEN }}
+          PANTHEON_SITE: dtp-nearly-empty-site
+          SOURCE_ENV: live
+          MULTIDEV_PREFIX: bats-
+          GITHUB_SHA: ${{ github.sha }}
+        run: |
+          # Compute multidev name using helper function (uses commit hash for uniqueness)
+          TEST_ENV=$(bash scripts/main.sh compute_multidev_name)
+          echo "TEST_ENV=${TEST_ENV}" >> $GITHUB_OUTPUT
+
+          # Create multidev using main.sh function
+          export MULTIDEV_NAME="${TEST_ENV}"
+          bash scripts/main.sh create_multidev
+
+      - name: Run Pantheon integration tests
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          PANTHEON_MACHINE_TOKEN: ${{ secrets.PANTHEON_MACHINE_TOKEN }}
+          PANTHEON_SSH_KEY: ${{ secrets.PANTHEON_SSH_KEY }}
+          PANTHEON_TEST_SITE: dtp-nearly-empty-site
+          PANTHEON_TEST_ENV: ${{ steps.test_env.outputs.TEST_ENV }}
+        run: |
+          # Run tests that interact with Pantheon (slower integration tests)
+          bats --jobs 4 tests/05-build_tools.bats tests/06a-create-from-live.bats tests/06b-create-from-dev.bats tests/06c-validation-and-delete.bats tests/07-site_root.bats tests/08-push_pantheon.bats tests/09-cleanup.bats
+
+      - name: Cleanup test environments
+        if: always()
+        env:
+          PANTHEON_MACHINE_TOKEN: ${{ secrets.PANTHEON_MACHINE_TOKEN }}
+          PANTHEON_SITE: dtp-nearly-empty-site
+          TEST_ENV: ${{ steps.test_env.outputs.TEST_ENV }}
+        run: |
+          # Extract hash from main test env name
+          HASH="${TEST_ENV#bats-}"
+
+          # List all multidevs and find any matching our test patterns
+          # Patterns: bats-{hash}, tmp1-{hash}, tmp2-{hash}
+          # Note: tmp1 is deleted in 06a test, tmp2 in 06b teardown
+          EXISTING_ENVS=$(terminus multidev:list dtp-nearly-empty-site --format=list 2>/dev/null | grep -E "^(bats-${HASH}|tmp[12]-${HASH})$" || true)
+
+          if [ -n "${EXISTING_ENVS}" ]; then
+            echo "Found test environments to clean up:"
+            echo "${EXISTING_ENVS}"
+
+            # Delete each environment that was found
+            echo "${EXISTING_ENVS}" | while read -r env; do
+              if [ -n "${env}" ]; then
+                echo "Deleting ${env}..."
+                export MULTIDEV_NAME="${env}"
+                bash scripts/main.sh delete_multidev || true
+              fi
+            done
+          else
+            echo "No test environments found to clean up"
+          fi

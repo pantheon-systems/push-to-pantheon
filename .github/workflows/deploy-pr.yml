@@ -10,44 +10,61 @@ on:
     paths:
       - '.github/testing_fixtures/**'
       - 'action.yml'
+      - 'scripts/**'
   workflow_dispatch:
+    inputs:
+      suite:
+        description: 'Which test suite(s) to run'
+        type: choice
+        options:
+          - all
+          - standard
+          - content
+          - git
+          - terminus
+          - advanced
+          - build-tools-advanced
+        default: all
 
 jobs:
-  deploy_pr:
-    name: Deploy Pull Request
-    # This job uses `pull_request_target` to gain access to secrets, which
+  run_test_suites:
+    name: Run Test Suites
+    # This workflow uses `pull_request_target` to gain access to secrets, which
     # are not available on normal `pull_request` events for forks.
-    # The two-step checkout process below is critical for security.
-    # It ensures that we are executing trusted code from the base repository
-    # while operating on the untrusted code from the pull request.
+    # The two-step checkout process is handled within the reusable test-suites workflow.
     permissions:
       deployments: write
-      contents: write # needed to checkout the PR code.
+      contents: write
       pull-requests: read
-    runs-on: ubuntu-latest
-    steps:
-    # Checkout the base repository at the current commit.
-    # This is the trusted code that will be executed.
-    - uses: actions/checkout@v6
+    uses: ./.github/workflows/test-suites.yml
+    with:
+      env_prefix: ${{ github.event.pull_request.number || 'manual' }}
+      suite: ${{ github.event_name == 'workflow_dispatch' && inputs.suite || 'all' }}
+    secrets:
+      PANTHEON_SSH_KEY: ${{ secrets.PANTHEON_SSH_KEY }}
+      PANTHEON_MACHINE_TOKEN: ${{ secrets.PANTHEON_MACHINE_TOKEN }}
 
-    # Checkout the pull request code into a subdirectory.
-    # This is the code that will be deployed.
-    - name: Checkout PR code
-      uses: actions/checkout@v6
-      with:
-        repository: ${{ github.event.pull_request.head.repo.full_name }}
-        ref: ${{ github.event.pull_request.head.ref }}
-        path: pr-code
-    - name: deploy to Pantheon
-      uses: ./
-      with:
-        ssh_key: ${{ secrets.PANTHEON_SSH_KEY }}
-        machine_token: ${{ secrets.PANTHEON_MACHINE_TOKEN }}
-        site: dtp-nearly-empty-site
-        target_env: "pr-${{ github.event.pull_request.number }}"
-        relative_site_root: "pr-code/.github/testing_fixtures/dtp-nearly-empty-site"
-        git_user_name: "Test Name"
-        git_user_email: "test@example.com"
-        git_commit_message: "This is an automated commit message from GitHub Actions for PR #${{ github.event.pull_request.number }}."
-        delete_old_environments: true
-        clone_content: true
+  cleanup:
+    name: Cleanup Test Environments
+    needs: run_test_suites
+    if: always()
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Install Terminus
+        uses: pantheon-systems/terminus-github-actions@v1
+        with:
+          pantheon-machine-token: ${{ secrets.PANTHEON_MACHINE_TOKEN }}
+
+      - name: Cleanup environments
+        env:
+          PANTHEON_MACHINE_TOKEN: ${{ secrets.PANTHEON_MACHINE_TOKEN }}
+          PANTHEON_SITE: dtp-nearly-empty-site
+          ENV_PREFIX: ${{ github.event.pull_request.number || 'manual' }}
+          DELETE_OLD_MULTIDEVS: true
+          WORKSPACE: ${{ github.workspace }}
+        run: bash ${WORKSPACE}/scripts/main.sh cleanup

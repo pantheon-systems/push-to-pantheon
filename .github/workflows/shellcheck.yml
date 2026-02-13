@@ -3,6 +3,7 @@ on:
   push:
     paths:
       - 'scripts/**'
+      - 'tests/helpers/*.bash'
       - '.github/workflows/shellcheck.yml'
 
 permissions:
@@ -16,4 +17,6 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v6
       - name: Run Shellcheck
-        run: shellcheck scripts/*.sh
+        run: |
+          shellcheck scripts/*.sh
+          shellcheck tests/helpers/*.bash

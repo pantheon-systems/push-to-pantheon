@@ -98,8 +98,9 @@ jobs:
           HASH="${TEST_ENV#bats-}"
 
           # List all multidevs and find any matching our test patterns
-          # Patterns: bats-{hash}, tmp1-{hash}, tmp2-{hash}, tmp3-{hash}
-          EXISTING_ENVS=$(terminus multidev:list dtp-nearly-empty-site --format=list 2>/dev/null | grep -E "^(bats-${HASH}|tmp[123]-${HASH})$" || true)
+          # Patterns: bats-{hash}, tmp1-{hash}, tmp2-{hash}
+          # Note: tmp1 is deleted in 06a test, tmp2 in 06b teardown
+          EXISTING_ENVS=$(terminus multidev:list dtp-nearly-empty-site --format=list 2>/dev/null | grep -E "^(bats-${HASH}|tmp[12]-${HASH})$" || true)
 
           if [ -n "${EXISTING_ENVS}" ]; then
             echo "Found test environments to clean up:"

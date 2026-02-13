@@ -73,4 +73,15 @@ teardown_file() {
     assert_success
     assert_output_contains "✅ Multidev"
     assert_output_contains "already exists."
+
+    # Test deletion
+    run delete_multidev
+    assert_success
+    assert_output_contains "deleted successfully"
+
+    # Verify it's gone
+    if terminus env:info "${PANTHEON_SITE}.${TEST_MULTIDEV_NAME}" >/dev/null 2>&1; then
+        echo "Multidev still exists after deletion"
+        return 1
+    fi
 }

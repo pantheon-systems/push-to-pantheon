@@ -28,7 +28,7 @@ Within each job, BATS runs test files concurrently using `--jobs 4`.
 
 **Test isolation**: Each workflow run creates dedicated multidev environments using commit hash for uniqueness:
 - Main test environment: `bats-{hash}` (e.g., `bats-a1b2` from commit a1b2...)
-- Temp test environments: `tmp1-{hash}`, `tmp2-{hash}`, `tmp3-{hash}`
+- Temp test environments: `tmp1-{hash}` (deleted in 06a), `tmp2-{hash}` (deleted in teardown)
 - Created fresh from live at test start
 - Deleted in the workflow's cleanup step (pattern-based, runs even if tests fail)
 - Unique per commit to prevent race conditions when workflows are canceled
@@ -132,7 +132,7 @@ Tests are split into two concurrent jobs:
 5. **05-build_tools.bats** - Terminus plugin detection
 6. **06a-create-from-live.bats** - Create multidev from live (uses `tmp1-{hash}`)
 7. **06b-create-from-dev.bats** - Create multidev from dev (uses `tmp2-{hash}`)
-8. **06c-validation-and-delete.bats** - Validation and delete tests (uses `tmp3-{hash}`)
+8. **06c-validation-and-delete.bats** - Validation tests (no environment needed)
 9. **07-site_root.bats** - Pantheon repo operations
 10. **08-push_pantheon.bats** - Full deployment logic
 11. **09-cleanup.bats** - Environment cleanup
@@ -187,10 +187,10 @@ This structure ensures:
   - Tests custom SOURCE_ENV parameter
   - Runs concurrently with 06a and 06c
 
-- **06c-validation-and-delete.bats** - Tests validation and deletion
-  - Validation tests for create_multidev and delete_multidev
-  - Delete tests using `tmp3-{hash}`
+- **06c-validation-and-delete.bats** - Tests validation and limits
+  - Validation tests for create_multidev and delete_multidev (error handling)
   - check_multidev_limit tests
+  - No environment creation needed
   - Runs concurrently with 06a and 06b
 
 ### Complex Integration Tests (Phase 4)
@@ -248,7 +248,7 @@ Tests run automatically via `.github/workflows/bats-tests.yml`:
 - **Jobs**: Two concurrent jobs (Fast Tests and Integration Tests)
 - **Environment**: Creates commit hash-based multidevs:
   - Main: `bats-{hash}` (e.g., `bats-a1b2`)
-  - Temp: `tmp1-{hash}`, `tmp2-{hash}`, `tmp3-{hash}`
+  - Temp: `tmp1-{hash}` (06a), `tmp2-{hash}` (06b)
 - **Parallelism**: `--jobs 4` for concurrent test file execution
 - **Cleanup**: Pattern-based cleanup in `always()` step (backstop only)
 - **Required**: Tests must pass before merging to `0.x` branch

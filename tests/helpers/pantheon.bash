@@ -46,7 +46,7 @@ get_temp_multidev_name() {
     else
         # Fall back to extracting from test env name
         # (e.g., "123" from "bats-123" or "126" from "bats-126bat")
-        test_id=$(echo "$(get_test_env)" | sed 's/^bats-//' | cut -c1-3)
+        test_id=$(get_test_env | sed 's/^bats-//' | cut -c1-3)
     fi
 
     echo "tmp${test_id}-${suffix}"

@@ -11,6 +11,7 @@ load_main_script() {
 
     # Source the script but prevent main() from executing
     # We remove the last line which calls main "$@"
+    # shellcheck disable=SC1090
     source <(sed '$ d' "${MAIN_SCRIPT}")
 }
 
@@ -64,6 +65,7 @@ common_teardown() {
 }
 
 # Assert that command succeeded (exit code 0)
+# shellcheck disable=SC2154  # status and output are BATS variables
 assert_success() {
     if [ "$status" -ne 0 ]; then
         echo "Expected success but got status: $status"
@@ -73,6 +75,7 @@ assert_success() {
 }
 
 # Assert that command failed (non-zero exit code)
+# shellcheck disable=SC2154  # status and output are BATS variables
 assert_failure() {
     if [ "$status" -eq 0 ]; then
         echo "Expected failure but command succeeded"
@@ -82,6 +85,7 @@ assert_failure() {
 }
 
 # Assert that output contains expected string
+# shellcheck disable=SC2154  # output is a BATS variable
 assert_output_contains() {
     local expected="$1"
     if [[ ! "$output" =~ $expected ]]; then
@@ -92,6 +96,7 @@ assert_output_contains() {
 }
 
 # Assert that output does not contain string
+# shellcheck disable=SC2154  # output is a BATS variable
 assert_output_not_contains() {
     local unexpected="$1"
     if [[ "$output" =~ $unexpected ]]; then

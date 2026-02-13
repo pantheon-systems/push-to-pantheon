@@ -23,6 +23,7 @@ on:
           - git
           - terminus
           - advanced
+          - build-tools-advanced
         default: all
 
 jobs:

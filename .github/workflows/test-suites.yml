@@ -29,6 +29,7 @@ on:
           - git
           - terminus
           - advanced
+          - build-tools-advanced
         default: all
       env_prefix:
         description: 'Environment name prefix (e.g., "test", "demo")'
@@ -91,7 +92,7 @@ jobs:
 
   content:
     name: Clone Content
-    if: inputs.suite == 'all' || inputs.suite == 'content'
+    if: inputs.suite == 'all' || inputs.suite == 'content' || inputs.suite == 'build-tools-advanced'
     runs-on: ubuntu-latest
     steps:
       # Checkout base repository code (trusted)
@@ -185,7 +186,7 @@ jobs:
 
   terminus-preinstalled:
     name: Terminus Pre-installed
-    if: inputs.suite == 'all' || inputs.suite == 'terminus'
+    if: inputs.suite == 'all' || inputs.suite == 'terminus' || inputs.suite == 'build-tools-advanced'
     runs-on: ubuntu-latest
     steps:
       # Checkout base repository code (trusted)
@@ -241,7 +242,7 @@ jobs:
 
   advanced:
     name: Advanced Deployment
-    if: inputs.suite == 'all' || inputs.suite == 'advanced'
+    if: inputs.suite == 'all' || inputs.suite == 'advanced' || inputs.suite == 'build-tools-advanced'
     runs-on: ubuntu-latest
     steps:
       # Checkout base repository code (trusted)

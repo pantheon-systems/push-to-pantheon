@@ -50,12 +50,17 @@ teardown_file() {
     run create_multidev
     assert_success
     assert_output_contains "Creating multidev"
+
+    # Wait for environment to appear in multidev list (for next test)
+    for i in {1..30}; do
+        if terminus multidev:list "${PANTHEON_SITE}" --format=list | grep -q "^${TEST_MULTIDEV_NAME}$"; then
+            break
+        fi
+        sleep 2
+    done
 }
 
 @test "create_multidev: skips creation if multidev already exists" {
-    # Wait for the previous test's creation workflow to complete
-    terminus workflow:wait "${PANTHEON_SITE}.${TEST_MULTIDEV_NAME}" "Create a Multidev environment" --max=300
-
     # Reuse the environment created in the previous test
     export MULTIDEV_NAME="${TEST_MULTIDEV_NAME}"
     export SOURCE_ENV="live"

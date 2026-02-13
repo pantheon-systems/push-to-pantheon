@@ -83,6 +83,15 @@ teardown_file() {
 
     # Create environment first
     terminus env:delete "${PANTHEON_SITE}.${MULTIDEV_NAME}" --delete-branch --yes 2>/dev/null || true
+
+    # Wait for delete to complete
+    for i in {1..30}; do
+        if ! terminus multidev:list "${PANTHEON_SITE}" --format=list | grep -q "^${MULTIDEV_NAME}$"; then
+            break
+        fi
+        sleep 2
+    done
+
     terminus multidev:create "${PANTHEON_SITE}.live" "${MULTIDEV_NAME}" --yes
 
     run delete_multidev

@@ -17,8 +17,28 @@ permissions:
   pull-requests: read
 
 jobs:
-  bats:
-    name: Run BATS Tests
+  fast-tests:
+    name: Fast Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install BATS
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y bats
+
+      - name: Run fast tests
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: |
+          # Run tests that don't require Pantheon infrastructure
+          bats --jobs 4 tests/01-main.bats tests/02-get_target_env.bats tests/03-permissions.bats tests/04-ssh_setup.bats
+
+  integration-tests:
+    name: Integration Tests
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -55,7 +75,7 @@ jobs:
           export MULTIDEV_NAME="${TEST_ENV}"
           bash scripts/main.sh create_multidev
 
-      - name: Run BATS tests
+      - name: Run Pantheon integration tests
         env:
           GITHUB_TOKEN: ${{ github.token }}
           GITHUB_REPOSITORY: ${{ github.repository }}
@@ -64,7 +84,8 @@ jobs:
           PANTHEON_TEST_SITE: dtp-nearly-empty-site
           PANTHEON_TEST_ENV: ${{ steps.test_env.outputs.TEST_ENV }}
         run: |
-          bats tests/*.bats
+          # Run tests that interact with Pantheon (slower integration tests)
+          bats --jobs 4 tests/05-build_tools.bats tests/06-multidev.bats tests/07-site_root.bats tests/08-push_pantheon.bats tests/09-cleanup.bats
 
       - name: Cleanup test environment
         if: always()

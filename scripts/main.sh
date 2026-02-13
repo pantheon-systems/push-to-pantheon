@@ -15,6 +15,7 @@ yellow='\033[0;33m'   # Yellow
 function main() {
 	help_msg="Usage: bash ./scripts/main.sh <command>
 	Available commands:
+	- compute_multidev_name: Compute a multidev name for PR or branch-based workflows (respects 11-char limit).
 	- get_target_env: Determine the target environment based on the context of the GitHub Actions workflow.
 	- check_missing_permissions: Check for missing GitHub permissions and return a list of any that are missing.
 	- get_missing_permissions_help: Print a help message with instructions for how to add the missing permissions to your workflow.
@@ -39,7 +40,7 @@ function main() {
 	fi
 
 	# Check for a valid command.
-	if [ "$1" != 'get_target_env' ] && [ "$1" != 'check_missing_permissions' ] && [ "$1" != 'get_missing_permissions_help' ] && [ "$1" != 'setup_ssh_hostkeys' ] && [ "$1" != 'prepare_site_root' ] && [ "$1" != 'push_to_pantheon' ] && [ "$1" != 'cleanup' ] && [ "$1" != 'verify_build_tools' ] && [ "$1" != 'create_multidev' ] && [ "$1" != 'delete_multidev' ]; then
+	if [ "$1" != 'compute_multidev_name' ] && [ "$1" != 'get_target_env' ] && [ "$1" != 'check_missing_permissions' ] && [ "$1" != 'get_missing_permissions_help' ] && [ "$1" != 'setup_ssh_hostkeys' ] && [ "$1" != 'prepare_site_root' ] && [ "$1" != 'push_to_pantheon' ] && [ "$1" != 'cleanup' ] && [ "$1" != 'verify_build_tools' ] && [ "$1" != 'create_multidev' ] && [ "$1" != 'delete_multidev' ]; then
 		echo -e "${red}Invalid command: $1${normal}"
 		echo -e "${help_msg}"
 		exit 1
@@ -47,6 +48,34 @@ function main() {
 
 	# Execute the command.
 	"$1"
+}
+
+# Compute a multidev name for PR or branch-based workflows.
+# This logic is reused across multiple workflows (BATS tests, deployments, etc.)
+# Requires environment variables:
+#   MULTIDEV_PREFIX: Prefix for the environment name (e.g., "bats-", "pr-")
+#   GITHUB_EVENT_NAME: Either "pull_request" or "push"
+#   GITHUB_PR_NUMBER: PR number (only for pull_request events)
+#   GITHUB_REF_NAME: Branch name (for push events)
+# Outputs the computed multidev name (respects 11-character Pantheon limit)
+function compute_multidev_name() {
+	if [ -z "${MULTIDEV_PREFIX}" ]; then
+		echo -e "${red}Error: MULTIDEV_PREFIX environment variable is required${normal}"
+		exit 1
+	fi
+
+	# Compute PR-specific multidev name (max 11 chars for Pantheon)
+	if [ "${GITHUB_EVENT_NAME}" == "pull_request" ]; then
+		# PR format: {prefix}{num} (e.g., bats-123, pr-456)
+		echo "${MULTIDEV_PREFIX}${GITHUB_PR_NUMBER}"
+	else
+		# Push format: {prefix}{6char branch} (e.g., bats-126mor for "126-more-testing")
+		# Calculate how many chars we have for the branch based on prefix length
+		local prefix_len=${#MULTIDEV_PREFIX}
+		local branch_max_len=$((11 - prefix_len))
+		local sanitized_branch=$(echo "${GITHUB_REF_NAME}" | sed 's/[^a-zA-Z0-9-]//g' | cut -c1-${branch_max_len})
+		echo "${MULTIDEV_PREFIX}${sanitized_branch}"
+	fi
 }
 
 # Function to determine the target environment based on the context of the

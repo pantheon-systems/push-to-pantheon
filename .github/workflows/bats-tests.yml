@@ -44,18 +44,13 @@ jobs:
           PANTHEON_MACHINE_TOKEN: ${{ secrets.PANTHEON_MACHINE_TOKEN }}
           PANTHEON_SITE: dtp-nearly-empty-site
           SOURCE_ENV: live
+          MULTIDEV_PREFIX: bats-
+          GITHUB_EVENT_NAME: ${{ github.event_name }}
+          GITHUB_PR_NUMBER: ${{ github.event.pull_request.number }}
+          GITHUB_REF_NAME: ${{ github.ref_name }}
         run: |
-          # Compute PR-specific multidev name (max 11 chars for Pantheon)
-          if [ "${{ github.event_name }}" == "pull_request" ]; then
-            # PR format: bats-{num} (e.g., bats-123)
-            TEST_ENV="bats-${{ github.event.pull_request.number }}"
-          else
-            # Push format: bats-{6char branch} (e.g., bats-126mor for "126-more-testing")
-            # Limit branch to 6 chars: 11 total - 5 for "bats-" = 6 for branch
-            BRANCH=$(echo "${{ github.ref_name }}" | sed 's/[^a-zA-Z0-9-]//g' | cut -c1-6)
-            TEST_ENV="bats-${BRANCH}"
-          fi
-
+          # Compute multidev name using helper function
+          TEST_ENV=$(bash scripts/main.sh compute_multidev_name)
           echo "TEST_ENV=${TEST_ENV}" >> $GITHUB_OUTPUT
 
           # Create multidev using main.sh function

@@ -33,6 +33,25 @@ get_test_env() {
     echo "${PANTHEON_TEST_ENV}"
 }
 
+# Generate a unique temporary multidev name for tests
+# Takes a suffix number and returns a unique name based on PR/branch context
+# Example: get_temp_multidev_name 1 -> "tmp123-1" (if PR #123)
+get_temp_multidev_name() {
+    local suffix="$1"
+    local test_id
+
+    # Use PR number directly if available (most accurate)
+    if [ -n "${GITHUB_PR_NUMBER}" ]; then
+        test_id="${GITHUB_PR_NUMBER}"
+    else
+        # Fall back to extracting from test env name
+        # (e.g., "123" from "bats-123" or "126" from "bats-126bat")
+        test_id=$(echo "$(get_test_env)" | sed 's/^bats-//' | cut -c1-3)
+    fi
+
+    echo "tmp${test_id}-${suffix}"
+}
+
 # Check if a multidev environment exists
 multidev_exists() {
     local site="$1"

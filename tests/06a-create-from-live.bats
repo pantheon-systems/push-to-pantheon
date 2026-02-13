@@ -52,12 +52,20 @@ teardown_file() {
     assert_output_contains "Creating multidev"
 
     # Wait for environment to appear in multidev list (for next test)
+    echo "Waiting for ${TEST_MULTIDEV_NAME} to appear in multidev list..."
     for i in {1..30}; do
         if terminus multidev:list "${PANTHEON_SITE}" --format=list | grep -q "^${TEST_MULTIDEV_NAME}$"; then
+            echo "${TEST_MULTIDEV_NAME} found in list after ${i} attempts"
             break
         fi
         sleep 2
     done
+
+    # Verify it's actually in the list
+    if ! terminus multidev:list "${PANTHEON_SITE}" --format=list | grep -q "^${TEST_MULTIDEV_NAME}$"; then
+        echo "ERROR: ${TEST_MULTIDEV_NAME} not found in list after 60 seconds!"
+        return 1
+    fi
 }
 
 @test "create_multidev: skips creation if multidev already exists" {
@@ -68,4 +76,6 @@ teardown_file() {
     run create_multidev
     assert_success
     assert_output_contains "already exists"
+    # Verify it detected existing env and didn't try to create
+    assert_output_not_contains "Creating multidev"
 }

@@ -6,11 +6,6 @@ on:
       - 'scripts/**'
       - 'tests/**'
       - '.github/workflows/bats-tests.yml'
-  pull_request:
-    paths:
-      - 'scripts/**'
-      - 'tests/**'
-      - '.github/workflows/bats-tests.yml'
 
 permissions:
   contents: read

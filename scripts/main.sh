@@ -544,10 +544,10 @@ function cleanup() {
 		exit 0
 	fi
 
-	# Re-use ALL_ENVS if available, otherwise fetch again
-	if [ -z "${ALL_ENVS}" ]; then
-		ALL_ENVS=$(terminus env:list "$PANTHEON_SITE" --format=list)
-	fi
+	# Refresh ALL_ENVS after current run deletions to avoid checking deleted environments
+	echo ""
+	echo -e "${yellow}Refreshing environment list after current run cleanup...${normal}"
+	ALL_ENVS=$(terminus multidev:list "${PANTHEON_SITE}" --format=list 2>/dev/null || echo "")
 
 	# Age threshold in days - only delete environments older than this
 	# Default to 14 days if not specified
@@ -603,6 +603,12 @@ function cleanup() {
 	for ENV in $CANDIDATE_ENVS; do
 		# Get the last modified timestamp for this environment
 		CREATED_TIMESTAMP=$(terminus env:info "${PANTHEON_SITE}.${ENV}" --field=created 2>/dev/null || echo "0")
+
+		# Skip if timestamp is invalid (environment was deleted or doesn't exist)
+		if [ "$CREATED_TIMESTAMP" = "0" ] || [ -z "$CREATED_TIMESTAMP" ]; then
+			echo -e "${yellow}Skipping ${normal}${bold}${ENV}${normal}${yellow} (invalid or missing timestamp)${normal}"
+			continue
+		fi
 
 		# Calculate age in seconds
 		AGE_SECONDS=$((CURRENT_TIMESTAMP - CREATED_TIMESTAMP))

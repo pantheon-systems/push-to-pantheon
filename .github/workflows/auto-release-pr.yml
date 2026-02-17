@@ -1,0 +1,286 @@
+name: Auto Release PR
+
+on:
+  # Trigger when PRs are merged to 0.x
+  pull_request_target:
+    types: [closed]
+    branches:
+      - 0.x
+
+  # Trigger when comments are added (for /version override)
+  issue_comment:
+    types: [created]
+
+  # Trigger when PR title is edited (for version override)
+  pull_request:
+    types: [edited, synchronize]
+    branches:
+      - 0.x
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  create-release-pr:
+    name: Create or Update Release PR
+    runs-on: ubuntu-latest
+    # Only run if:
+    # 1. Non-release PR was merged to 0.x (don't trigger when release PR is merged), OR
+    # 2. Comment on a release PR, OR
+    # 3. Release PR was edited
+    if: |
+      (github.event_name == 'pull_request_target' && github.event.pull_request.merged == true && !startsWith(github.event.pull_request.title, 'Release ')) ||
+      (github.event_name == 'issue_comment' && startsWith(github.event.issue.title, 'Release ')) ||
+      (github.event_name == 'pull_request' && startsWith(github.event.pull_request.title, 'Release '))
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          ref: 0.x
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Check for version override in comment
+        id: check_comment
+        if: github.event_name == 'issue_comment'
+        env:
+          COMMENT_BODY: ${{ github.event.comment.body }}
+        run: |
+          # Check if comment contains /version command
+          if echo "$COMMENT_BODY" | grep -qE '^/version [0-9]+\.[0-9]+\.[0-9]+$'; then
+            VERSION=$(echo "$COMMENT_BODY" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')
+            echo "override_version=$VERSION" >> $GITHUB_OUTPUT
+            echo "has_override=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_override=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Check for version override in PR title
+        id: check_title
+        if: github.event_name == 'pull_request' || github.event_name == 'pull_request_target'
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          # Extract version from "Release X.Y.Z" title
+          if echo "$PR_TITLE" | grep -qE '^Release [0-9]+\.[0-9]+\.[0-9]+'; then
+            VERSION=$(echo "$PR_TITLE" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')
+            echo "override_version=$VERSION" >> $GITHUB_OUTPUT
+            echo "has_override=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_override=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Determine next version
+        id: version
+        env:
+          COMMENT_HAS_OVERRIDE: ${{ steps.check_comment.outputs.has_override }}
+          COMMENT_OVERRIDE_VERSION: ${{ steps.check_comment.outputs.override_version }}
+          TITLE_HAS_OVERRIDE: ${{ steps.check_title.outputs.has_override }}
+          TITLE_OVERRIDE_VERSION: ${{ steps.check_title.outputs.override_version }}
+        run: |
+          # Get latest tag
+          LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "0.0.0")
+          echo "latest_tag=$LATEST_TAG" >> $GITHUB_OUTPUT
+
+          # Check for overrides (using env vars to prevent code injection)
+          if [ "$COMMENT_HAS_OVERRIDE" = "true" ]; then
+            NEW_VERSION="$COMMENT_OVERRIDE_VERSION"
+            echo "source=comment" >> $GITHUB_OUTPUT
+          elif [ "$TITLE_HAS_OVERRIDE" = "true" ]; then
+            NEW_VERSION="$TITLE_OVERRIDE_VERSION"
+            echo "source=title" >> $GITHUB_OUTPUT
+          else
+            # Auto-increment patch version
+            IFS='.' read -r major minor patch <<< "${LATEST_TAG}"
+            NEW_VERSION="${major}.${minor}.$((patch + 1))"
+            echo "source=auto" >> $GITHUB_OUTPUT
+          fi
+
+          echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
+          echo "Next version will be: $NEW_VERSION"
+
+      - name: Fetch latest action versions
+        id: action_versions
+        run: |
+          # Fetch latest versions for actions referenced in README
+          CHECKOUT_VERSION=$(gh release view --repo actions/checkout --json tagName -q .tagName)
+          CACHE_VERSION=$(gh release view --repo actions/cache --json tagName -q .tagName)
+
+          echo "checkout=$CHECKOUT_VERSION" >> $GITHUB_OUTPUT
+          echo "cache=$CACHE_VERSION" >> $GITHUB_OUTPUT
+
+          echo "Latest action versions:"
+          echo "  actions/checkout: $CHECKOUT_VERSION"
+          echo "  actions/cache: $CACHE_VERSION"
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - name: Update versions in README
+        env:
+          LATEST_TAG: ${{ steps.version.outputs.latest_tag }}
+          NEW_VERSION: ${{ steps.version.outputs.new_version }}
+          CHECKOUT_VERSION: ${{ steps.action_versions.outputs.checkout }}
+          CACHE_VERSION: ${{ steps.action_versions.outputs.cache }}
+        run: |
+          # Escape dots for sed
+          LATEST_TAG_ESCAPED=$(echo "$LATEST_TAG" | sed 's/\./\\./g')
+
+          # Update pantheon-systems/push-to-pantheon version references
+          # Only update semantic version tags, not branch references
+          sed -i "s|pantheon-systems/push-to-pantheon@${LATEST_TAG_ESCAPED}|pantheon-systems/push-to-pantheon@${NEW_VERSION}|g" readme.md
+
+          # Update actions/checkout to latest (only update major version references like @v6)
+          CHECKOUT_MAJOR=$(echo "$CHECKOUT_VERSION" | grep -oE '^v[0-9]+')
+          sed -i "s|actions/checkout@v[0-9]\+|actions/checkout@${CHECKOUT_MAJOR}|g" readme.md
+
+          # Update actions/cache to latest
+          CACHE_MAJOR=$(echo "$CACHE_VERSION" | grep -oE '^v[0-9]+')
+          sed -i "s|actions/cache@v[0-9]\+|actions/cache@${CACHE_MAJOR}|g" readme.md
+
+          echo "Updated README.md with new versions"
+
+      - name: Check if release PR exists
+        id: check_pr
+        run: |
+          # Check for existing release PR
+          PR_NUMBER=$(gh pr list --base 0.x --state open --json number,title --jq '.[] | select(.title | startswith("Release ")) | .number' | head -1)
+
+          if [ -n "$PR_NUMBER" ]; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+            echo "pr_number=$PR_NUMBER" >> $GITHUB_OUTPUT
+            echo "Found existing release PR #$PR_NUMBER"
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+            echo "No existing release PR found"
+          fi
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Create or update release branch
+        id: branch
+        env:
+          NEW_VERSION: ${{ steps.version.outputs.new_version }}
+        run: |
+          BRANCH_NAME="release-${NEW_VERSION}"
+
+          # Check if branch exists
+          if git ls-remote --heads origin "$BRANCH_NAME" | grep -q "$BRANCH_NAME"; then
+            echo "Branch $BRANCH_NAME exists, checking it out"
+            git fetch origin "$BRANCH_NAME"
+            git checkout "$BRANCH_NAME"
+
+            # Reset to latest 0.x and reapply version changes
+            git reset --hard origin/0.x
+          else
+            echo "Creating new branch $BRANCH_NAME"
+            git checkout -b "$BRANCH_NAME"
+          fi
+
+          echo "branch_name=$BRANCH_NAME" >> $GITHUB_OUTPUT
+
+      - name: Commit version changes
+        id: commit
+        env:
+          NEW_VERSION: ${{ steps.version.outputs.new_version }}
+        run: |
+          git add readme.md
+
+          if ! git diff --staged --quiet; then
+            git commit -m "docs: Bump version to $NEW_VERSION"
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+            echo "No changes to commit"
+          fi
+
+      - name: Push release branch
+        if: steps.commit.outputs.has_changes == 'true'
+        env:
+          BRANCH_NAME: ${{ steps.branch.outputs.branch_name }}
+        run: |
+          git push --force origin "$BRANCH_NAME"
+
+      - name: Create or update PR
+        if: steps.commit.outputs.has_changes == 'true'
+        env:
+          NEW_VERSION: ${{ steps.version.outputs.new_version }}
+          BRANCH_NAME: ${{ steps.branch.outputs.branch_name }}
+          LATEST_TAG: ${{ steps.version.outputs.latest_tag }}
+          CHECKOUT_VERSION: ${{ steps.action_versions.outputs.checkout }}
+          CACHE_VERSION: ${{ steps.action_versions.outputs.cache }}
+        run: |
+          PR_BODY="This PR updates version references in the README from \`$LATEST_TAG\` to \`$NEW_VERSION\`.
+
+          ## Changes
+          - Updated \`pantheon-systems/push-to-pantheon\` references to \`$NEW_VERSION\`
+          - Updated \`actions/checkout\` to \`$CHECKOUT_VERSION\`
+          - Updated \`actions/cache\` to \`$CACHE_VERSION\`
+
+          ## Version Override
+          You can override the version by:
+          1. **Edit the PR title** to \`Release X.Y.Z\` (e.g., \`Release 0.9.0\`)
+          2. **Comment** \`/version X.Y.Z\` (e.g., \`/version 0.9.0\`)
+
+          The workflow will automatically update the branch with the new version.
+
+          ## Release Process
+          1. Review the version changes
+          2. Override the version if needed (see above)
+          3. Mark this PR as **Ready for review** when you're ready to release
+          4. Merge this PR
+          5. Run the **Create Release** workflow to publish the release"
+
+          if [ "${{ steps.check_pr.outputs.exists }}" = "true" ]; then
+            # Update existing PR
+            PR_NUMBER="${{ steps.check_pr.outputs.pr_number }}"
+            gh pr edit "$PR_NUMBER" \
+              --title "Release $NEW_VERSION" \
+              --body "$PR_BODY"
+
+            # Ensure release label is applied
+            gh pr edit "$PR_NUMBER" --add-label "release"
+
+            echo "Updated existing PR #$PR_NUMBER"
+          else
+            # Create new PR in draft mode with release label
+            gh pr create \
+              --base 0.x \
+              --head "$BRANCH_NAME" \
+              --title "Release $NEW_VERSION" \
+              --body "$PR_BODY" \
+              --label "release" \
+              --draft
+            echo "Created new draft PR"
+          fi
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - name: Comment on trigger PR
+        if: github.event_name == 'pull_request_target' && github.event.pull_request.merged == true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          NEW_VERSION: ${{ steps.version.outputs.new_version }}
+        run: |
+          gh pr comment "$PR_NUMBER" \
+            --body "🤖 A release PR for version \`$NEW_VERSION\` has been created/updated automatically."
+
+      - name: React to version override comment
+        if: github.event_name == 'issue_comment' && steps.check_comment.outputs.has_override == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          COMMENT_ID: ${{ github.event.comment.id }}
+        run: |
+          gh api \
+            --method POST \
+            -H "Accept: application/vnd.github+json" \
+            "/repos/${REPO}/issues/comments/${COMMENT_ID}/reactions" \
+            -f content='rocket'

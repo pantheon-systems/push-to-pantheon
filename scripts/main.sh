@@ -118,6 +118,15 @@ function get_target_env() {
 		exit 1
 	fi
 
+	# Validate that TARGET_ENV only contains safe characters (alphanumeric, hyphens, underscores)
+	# This prevents injection attacks and ensures compatibility with Pantheon environment naming
+	# Use bash regex matching instead of grep to properly handle multi-line input
+	if ! [[ "${TARGET_ENV}" =~ ^[a-zA-Z0-9_-]+$ ]]; then
+		echo -e "${red}Error: Invalid target environment name '${TARGET_ENV}'${normal}" >&2
+		echo -e "${yellow}Environment names must contain only alphanumeric characters, hyphens, and underscores${normal}" >&2
+		exit 1
+	fi
+
 	echo "${TARGET_ENV}"
 }
 

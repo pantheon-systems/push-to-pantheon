@@ -1,32 +1,68 @@
 name: Create Release
 
 on:
+  # Trigger when a PR with "release" label is merged to 0.x
+  pull_request_target:
+    types: [closed]
+    branches:
+      - 0.x
+
+  # Keep manual trigger as backup
   workflow_dispatch:
     inputs:
       version:
-        description: 'The version to release (e.g., v1.2.3)'
+        description: 'The version to release (e.g., 0.9.0)'
         required: true
         type: string
 
+permissions:
+  contents: write
+
 jobs:
   release:
-    name: 'Release Push to Pantheon update'
+    name: 'Create Draft Release'
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      
+    # Only run if PR was merged and has release label, OR manual trigger
+    if: |
+      (github.event_name == 'pull_request_target' && github.event.pull_request.merged == true && contains(github.event.pull_request.labels.*.name, 'release')) ||
+      github.event_name == 'workflow_dispatch'
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
         with:
-          # We need to fetch all history and tags to correctly determine the previous version
+          ref: 0.x
           fetch-depth: 0
+
+      - name: Extract version from PR title or input
+        id: version
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          MANUAL_VERSION: ${{ github.event.inputs.version }}
+        run: |
+          if [ "$EVENT_NAME" = "pull_request_target" ]; then
+            # Extract version from "Release X.Y.Z" PR title
+            VERSION=$(echo "$PR_TITLE" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')
+            if [ -z "$VERSION" ]; then
+              echo "Error: Could not extract version from PR title"
+              exit 1
+            fi
+            echo "source=pr_title" >> $GITHUB_OUTPUT
+          else
+            # Use manual input
+            VERSION="$MANUAL_VERSION"
+            echo "source=manual" >> $GITHUB_OUTPUT
+          fi
+
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Will create release for version: $VERSION"
 
       - name: Get previous version tag
         id: get_version
         run: |
           # Get the latest tag from the repository
-          PREVIOUS_VERSION=$(git describe --tags --abbrev=0)
+          PREVIOUS_VERSION=$(git describe --tags --abbrev=0 2>/dev/null || echo "0.0.0")
           echo "previous_version=$PREVIOUS_VERSION" >> $GITHUB_OUTPUT
         shell: bash
 
@@ -36,11 +72,9 @@ jobs:
           PREVIOUS_VERSION_ESCAPED=$(echo "${{ steps.get_version.outputs.previous_version }}" | sed 's/\./\\./g')
           if grep -q "$PREVIOUS_VERSION_ESCAPED" readme.md; then
             echo "Error: Previous version '${{ steps.get_version.outputs.previous_version }}' found in README.md"
-            echo "Run the 'Prepare Release' workflow to update the version first."
+            echo "The release PR should have updated all version references."
             exit 1
           fi
-          # Output the new version for further steps.
-          echo "new_version=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
         shell: bash
 
       - name: Configure Git
@@ -50,17 +84,37 @@ jobs:
         shell: bash
 
       - name: Create and push Git tag
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
         run: |
-          git tag ${{ github.event.inputs.version }}
-          git push origin ${{ github.event.inputs.version }}
+          git tag "$VERSION"
+          git push origin "$VERSION"
         shell: bash
 
-      - name: Create GitHub Release
+      - name: Create GitHub Draft Release
         env:
-          # The GITHUB_TOKEN is automatically provided by GitHub
           GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+          REPO: ${{ github.repository }}
         run: |
-          gh release create ${{ github.event.inputs.version }} \
-            --title "${{ github.event.inputs.version }}" \
-            --generate-notes
+          gh release create "$VERSION" \
+            --title "$VERSION" \
+            --generate-notes \
+            --draft
+
+          echo "✅ Draft release $VERSION created successfully"
+          echo "Visit https://github.com/${REPO}/releases to review and publish it"
         shell: bash
+
+      - name: Comment on merged PR
+        if: github.event_name == 'pull_request_target'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          gh pr comment "$PR_NUMBER" \
+            --body "🎉 Draft release [\`$VERSION\`](https://github.com/${REPO}/releases/tag/$VERSION) has been created automatically.
+
+          Review and publish the release at: https://github.com/${REPO}/releases"

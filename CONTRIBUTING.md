@@ -4,17 +4,55 @@
 
 ## Cutting a release
 
-Cutting a release is a _manual_ process and should be created from the `0.x` branch. This is to ensure that we know exactly what changes are included in the release and when releases are made.
+Releases are **fully automated** through GitHub workflows. The process requires minimal human intervention.
 
-### Prepare first
-Before cutting a release, we must first _prepare_ the release. Currently, preparing the release simply creates a GitHub Pull Request that updates the version number in the `readme.md` file to bump the examples to the latest version. 
+### Automated Release Flow
 
-To prepare a release, navigate to the Actions tab and select the pinned "Prepare Release" workflow. Fill in the required field for the new version number, and submit the form. This will create a pull request that updates the version number in the `readme.md` file.
+**1. Merge a PR → Release PR is created automatically**
 
-Once this pull request is approved and merged, a new release can be cut.
+When any PR is merged to the `0.x` branch, the **Auto Release PR** workflow automatically:
+- Creates or updates a draft release PR (labeled `release`)
+- Auto-increments the patch version (e.g., `0.8.0` → `0.8.1`)
+- Updates all action version references in `readme.md`:
+  - `pantheon-systems/push-to-pantheon` → new version being released
+  - `actions/checkout` → latest major version
+  - `actions/cache` → latest major version
 
-### Create the release
-To cut a new release, navigate to the Actions tab and select the pinned "Create Release" workflow. Fill in the required field for the version number, and submit the form. This workflow will check the `readme.md` file for the new version number. If the last release version is still referenced in the `readme.md` file, the workflow will fail. If the last release version is not found, a new Git tag will be created, and the release will be published on GitHub with release notes auto-generated from the merged PRs.
+**2. Override version if needed (optional)**
+
+By default, the patch version is incremented. For minor or major bumps:
+- **Edit the release PR title** to `Release X.Y.Z` (e.g., `Release 0.9.0`), OR
+- **Comment on the release PR** with `/version X.Y.Z` (e.g., `/version 0.9.0`)
+
+The workflow automatically updates the release branch with the new version.
+
+**3. Merge release PR → Draft release is created**
+
+When you merge the release PR:
+1. Mark the draft PR as **Ready for review**
+2. Review and approve
+3. Merge to `0.x`
+4. The **Create Release** workflow automatically:
+   - Creates a git tag
+   - Creates a **draft GitHub release** with auto-generated notes
+   - Comments on the merged PR with a link to the release
+
+**4. Publish the release**
+
+Navigate to the [Releases page](https://github.com/pantheon-systems/push-to-pantheon/releases) and:
+1. Review the draft release notes
+2. Edit if needed
+3. Click **Publish release**
+
+### Manual Override (Backup)
+
+If the automated workflow fails, you can manually trigger the Create Release workflow:
+1. Navigate to Actions → "Create Release"
+2. Fill in the version number
+3. Submit the form
+4. This creates the git tag and draft release
+
+> **Note:** The workflow validates that version references were updated in `readme.md` before creating the release, ensuring consistency.
 
 ## Testing changes to the Deploy PR to Pantheon workflow
 

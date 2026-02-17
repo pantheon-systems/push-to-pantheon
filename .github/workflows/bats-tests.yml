@@ -88,32 +88,20 @@ jobs:
           # Run tests that interact with Pantheon (slower integration tests)
           bats --jobs 4 tests/05-build_tools.bats tests/06a-create-from-live.bats tests/06b-create-from-dev.bats tests/06c-validation-and-delete.bats tests/07-site_root.bats tests/08-push_pantheon.bats tests/09-cleanup.bats
 
+      - name: Install Terminus Build Tools Plugin
+        if: always()
+        run: terminus self:plugin:install pantheon-systems/terminus-build-tools-plugin
+
       - name: Cleanup test environments
         if: always()
         env:
           PANTHEON_MACHINE_TOKEN: ${{ secrets.PANTHEON_MACHINE_TOKEN }}
           PANTHEON_SITE: dtp-nearly-empty-site
-          TEST_ENV: ${{ steps.test_env.outputs.TEST_ENV }}
-        run: |
-          # Extract hash from main test env name
-          HASH="${TEST_ENV#bats-}"
-
-          # List all multidevs and find any matching our test patterns
-          # Patterns: bats-{hash}, tmp1-{hash}, tmp2-{hash}
-          # Note: tmp1 is deleted in 06a test, tmp2 in 06b teardown
-          EXISTING_ENVS=$(terminus multidev:list dtp-nearly-empty-site --format=list 2>/dev/null | grep -E "^(bats-${HASH}|tmp[12]-${HASH})$" || true)
-
-          if [ -n "${EXISTING_ENVS}" ]; then
-            echo "Found test environments to clean up:"
-            echo "${EXISTING_ENVS}"
-
-            # Delete each environment that was found
-            echo "${EXISTING_ENVS}" | while read -r env; do
-              if [ -n "${env}" ]; then
-                echo "Deleting ${env}..."
-                bash scripts/main.sh delete_multidev "${env}" || true
-              fi
-            done
-          else
-            echo "No test environments found to clean up"
-          fi
+          PANTHEON_TARGET_ENV: ${{ steps.test_env.outputs.TEST_ENV }}
+          DELETE_OLD_MULTIDEVS: true
+          MULTIDEV_DELETE_PATTERN: 'bats-'
+          MULTIDEV_AGE_THRESHOLD_DAYS: 0
+          GITHUB_TOKEN: ${{ github.token }}
+          CI_PROJECT_USERNAME: ${{ github.repository_owner }}
+          CI_PROJECT_REPONAME: ${{ github.event.repository.name }}
+        run: bash scripts/main.sh cleanup

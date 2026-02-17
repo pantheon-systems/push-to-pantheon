@@ -485,6 +485,9 @@ function cleanup() {
 	# Get all multidevs for cleanup operations
 	ALL_ENVS=$(terminus multidev:list "${PANTHEON_SITE}" --format=list 2>/dev/null || echo "")
 
+	# Track environments deleted in the current run to exclude them from age-based cleanup
+	DELETED_CURRENT_RUN_ENVS=""
+
 	# Always delete test suite environments from the current run when ENV_PREFIX is set
 	if [ -n "$ENV_PREFIX" ]; then
 		echo ""
@@ -500,6 +503,8 @@ function cleanup() {
 			CURRENT_RUN_ENVS=$(echo "${TEST_SUITE_ENVS}" | grep "^${ENV_PREFIX}-" || true)
 
 			if [ -n "${CURRENT_RUN_ENVS}" ]; then
+				# Track these for exclusion from age-based cleanup
+				DELETED_CURRENT_RUN_ENVS="${CURRENT_RUN_ENVS}"
 				echo ""
 				echo -e "${yellow}Deleting environments from current run (${ENV_PREFIX}-*):${normal}"
 
@@ -596,6 +601,14 @@ function cleanup() {
 	# If we have a prefix, exclude all environments starting with that prefix
 	if [ -n "$ENV_PREFIX" ]; then
 		CANDIDATE_ENVS=$(echo "$CANDIDATE_ENVS" | grep -v "^${ENV_PREFIX}-")
+	fi
+
+	# Exclude environments we just deleted in the current run to avoid race conditions
+	# where Terminus hasn't updated its list yet
+	if [ -n "$DELETED_CURRENT_RUN_ENVS" ]; then
+		for deleted_env in $DELETED_CURRENT_RUN_ENVS; do
+			CANDIDATE_ENVS=$(echo "$CANDIDATE_ENVS" | grep -v "^${deleted_env}$")
+		done
 	fi
 
 	# Filter by age and collect environments with their timestamps for sorting

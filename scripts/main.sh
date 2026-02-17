@@ -507,6 +507,16 @@ function cleanup() {
 		cd "${SITE_ROOT}" || return
 	fi
 
+	# Check early if we should skip cleanup entirely
+	# This prevents unnecessary API calls when cleanup is not enabled
+	if [ -z "$DELETE_OLD_MULTIDEVS" ] || [ "$DELETE_OLD_MULTIDEVS" != "true" ]; then
+		# Still run PR cleanup and current run cleanup, but skip age-based cleanup
+		if [ -z "$ENV_PREFIX" ]; then
+			echo -e "${red}delete_old_environments was not set to true. Skipping cleanup...${normal}"
+			exit 0
+		fi
+	fi
+
 	# Export CI variables so Build Tools knows which GitHub repo to check
 	export CI_PROJECT_USERNAME
 	export CI_PROJECT_REPONAME
@@ -578,10 +588,6 @@ function cleanup() {
 	# The block below is intended to delete old environments that are not
 	# associated with pull requests. This is useful for cleaning up
 	# environments created by manual workflows or other automated processes.
-	if [ -z "$DELETE_OLD_MULTIDEVS" ] || [ "$DELETE_OLD_MULTIDEVS" != "true" ]; then
-		echo -e "${red}delete_old_environments was not set to true. Skipping deletion of old environments...${normal}"
-		exit 0
-	fi
 
 	# Refresh ALL_ENVS after current run deletions to avoid checking deleted environments
 	echo ""

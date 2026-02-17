@@ -481,7 +481,7 @@ function cleanup() {
 			echo -e "${yellow}No multidevs found${normal}"
 		else
 			# Find test suite environments (ending in -std, -cont, -git, -term, -adv)
-			TEST_SUITE_ENVS=$(echo "${ALL_ENVS}" | grep -E '-(std|cont|git|term|adv)$' || true)
+			TEST_SUITE_ENVS=$(echo "${ALL_ENVS}" | grep -E -- '-(std|cont|git|term|adv)$' || true)
 
 			# Delete environments from this run (regardless of age)
 			CURRENT_RUN_ENVS=$(echo "${TEST_SUITE_ENVS}" | grep "^${ENV_PREFIX}-" || true)
@@ -537,12 +537,11 @@ function cleanup() {
 	fi
 
 	# Start with environments matching suite patterns or legacy wd- pattern
-	SUITE_PATTERN='(^wd-|-std$|-cont$|-git$|-term$|-adv$)'
 	FILTERED_ENVS=$(echo "$ALL_ENVS" \
 		| grep -v '^dev$' \
 		| grep -v '^test$' \
 		| grep -v '^live$' \
-		| grep -E "${SUITE_PATTERN}")
+		| grep -E -- '(^wd-|-std$|-cont$|-git$|-term$|-adv$)')
 
 	# If MULTIDEV_DELETE_PATTERN is set, also include environments matching that pattern
 	# (excluding pr- environments which are handled by build:env:delete:pr)

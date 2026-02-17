@@ -74,17 +74,22 @@ jobs:
 
       - name: Determine next version
         id: version
+        env:
+          COMMENT_HAS_OVERRIDE: ${{ steps.check_comment.outputs.has_override }}
+          COMMENT_OVERRIDE_VERSION: ${{ steps.check_comment.outputs.override_version }}
+          TITLE_HAS_OVERRIDE: ${{ steps.check_title.outputs.has_override }}
+          TITLE_OVERRIDE_VERSION: ${{ steps.check_title.outputs.override_version }}
         run: |
           # Get latest tag
           LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "0.0.0")
           echo "latest_tag=$LATEST_TAG" >> $GITHUB_OUTPUT
 
-          # Check for overrides
-          if [ "${{ steps.check_comment.outputs.has_override }}" = "true" ]; then
-            NEW_VERSION="${{ steps.check_comment.outputs.override_version }}"
+          # Check for overrides (using env vars to prevent code injection)
+          if [ "$COMMENT_HAS_OVERRIDE" = "true" ]; then
+            NEW_VERSION="$COMMENT_OVERRIDE_VERSION"
             echo "source=comment" >> $GITHUB_OUTPUT
-          elif [ "${{ steps.check_title.outputs.has_override }}" = "true" ]; then
-            NEW_VERSION="${{ steps.check_title.outputs.override_version }}"
+          elif [ "$TITLE_HAS_OVERRIDE" = "true" ]; then
+            NEW_VERSION="$TITLE_OVERRIDE_VERSION"
             echo "source=title" >> $GITHUB_OUTPUT
           else
             # Auto-increment patch version
@@ -94,7 +99,7 @@ jobs:
           fi
 
           echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
-          echo "Next version will be: $NEW_VERSION (from ${{ steps.version.outputs.source }})"
+          echo "Next version will be: $NEW_VERSION"
 
       - name: Fetch latest action versions
         id: action_versions

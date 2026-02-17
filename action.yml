@@ -100,7 +100,14 @@ runs:
           fi
 
           echo "PANTHEON_TARGET_ENV set to ${TARGET_ENV}"
-          echo "PANTHEON_TARGET_ENV=${TARGET_ENV}" >> $GITHUB_ENV
+
+          # Use heredoc syntax to prevent environment variable injection
+          # This is the secure way to set env vars from untrusted input
+          {
+            echo "PANTHEON_TARGET_ENV<<EOF"
+            echo "${TARGET_ENV}"
+            echo "EOF"
+          } >> $GITHUB_ENV
 
       - name: Set clone content flag
         shell: bash

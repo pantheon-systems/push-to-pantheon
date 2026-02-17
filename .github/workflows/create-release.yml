@@ -37,10 +37,11 @@ jobs:
       - name: Extract version from PR title or input
         id: version
         env:
+          EVENT_NAME: ${{ github.event_name }}
           PR_TITLE: ${{ github.event.pull_request.title }}
           MANUAL_VERSION: ${{ github.event.inputs.version }}
         run: |
-          if [ "${{ github.event_name }}" = "pull_request_target" ]; then
+          if [ "$EVENT_NAME" = "pull_request_target" ]; then
             # Extract version from "Release X.Y.Z" PR title
             VERSION=$(echo "$PR_TITLE" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')
             if [ -z "$VERSION" ]; then

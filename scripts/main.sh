@@ -48,8 +48,10 @@ function main() {
 		exit 1
 	fi
 
-	# Execute the command.
-	"$1"
+	# Execute the command with any additional arguments
+	COMMAND="$1"
+	shift
+	"$COMMAND" "$@"
 }
 
 # Compute a multidev name for PR or branch-based workflows.
@@ -372,9 +374,8 @@ function push_to_pantheon() {
 			echo -e "${yellow}Target environment is ${normal}${bold}${PANTHEON_TARGET_ENV}${normal}${yellow}, pushing to branch with the same name on Pantheon.${normal}"
 
 			# Create multidev if it doesn't exist (reuse create_multidev logic)
-			export MULTIDEV_NAME="${PANTHEON_TARGET_ENV}"
 			export SOURCE_ENV="${PANTHEON_SOURCE_ENV}"
-			create_multidev
+			create_multidev "${PANTHEON_TARGET_ENV}"
 		fi
 
 		# Ensure repo is not shallow; Pantheon rejects shallow pushes
@@ -417,6 +418,14 @@ function push_to_pantheon() {
 	echo "PR_NUM=${PR_NUM}"
 	echo "Current git HEAD SHA: $(git rev-parse HEAD)"
 
+	# Ensure CI variables are exported for Build Tools
+	export CI_COMMIT_SHA
+	export CIRCLE_SHA1
+	export GITHUB_SHA
+	export CI_BUILD_URL
+	export CI_PROJECT_USERNAME
+	export CI_PROJECT_REPONAME
+
 	# Build the terminus command with optional --pr-id flag
 	TERMINUS_CMD="terminus -n build:env:create \"${PANTHEON_SITE}.${PANTHEON_SOURCE_ENV}\" \"${PANTHEON_TARGET_ENV}\" --yes --message=\"${PANTHEON_COMMIT_MESSAGE}\""
 
@@ -430,8 +439,42 @@ function push_to_pantheon() {
 		TERMINUS_CMD="${TERMINUS_CMD} ${PANTHEON_CLONE_CONTENT_FLAG}"
 	fi
 
-	# Execute the command
-	eval "${TERMINUS_CMD}"
+	# Execute the command with output filtering to suppress non-fatal 422 errors
+	# Build Tools tries to comment on commits from Pantheon's git history that may not exist in GitHub
+	# These produce "422 Unprocessable Entity" errors that are non-fatal and can be safely suppressed
+	set +e
+	TEMP_LOG=$(mktemp)
+	eval "${TERMINUS_CMD}" 2>&1 | while IFS= read -r line; do
+		# Skip lines containing 422 errors about missing commits
+		if echo "$line" | grep -q "422 Unprocessable Entity"; then
+			echo "$line" >> "$TEMP_LOG"
+			continue
+		fi
+		if echo "$line" | grep -q "No commit found for SHA"; then
+			echo "$line" >> "$TEMP_LOG"
+			continue
+		fi
+		# Show all other lines
+		echo "$line"
+	done
+	EXIT_CODE=${PIPESTATUS[0]}
+	set -e
+
+	# Notify if we suppressed any 422 errors
+	if [ -s "$TEMP_LOG" ]; then
+		SUPPRESSED_COUNT=$(grep -c "422 Unprocessable Entity" "$TEMP_LOG" || echo "0")
+		if [ "$SUPPRESSED_COUNT" -gt 0 ]; then
+			echo ""
+			echo -e "${yellow}Note: Suppressed ${SUPPRESSED_COUNT} non-fatal 422 error(s) from Build Tools GitHub API calls${normal}"
+		fi
+	fi
+
+	rm -f "$TEMP_LOG"
+
+	# Fail if the command failed
+	if [ "$EXIT_CODE" -ne 0 ]; then
+		exit "$EXIT_CODE"
+	fi
 }
 
 # Function to delete a GitHub environment and all of its associated deployments.
@@ -473,6 +516,21 @@ function cleanup() {
 		cd "${SITE_ROOT}" || return
 	fi
 
+	# Check early if we should skip cleanup entirely
+	# This prevents unnecessary API calls when cleanup is not enabled
+	if [ -z "$DELETE_OLD_MULTIDEVS" ] || [ "$DELETE_OLD_MULTIDEVS" != "true" ]; then
+		# Still run PR cleanup and current run cleanup, but skip age-based cleanup
+		if [ -z "$ENV_PREFIX" ]; then
+			echo -e "${red}delete_old_environments was not set to true. Skipping cleanup...${normal}"
+			exit 0
+		fi
+	fi
+
+	# Export CI variables so Build Tools knows which GitHub repo to check
+	export CI_PROJECT_USERNAME
+	export CI_PROJECT_REPONAME
+	export GITHUB_TOKEN
+
 	echo -e "${yellow}Deleting stale Pantheon PR multidev environments...${normal}"
 	# This command will find and delete multidev environments that are
 	# associated with closed or merged pull requests.
@@ -480,6 +538,9 @@ function cleanup() {
 
 	# Get all multidevs for cleanup operations
 	ALL_ENVS=$(terminus multidev:list "${PANTHEON_SITE}" --format=list 2>/dev/null || echo "")
+
+	# Track environments deleted in the current run to exclude them from age-based cleanup
+	DELETED_CURRENT_RUN_ENVS=""
 
 	# Always delete test suite environments from the current run when ENV_PREFIX is set
 	if [ -n "$ENV_PREFIX" ]; then
@@ -490,21 +551,43 @@ function cleanup() {
 			echo -e "${yellow}No multidevs found${normal}"
 		else
 			# Find test suite environments (ending in -std, -cont, -git, -term, -adv)
-			TEST_SUITE_ENVS=$(echo "${ALL_ENVS}" | grep -E '-(std|cont|git|term|adv)$' || true)
+			TEST_SUITE_ENVS=$(echo "${ALL_ENVS}" | grep -E -- '-(std|cont|git|term|adv)$' || true)
 
 			# Delete environments from this run (regardless of age)
 			CURRENT_RUN_ENVS=$(echo "${TEST_SUITE_ENVS}" | grep "^${ENV_PREFIX}-" || true)
 
 			if [ -n "${CURRENT_RUN_ENVS}" ]; then
+				# Track these for exclusion from age-based cleanup
+				DELETED_CURRENT_RUN_ENVS="${CURRENT_RUN_ENVS}"
 				echo ""
 				echo -e "${yellow}Deleting environments from current run (${ENV_PREFIX}-*):${normal}"
-				echo "${CURRENT_RUN_ENVS}" | while read -r env; do
+
+				# Parallel deletion with max concurrent limit
+				MAX_PARALLEL="${CLEANUP_MAX_PARALLEL:-5}"
+				PIDS=()
+
+				for env in ${CURRENT_RUN_ENVS}; do
 					if [ -n "${env}" ]; then
 						echo -e "${yellow}  Deleting ${normal}${bold}${env}${normal}${yellow}...${normal}"
-						export MULTIDEV_NAME="${env}"
-						delete_multidev || true
+
+						# Delete in background
+						(
+							delete_multidev "${env}" || true
+						) &
+						PIDS+=($!)
+
+						# Wait if we hit the parallel limit
+						if [ ${#PIDS[@]} -ge "${MAX_PARALLEL}" ]; then
+							wait "${PIDS[@]}"
+							PIDS=()
+						fi
 					fi
 				done
+
+				# Wait for remaining background jobs
+				if [ ${#PIDS[@]} -gt 0 ]; then
+					wait "${PIDS[@]}"
+				fi
 			else
 				echo -e "${yellow}No current run environments found matching ${ENV_PREFIX}-*${normal}"
 			fi
@@ -514,15 +597,11 @@ function cleanup() {
 	# The block below is intended to delete old environments that are not
 	# associated with pull requests. This is useful for cleaning up
 	# environments created by manual workflows or other automated processes.
-	if [ -z "$DELETE_OLD_MULTIDEVS" ] || [ "$DELETE_OLD_MULTIDEVS" != "true" ]; then
-		echo -e "${red}delete_old_environments was not set to true. Skipping deletion of old environments...${normal}"
-		exit 0
-	fi
 
-	# Re-use ALL_ENVS if available, otherwise fetch again
-	if [ -z "${ALL_ENVS}" ]; then
-		ALL_ENVS=$(terminus env:list "$PANTHEON_SITE" --format=list)
-	fi
+	# Refresh ALL_ENVS after current run deletions to avoid checking deleted environments
+	echo ""
+	echo -e "${yellow}Refreshing environment list after current run cleanup...${normal}"
+	ALL_ENVS=$(terminus multidev:list "${PANTHEON_SITE}" --format=list 2>/dev/null || echo "")
 
 	# Age threshold in days - only delete environments older than this
 	# Default to 14 days if not specified
@@ -550,7 +629,7 @@ function cleanup() {
 		| grep -v '^dev$' \
 		| grep -v '^test$' \
 		| grep -v '^live$' \
-		| grep -E '(^wd-|-std$|-cont$|-git$|-term$|-adv$)')
+		| grep -E -- '(^wd-|-std$|-cont$|-git$|-term$|-adv$)')
 
 	# If MULTIDEV_DELETE_PATTERN is set, also include environments matching that pattern
 	# (excluding pr- environments which are handled by build:env:delete:pr)
@@ -559,7 +638,7 @@ function cleanup() {
 			| grep -v '^dev$' \
 			| grep -v '^test$' \
 			| grep -v '^live$' \
-			| grep "$MULTIDEV_DELETE_PATTERN" \
+			| grep -F "${MULTIDEV_DELETE_PATTERN}" \
 			| grep -v '^pr-')
 		FILTERED_ENVS=$(echo -e "${FILTERED_ENVS}\n${PATTERN_ENVS}" | sort -u)
 	fi
@@ -573,11 +652,25 @@ function cleanup() {
 		CANDIDATE_ENVS=$(echo "$CANDIDATE_ENVS" | grep -v "^${ENV_PREFIX}-")
 	fi
 
+	# Exclude environments we just deleted in the current run to avoid race conditions
+	# where Terminus hasn't updated its list yet
+	if [ -n "$DELETED_CURRENT_RUN_ENVS" ]; then
+		for deleted_env in $DELETED_CURRENT_RUN_ENVS; do
+			CANDIDATE_ENVS=$(echo "$CANDIDATE_ENVS" | grep -v "^${deleted_env}$")
+		done
+	fi
+
 	# Filter by age and collect environments with their timestamps for sorting
 	OLDEST_ENVIRONMENTS=""
 	for ENV in $CANDIDATE_ENVS; do
 		# Get the last modified timestamp for this environment
 		CREATED_TIMESTAMP=$(terminus env:info "${PANTHEON_SITE}.${ENV}" --field=created 2>/dev/null || echo "0")
+
+		# Skip if timestamp is invalid (environment was deleted or doesn't exist)
+		if [ "$CREATED_TIMESTAMP" = "0" ] || [ -z "$CREATED_TIMESTAMP" ]; then
+			echo -e "${yellow}Skipping ${normal}${bold}${ENV}${normal}${yellow} (invalid or missing timestamp)${normal}"
+			continue
+		fi
 
 		# Calculate age in seconds
 		AGE_SECONDS=$((CURRENT_TIMESTAMP - CREATED_TIMESTAMP))
@@ -596,31 +689,56 @@ function cleanup() {
 
 	# Exit if there are no environments to delete.
 	if [ -z "$OLDEST_ENVIRONMENTS" ] ; then
-		echo -e "${red}No old environments matching the pattern found to delete.${normal}"
+		echo ""
+		echo -e "${green}✅ No old environments found older than ${AGE_THRESHOLD_DAYS} days. Cleanup complete.${normal}"
 		exit 0
 	fi
 
-	# Go ahead and delete the oldest environments.
-	for ENV_TO_DELETE in $OLDEST_ENVIRONMENTS; do
-		# Use delete_multidev helper function
-		export MULTIDEV_NAME="${ENV_TO_DELETE}"
-		delete_multidev
+	echo -e "${yellow}Found ${normal}${bold}$(echo "$OLDEST_ENVIRONMENTS" | wc -w | tr -d ' ')${normal}${yellow} old environment(s) to delete${normal}"
 
-		# Also delete GitHub environment if applicable
-		if [ -n "$GITHUB_REPOSITORY" ]; then
-			delete_github_environment "$ENV_TO_DELETE"
-		else
-			echo -e "${red}Skipping GitHub deletion for ${normal}${bold}${ENV_TO_DELETE}${normal}${red} — GITHUB_TOKEN or GITHUB_REPOSITORY not set.${normal}"
+	# Go ahead and delete the oldest environments (in parallel)
+	MAX_PARALLEL="${CLEANUP_MAX_PARALLEL:-5}"
+	PIDS=()
+
+	for ENV_TO_DELETE in $OLDEST_ENVIRONMENTS; do
+		# Delete in background
+		(
+			delete_multidev "${ENV_TO_DELETE}"
+
+			# Also delete GitHub environment if applicable
+			if [ -n "$GITHUB_REPOSITORY" ]; then
+				delete_github_environment "$ENV_TO_DELETE"
+			else
+				echo -e "${red}Skipping GitHub deletion for ${normal}${bold}${ENV_TO_DELETE}${normal}${red} — GITHUB_TOKEN or GITHUB_REPOSITORY not set.${normal}"
+			fi
+		) &
+		PIDS+=($!)
+
+		# Wait if we hit the parallel limit
+		if [ ${#PIDS[@]} -ge "${MAX_PARALLEL}" ]; then
+			wait "${PIDS[@]}"
+			PIDS=()
 		fi
 	done
+
+	# Wait for remaining background jobs
+	if [ ${#PIDS[@]} -gt 0 ]; then
+		wait "${PIDS[@]}"
+	fi
+
+	echo ""
+	echo -e "${green}✅ Age-based cleanup complete.${normal}"
 }
 
 # Create a multidev environment from a source environment if it doesn't already exist.
+# Parameters:
+#   $1: MULTIDEV_NAME - The name of the multidev to create
 # Requires environment variables:
 #   PANTHEON_SITE: The Pantheon site name
-#   MULTIDEV_NAME: The name of the multidev to create
 #   SOURCE_ENV: The source environment to clone from (default: live)
 function create_multidev() {
+	local MULTIDEV_NAME="${1}"
+
 	if [ -z "${PANTHEON_SITE}" ]; then
 		echo -e "${red}Error: PANTHEON_SITE environment variable is required${normal}"
 		exit 1
@@ -649,10 +767,13 @@ function create_multidev() {
 }
 
 # Delete a specific multidev environment and its Git branch.
+# Parameters:
+#   $1: MULTIDEV_NAME - The name of the multidev to delete
 # Requires environment variables:
 #   PANTHEON_SITE: The Pantheon site name
-#   MULTIDEV_NAME: The name of the multidev to delete
 function delete_multidev() {
+	local MULTIDEV_NAME="${1}"
+
 	if [ -z "${PANTHEON_SITE}" ]; then
 		echo -e "${red}Error: PANTHEON_SITE environment variable is required${normal}"
 		exit 1

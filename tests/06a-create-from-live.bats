@@ -41,14 +41,13 @@ teardown_file() {
 }
 
 @test "create_multidev and delete_multidev: create, detect existing, and delete" {
-    export MULTIDEV_NAME="${TEST_MULTIDEV_NAME}"
     export SOURCE_ENV="live"
 
     # Ensure it doesn't exist first
-    terminus env:delete "${PANTHEON_SITE}.${MULTIDEV_NAME}" --delete-branch --yes 2>/dev/null || true
+    terminus env:delete "${PANTHEON_SITE}.${TEST_MULTIDEV_NAME}" --delete-branch --yes 2>/dev/null || true
 
     # First call: create the environment
-    run create_multidev
+    run create_multidev "${TEST_MULTIDEV_NAME}"
     assert_success
     assert_output_contains "Creating multidev"
 
@@ -69,13 +68,13 @@ teardown_file() {
     fi
 
     # Second call: verify it detects the existing environment and returns early
-    run create_multidev
+    run create_multidev "${TEST_MULTIDEV_NAME}"
     assert_success
     assert_output_contains "✅ Multidev"
     assert_output_contains "already exists."
 
     # Test deletion
-    run delete_multidev
+    run delete_multidev "${TEST_MULTIDEV_NAME}"
     assert_success
     assert_output_contains "deleted successfully"
 

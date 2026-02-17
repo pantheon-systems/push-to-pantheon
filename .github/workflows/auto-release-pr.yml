@@ -115,7 +115,7 @@ jobs:
           echo "  actions/checkout: $CHECKOUT_VERSION"
           echo "  actions/cache: $CACHE_VERSION"
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ secrets.GH_PAT }}
 
       - name: Check if release PR exists
         id: check_pr
@@ -132,7 +132,7 @@ jobs:
             echo "No existing release PR found"
           fi
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ secrets.GH_PAT }}
 
       - name: Configure Git
         run: |
@@ -210,7 +210,7 @@ jobs:
       - name: Create or update PR
         if: steps.commit.outputs.has_changes == 'true'
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ secrets.GH_PAT }}
           NEW_VERSION: ${{ steps.version.outputs.new_version }}
           BRANCH_NAME: ${{ steps.branch.outputs.branch_name }}
           LATEST_TAG: ${{ steps.version.outputs.latest_tag }}
@@ -264,7 +264,7 @@ jobs:
       - name: Comment on trigger PR
         if: github.event_name == 'pull_request_target' && github.event.pull_request.merged == true
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ secrets.GH_PAT }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
           NEW_VERSION: ${{ steps.version.outputs.new_version }}
         run: |
@@ -274,7 +274,7 @@ jobs:
       - name: React to version override comment
         if: github.event_name == 'issue_comment' && steps.check_comment.outputs.has_override == 'true'
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ secrets.GH_PAT }}
           REPO: ${{ github.repository }}
           COMMENT_ID: ${{ github.event.comment.id }}
         run: |

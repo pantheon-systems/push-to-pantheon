@@ -27,11 +27,11 @@ jobs:
     runs-on: ubuntu-latest
     # Only run if:
     # 1. Non-release PR was merged to 0.x (don't trigger when release PR is merged), OR
-    # 2. Comment on a release PR, OR
+    # 2. Comment on a release PR (but not from bot), OR
     # 3. Release PR was edited
     if: |
       (github.event_name == 'pull_request_target' && github.event.pull_request.merged == true && !startsWith(github.event.pull_request.title, 'Release ')) ||
-      (github.event_name == 'issue_comment' && startsWith(github.event.issue.title, 'Release ')) ||
+      (github.event_name == 'issue_comment' && startsWith(github.event.issue.title, 'Release ') && github.event.comment.user.login != 'github-actions[bot]') ||
       (github.event_name == 'pull_request' && startsWith(github.event.pull_request.title, 'Release '))
 
     steps:
@@ -59,9 +59,9 @@ jobs:
 
       - name: Check for version override in PR title
         id: check_title
-        if: github.event_name == 'pull_request' || github.event_name == 'pull_request_target'
+        if: github.event_name == 'pull_request' || github.event_name == 'pull_request_target' || github.event_name == 'issue_comment'
         env:
-          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_TITLE: ${{ github.event_name == 'issue_comment' && github.event.issue.title || github.event.pull_request.title }}
         run: |
           # Extract version from "Release X.Y.Z" title
           if echo "$PR_TITLE" | grep -qE '^Release [0-9]+\.[0-9]+\.[0-9]+'; then
@@ -249,12 +249,16 @@ jobs:
           CHECKOUT_VERSION: ${{ steps.action_versions.outputs.checkout }}
           CACHE_VERSION: ${{ steps.action_versions.outputs.cache }}
         run: |
+          # Extract major versions only (v6 from v6.0.2, v5 from v5.0.3)
+          CHECKOUT_MAJOR=$(echo "$CHECKOUT_VERSION" | grep -oE '^v[0-9]+')
+          CACHE_MAJOR=$(echo "$CACHE_VERSION" | grep -oE '^v[0-9]+')
+
           PR_BODY="This PR updates version references in the README from \`$LATEST_TAG\` to \`$NEW_VERSION\`.
 
           ## Changes
           - Updated \`pantheon-systems/push-to-pantheon\` references to \`$NEW_VERSION\`
-          - Updated \`actions/checkout\` to \`$CHECKOUT_VERSION\`
-          - Updated \`actions/cache\` to \`$CACHE_VERSION\`
+          - Updated \`actions/checkout\` to \`$CHECKOUT_MAJOR\`
+          - Updated \`actions/cache\` to \`$CACHE_MAJOR\`
 
           ## Version Override
           You can override the version by:

@@ -502,13 +502,34 @@ function cleanup() {
 			if [ -n "${CURRENT_RUN_ENVS}" ]; then
 				echo ""
 				echo -e "${yellow}Deleting environments from current run (${ENV_PREFIX}-*):${normal}"
-				echo "${CURRENT_RUN_ENVS}" | while read -r env; do
+
+				# Parallel deletion with max concurrent limit
+				MAX_PARALLEL="${CLEANUP_MAX_PARALLEL:-5}"
+				PIDS=()
+
+				for env in ${CURRENT_RUN_ENVS}; do
 					if [ -n "${env}" ]; then
 						echo -e "${yellow}  Deleting ${normal}${bold}${env}${normal}${yellow}...${normal}"
-						export MULTIDEV_NAME="${env}"
-						delete_multidev || true
+
+						# Delete in background
+						(
+							export MULTIDEV_NAME="${env}"
+							delete_multidev || true
+						) &
+						PIDS+=($!)
+
+						# Wait if we hit the parallel limit
+						if [ ${#PIDS[@]} -ge "${MAX_PARALLEL}" ]; then
+							wait "${PIDS[@]}"
+							PIDS=()
+						fi
 					fi
 				done
+
+				# Wait for remaining background jobs
+				if [ ${#PIDS[@]} -gt 0 ]; then
+					wait "${PIDS[@]}"
+				fi
 			else
 				echo -e "${yellow}No current run environments found matching ${ENV_PREFIX}-*${normal}"
 			fi
@@ -604,19 +625,36 @@ function cleanup() {
 		exit 0
 	fi
 
-	# Go ahead and delete the oldest environments.
-	for ENV_TO_DELETE in $OLDEST_ENVIRONMENTS; do
-		# Use delete_multidev helper function
-		export MULTIDEV_NAME="${ENV_TO_DELETE}"
-		delete_multidev
+	# Go ahead and delete the oldest environments (in parallel)
+	MAX_PARALLEL="${CLEANUP_MAX_PARALLEL:-5}"
+	PIDS=()
 
-		# Also delete GitHub environment if applicable
-		if [ -n "$GITHUB_REPOSITORY" ]; then
-			delete_github_environment "$ENV_TO_DELETE"
-		else
-			echo -e "${red}Skipping GitHub deletion for ${normal}${bold}${ENV_TO_DELETE}${normal}${red} — GITHUB_TOKEN or GITHUB_REPOSITORY not set.${normal}"
+	for ENV_TO_DELETE in $OLDEST_ENVIRONMENTS; do
+		# Delete in background
+		(
+			export MULTIDEV_NAME="${ENV_TO_DELETE}"
+			delete_multidev
+
+			# Also delete GitHub environment if applicable
+			if [ -n "$GITHUB_REPOSITORY" ]; then
+				delete_github_environment "$ENV_TO_DELETE"
+			else
+				echo -e "${red}Skipping GitHub deletion for ${normal}${bold}${ENV_TO_DELETE}${normal}${red} — GITHUB_TOKEN or GITHUB_REPOSITORY not set.${normal}"
+			fi
+		) &
+		PIDS+=($!)
+
+		# Wait if we hit the parallel limit
+		if [ ${#PIDS[@]} -ge "${MAX_PARALLEL}" ]; then
+			wait "${PIDS[@]}"
+			PIDS=()
 		fi
 	done
+
+	# Wait for remaining background jobs
+	if [ ${#PIDS[@]} -gt 0 ]; then
+		wait "${PIDS[@]}"
+	fi
 }
 
 # Create a multidev environment from a source environment if it doesn't already exist.

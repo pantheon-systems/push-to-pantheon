@@ -48,8 +48,10 @@ function main() {
 		exit 1
 	fi
 
-	# Execute the command.
-	"$1"
+	# Execute the command with any additional arguments
+	COMMAND="$1"
+	shift
+	"$COMMAND" "$@"
 }
 
 # Compute a multidev name for PR or branch-based workflows.

@@ -428,8 +428,42 @@ function push_to_pantheon() {
 		TERMINUS_CMD="${TERMINUS_CMD} ${PANTHEON_CLONE_CONTENT_FLAG}"
 	fi
 
-	# Execute the command
-	eval "${TERMINUS_CMD}"
+	# Execute the command with output filtering to suppress non-fatal 422 errors
+	# Build Tools tries to comment on commits from Pantheon's git history that may not exist in GitHub
+	# These produce "422 Unprocessable Entity" errors that are non-fatal and can be safely suppressed
+	set +e
+	TEMP_LOG=$(mktemp)
+	eval "${TERMINUS_CMD}" 2>&1 | while IFS= read -r line; do
+		# Skip lines containing 422 errors about missing commits
+		if echo "$line" | grep -q "422 Unprocessable Entity"; then
+			echo "$line" >> "$TEMP_LOG"
+			continue
+		fi
+		if echo "$line" | grep -q "No commit found for SHA"; then
+			echo "$line" >> "$TEMP_LOG"
+			continue
+		fi
+		# Show all other lines
+		echo "$line"
+	done
+	EXIT_CODE=${PIPESTATUS[0]}
+	set -e
+
+	# Notify if we suppressed any 422 errors
+	if [ -s "$TEMP_LOG" ]; then
+		SUPPRESSED_COUNT=$(grep -c "422 Unprocessable Entity" "$TEMP_LOG" || echo "0")
+		if [ "$SUPPRESSED_COUNT" -gt 0 ]; then
+			echo ""
+			echo -e "${yellow}Note: Suppressed ${SUPPRESSED_COUNT} non-fatal 422 error(s) from Build Tools GitHub API calls${normal}"
+		fi
+	fi
+
+	rm -f "$TEMP_LOG"
+
+	# Fail if the command failed
+	if [ "$EXIT_CODE" -ne 0 ]; then
+		exit "$EXIT_CODE"
+	fi
 }
 
 # Function to delete a GitHub environment and all of its associated deployments.
@@ -638,9 +672,12 @@ function cleanup() {
 
 	# Exit if there are no environments to delete.
 	if [ -z "$OLDEST_ENVIRONMENTS" ] ; then
-		echo -e "${red}No old environments matching the pattern found to delete.${normal}"
+		echo ""
+		echo -e "${green}✅ No old environments found older than ${AGE_THRESHOLD_DAYS} days. Cleanup complete.${normal}"
 		exit 0
 	fi
+
+	echo -e "${yellow}Found ${normal}${bold}$(echo "$OLDEST_ENVIRONMENTS" | wc -w | tr -d ' ')${normal}${yellow} old environment(s) to delete${normal}"
 
 	# Go ahead and delete the oldest environments (in parallel)
 	MAX_PARALLEL="${CLEANUP_MAX_PARALLEL:-5}"
@@ -671,6 +708,9 @@ function cleanup() {
 	if [ ${#PIDS[@]} -gt 0 ]; then
 		wait "${PIDS[@]}"
 	fi
+
+	echo ""
+	echo -e "${green}✅ Age-based cleanup complete.${normal}"
 }
 
 # Create a multidev environment from a source environment if it doesn't already exist.

@@ -247,7 +247,6 @@ runs:
       - name: Verify Build Tools Plugin Installation
         shell: bash
         if: ${{ inputs.skip_build_tools != 'true' && steps.check_live_env.outputs.live_env_exists == 'true' }}
-        env:
         run: |
           # Verify Build Tools plugin installation
           ${GITHUB_ACTION_PATH}/scripts/main.sh verify_build_tools

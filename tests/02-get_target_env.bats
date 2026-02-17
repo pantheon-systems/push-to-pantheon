@@ -69,3 +69,36 @@ teardown() {
     run get_target_env
     assert_failure
 }
+
+@test "get_target_env: rejects INPUT_TARGET_ENV with special characters" {
+    export INPUT_TARGET_ENV="test;rm -rf /"
+
+    run get_target_env
+    assert_failure
+    [[ "$output" == *"Invalid target environment name"* ]]
+}
+
+@test "get_target_env: rejects INPUT_TARGET_ENV with newlines" {
+    export INPUT_TARGET_ENV="test
+newline"
+
+    run get_target_env
+    assert_failure
+    [[ "$output" == *"Invalid target environment name"* ]]
+}
+
+@test "get_target_env: accepts INPUT_TARGET_ENV with valid characters" {
+    export INPUT_TARGET_ENV="test-env_123"
+
+    run get_target_env
+    assert_success
+    [ "$output" = "test-env_123" ]
+}
+
+@test "get_target_env: rejects INPUT_TARGET_ENV with spaces" {
+    export INPUT_TARGET_ENV="test env"
+
+    run get_target_env
+    assert_failure
+    [[ "$output" == *"Invalid target environment name"* ]]
+}

@@ -69,4 +69,7 @@ jobs:
           PANTHEON_SITE: dtp-nearly-empty-site
           ENV_PREFIX: ${{ github.event.pull_request.number || 'manual' }}
           DELETE_OLD_MULTIDEVS: true
+          GITHUB_TOKEN: ${{ github.token }}
+          CI_PROJECT_USERNAME: ${{ github.repository_owner }}
+          CI_PROJECT_REPONAME: ${{ github.event.repository.name }}
         run: bash scripts/main.sh cleanup

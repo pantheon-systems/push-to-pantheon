@@ -472,6 +472,11 @@ function cleanup() {
 		cd "${SITE_ROOT}" || return
 	fi
 
+	# Export CI variables so Build Tools knows which GitHub repo to check
+	export CI_PROJECT_USERNAME
+	export CI_PROJECT_REPONAME
+	export GITHUB_TOKEN
+
 	echo -e "${yellow}Deleting stale Pantheon PR multidev environments...${normal}"
 	# This command will find and delete multidev environments that are
 	# associated with closed or merged pull requests.

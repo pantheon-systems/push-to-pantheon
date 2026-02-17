@@ -120,13 +120,16 @@ jobs:
       - name: Check if release PR exists
         id: check_pr
         run: |
-          # Check for existing release PR
-          PR_NUMBER=$(gh pr list --base 0.x --state open --json number,title --jq '.[] | select(.title | startswith("Release ")) | .number' | head -1)
+          # Check for existing release PR and get its head branch
+          PR_DATA=$(gh pr list --base 0.x --state open --json number,title,headRefName --jq '.[] | select(.title | startswith("Release "))' | head -1)
 
-          if [ -n "$PR_NUMBER" ]; then
+          if [ -n "$PR_DATA" ]; then
+            PR_NUMBER=$(echo "$PR_DATA" | jq -r '.number')
+            HEAD_BRANCH=$(echo "$PR_DATA" | jq -r '.headRefName')
             echo "exists=true" >> $GITHUB_OUTPUT
             echo "pr_number=$PR_NUMBER" >> $GITHUB_OUTPUT
-            echo "Found existing release PR #$PR_NUMBER"
+            echo "head_branch=$HEAD_BRANCH" >> $GITHUB_OUTPUT
+            echo "Found existing release PR #$PR_NUMBER (branch: $HEAD_BRANCH)"
           else
             echo "exists=false" >> $GITHUB_OUTPUT
             echo "No existing release PR found"
@@ -139,15 +142,44 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
+      - name: Close old PR if version changed
+        if: steps.check_pr.outputs.exists == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT }}
+          PR_NUMBER: ${{ steps.check_pr.outputs.pr_number }}
+          OLD_BRANCH: ${{ steps.check_pr.outputs.head_branch }}
+          NEW_VERSION: ${{ steps.version.outputs.new_version }}
+        run: |
+          NEW_BRANCH="release-${NEW_VERSION}"
+
+          # If the branch name changed (version override), close old PR
+          if [ "$OLD_BRANCH" != "$NEW_BRANCH" ]; then
+            echo "Version changed, closing old PR #$PR_NUMBER (branch: $OLD_BRANCH)"
+            gh pr close "$PR_NUMBER" --comment "Closing this PR because the version was changed. A new PR will be created for version $NEW_VERSION."
+
+            # Delete the old branch
+            git push origin --delete "$OLD_BRANCH" || echo "Branch $OLD_BRANCH already deleted or doesn't exist"
+
+            echo "Closed old PR and deleted branch $OLD_BRANCH"
+          else
+            echo "Same version, will update existing PR"
+          fi
+
       - name: Create or update release branch
         id: branch
         env:
           NEW_VERSION: ${{ steps.version.outputs.new_version }}
+          PR_EXISTS: ${{ steps.check_pr.outputs.exists }}
+          OLD_BRANCH: ${{ steps.check_pr.outputs.head_branch }}
         run: |
           BRANCH_NAME="release-${NEW_VERSION}"
 
-          # Check if branch exists
-          if git ls-remote --heads origin "$BRANCH_NAME" | grep -q "$BRANCH_NAME"; then
+          # Check if we closed the old PR (different version)
+          if [ "$PR_EXISTS" = "true" ] && [ "$OLD_BRANCH" != "$BRANCH_NAME" ]; then
+            echo "Creating new branch for version override: $BRANCH_NAME"
+            git checkout -b "$BRANCH_NAME"
+          # Check if branch already exists
+          elif git ls-remote --heads origin "$BRANCH_NAME" | grep -q "$BRANCH_NAME"; then
             echo "Branch $BRANCH_NAME exists, checking it out"
             git fetch origin "$BRANCH_NAME"
             git checkout "$BRANCH_NAME"
@@ -238,8 +270,10 @@ jobs:
           4. Merge this PR
           5. Run the **Create Release** workflow to publish the release"
 
-          if [ "${{ steps.check_pr.outputs.exists }}" = "true" ]; then
-            # Update existing PR
+          # Check if we need to create new PR or update existing
+          # If old branch exists but differs from new branch, we closed it and need to create new
+          if [ "${{ steps.check_pr.outputs.exists }}" = "true" ] && [ "${{ steps.check_pr.outputs.head_branch }}" = "$BRANCH_NAME" ]; then
+            # Update existing PR (same branch)
             PR_NUMBER="${{ steps.check_pr.outputs.pr_number }}"
             gh pr edit "$PR_NUMBER" \
               --title "Release $NEW_VERSION" \
@@ -250,7 +284,7 @@ jobs:
 
             echo "Updated existing PR #$PR_NUMBER"
           else
-            # Create new PR in draft mode with release label
+            # Create new PR (either no PR exists, or we closed the old one due to version change)
             gh pr create \
               --base 0.x \
               --head "$BRANCH_NAME" \
@@ -258,7 +292,7 @@ jobs:
               --body "$PR_BODY" \
               --label "release" \
               --draft
-            echo "Created new draft PR"
+            echo "Created new draft PR for $NEW_VERSION"
           fi
 
       - name: Comment on trigger PR

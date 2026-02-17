@@ -408,6 +408,14 @@ function push_to_pantheon() {
 	echo "PR_NUM=${PR_NUM}"
 	echo "Current git HEAD SHA: $(git rev-parse HEAD)"
 
+	# Ensure CI variables are exported for Build Tools
+	export CI_COMMIT_SHA
+	export CIRCLE_SHA1
+	export GITHUB_SHA
+	export CI_BUILD_URL
+	export CI_PROJECT_USERNAME
+	export CI_PROJECT_REPONAME
+
 	# Build the terminus command with optional --pr-id flag
 	TERMINUS_CMD="terminus -n build:env:create \"${PANTHEON_SITE}.${PANTHEON_SOURCE_ENV}\" \"${PANTHEON_TARGET_ENV}\" --yes --message=\"${PANTHEON_COMMIT_MESSAGE}\""
 

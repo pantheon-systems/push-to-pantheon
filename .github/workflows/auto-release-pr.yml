@@ -117,30 +117,6 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
 
-      - name: Update versions in README
-        env:
-          LATEST_TAG: ${{ steps.version.outputs.latest_tag }}
-          NEW_VERSION: ${{ steps.version.outputs.new_version }}
-          CHECKOUT_VERSION: ${{ steps.action_versions.outputs.checkout }}
-          CACHE_VERSION: ${{ steps.action_versions.outputs.cache }}
-        run: |
-          # Escape dots for sed
-          LATEST_TAG_ESCAPED=$(echo "$LATEST_TAG" | sed 's/\./\\./g')
-
-          # Update pantheon-systems/push-to-pantheon version references
-          # Only update semantic version tags, not branch references
-          sed -i "s|pantheon-systems/push-to-pantheon@${LATEST_TAG_ESCAPED}|pantheon-systems/push-to-pantheon@${NEW_VERSION}|g" readme.md
-
-          # Update actions/checkout to latest (only update major version references like @v6)
-          CHECKOUT_MAJOR=$(echo "$CHECKOUT_VERSION" | grep -oE '^v[0-9]+')
-          sed -i "s|actions/checkout@v[0-9]\+|actions/checkout@${CHECKOUT_MAJOR}|g" readme.md
-
-          # Update actions/cache to latest
-          CACHE_MAJOR=$(echo "$CACHE_VERSION" | grep -oE '^v[0-9]+')
-          sed -i "s|actions/cache@v[0-9]\+|actions/cache@${CACHE_MAJOR}|g" readme.md
-
-          echo "Updated README.md with new versions"
-
       - name: Check if release PR exists
         id: check_pr
         run: |
@@ -184,6 +160,30 @@ jobs:
           fi
 
           echo "branch_name=$BRANCH_NAME" >> $GITHUB_OUTPUT
+
+      - name: Update versions in README
+        env:
+          LATEST_TAG: ${{ steps.version.outputs.latest_tag }}
+          NEW_VERSION: ${{ steps.version.outputs.new_version }}
+          CHECKOUT_VERSION: ${{ steps.action_versions.outputs.checkout }}
+          CACHE_VERSION: ${{ steps.action_versions.outputs.cache }}
+        run: |
+          # Escape dots for sed
+          LATEST_TAG_ESCAPED=$(echo "$LATEST_TAG" | sed 's/\./\\./g')
+
+          # Update pantheon-systems/push-to-pantheon version references
+          # Only update semantic version tags, not branch references
+          sed -i "s|pantheon-systems/push-to-pantheon@${LATEST_TAG_ESCAPED}|pantheon-systems/push-to-pantheon@${NEW_VERSION}|g" readme.md
+
+          # Update actions/checkout to latest (only update major version references like @v6)
+          CHECKOUT_MAJOR=$(echo "$CHECKOUT_VERSION" | grep -oE '^v[0-9]+')
+          sed -i "s|actions/checkout@v[0-9]\+|actions/checkout@${CHECKOUT_MAJOR}|g" readme.md
+
+          # Update actions/cache to latest
+          CACHE_MAJOR=$(echo "$CACHE_VERSION" | grep -oE '^v[0-9]+')
+          sed -i "s|actions/cache@v[0-9]\+|actions/cache@${CACHE_MAJOR}|g" readme.md
+
+          echo "Updated README.md with new versions"
 
       - name: Commit version changes
         id: commit

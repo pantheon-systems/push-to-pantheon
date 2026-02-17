@@ -41,13 +41,12 @@ teardown_file() {
 }
 
 @test "create_multidev: uses custom SOURCE_ENV when specified" {
-    export MULTIDEV_NAME="${TEST_MULTIDEV_NAME}"
     export SOURCE_ENV="dev"
 
     # Ensure it doesn't exist first
-    terminus env:delete "${PANTHEON_SITE}.${MULTIDEV_NAME}" --delete-branch --yes 2>/dev/null || true
+    terminus env:delete "${PANTHEON_SITE}.${TEST_MULTIDEV_NAME}" --delete-branch --yes 2>/dev/null || true
 
-    run create_multidev
+    run create_multidev "${TEST_MULTIDEV_NAME}"
     assert_success
     assert_output_contains "from"
     assert_output_contains "dev"

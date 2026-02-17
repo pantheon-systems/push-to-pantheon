@@ -363,9 +363,8 @@ function push_to_pantheon() {
 			echo -e "${yellow}Target environment is ${normal}${bold}${PANTHEON_TARGET_ENV}${normal}${yellow}, pushing to branch with the same name on Pantheon.${normal}"
 
 			# Create multidev if it doesn't exist (reuse create_multidev logic)
-			export MULTIDEV_NAME="${PANTHEON_TARGET_ENV}"
 			export SOURCE_ENV="${PANTHEON_SOURCE_ENV}"
-			create_multidev
+			create_multidev "${PANTHEON_TARGET_ENV}"
 		fi
 
 		# Ensure repo is not shallow; Pantheon rejects shallow pushes
@@ -518,8 +517,7 @@ function cleanup() {
 
 						# Delete in background
 						(
-							export MULTIDEV_NAME="${env}"
-							delete_multidev || true
+							delete_multidev "${env}" || true
 						) &
 						PIDS+=($!)
 
@@ -651,8 +649,7 @@ function cleanup() {
 	for ENV_TO_DELETE in $OLDEST_ENVIRONMENTS; do
 		# Delete in background
 		(
-			export MULTIDEV_NAME="${ENV_TO_DELETE}"
-			delete_multidev
+			delete_multidev "${ENV_TO_DELETE}"
 
 			# Also delete GitHub environment if applicable
 			if [ -n "$GITHUB_REPOSITORY" ]; then
@@ -677,11 +674,14 @@ function cleanup() {
 }
 
 # Create a multidev environment from a source environment if it doesn't already exist.
+# Parameters:
+#   $1: MULTIDEV_NAME - The name of the multidev to create
 # Requires environment variables:
 #   PANTHEON_SITE: The Pantheon site name
-#   MULTIDEV_NAME: The name of the multidev to create
 #   SOURCE_ENV: The source environment to clone from (default: live)
 function create_multidev() {
+	local MULTIDEV_NAME="${1}"
+
 	if [ -z "${PANTHEON_SITE}" ]; then
 		echo -e "${red}Error: PANTHEON_SITE environment variable is required${normal}"
 		exit 1
@@ -710,10 +710,13 @@ function create_multidev() {
 }
 
 # Delete a specific multidev environment and its Git branch.
+# Parameters:
+#   $1: MULTIDEV_NAME - The name of the multidev to delete
 # Requires environment variables:
 #   PANTHEON_SITE: The Pantheon site name
-#   MULTIDEV_NAME: The name of the multidev to delete
 function delete_multidev() {
+	local MULTIDEV_NAME="${1}"
+
 	if [ -z "${PANTHEON_SITE}" ]; then
 		echo -e "${red}Error: PANTHEON_SITE environment variable is required${normal}"
 		exit 1

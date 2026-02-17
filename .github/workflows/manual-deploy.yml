@@ -82,5 +82,4 @@ jobs:
           PANTHEON_SITE: dtp-nearly-empty-site
           ENV_PREFIX: ${{ needs.compute_env_prefix.outputs.env_prefix }}
           DELETE_OLD_MULTIDEVS: true
-          WORKSPACE: ${{ github.workspace }}
-        run: bash ${WORKSPACE}/scripts/main.sh cleanup
+        run: bash scripts/main.sh cleanup

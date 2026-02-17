@@ -537,11 +537,12 @@ function cleanup() {
 	fi
 
 	# Start with environments matching suite patterns or legacy wd- pattern
+	SUITE_PATTERN='(^wd-|-std$|-cont$|-git$|-term$|-adv$)'
 	FILTERED_ENVS=$(echo "$ALL_ENVS" \
 		| grep -v '^dev$' \
 		| grep -v '^test$' \
 		| grep -v '^live$' \
-		| grep -E '(^wd-|-std$|-cont$|-git$|-term$|-adv$)')
+		| grep -E "${SUITE_PATTERN}")
 
 	# If MULTIDEV_DELETE_PATTERN is set, also include environments matching that pattern
 	# (excluding pr- environments which are handled by build:env:delete:pr)
@@ -550,7 +551,7 @@ function cleanup() {
 			| grep -v '^dev$' \
 			| grep -v '^test$' \
 			| grep -v '^live$' \
-			| grep "$MULTIDEV_DELETE_PATTERN" \
+			| grep -F "${MULTIDEV_DELETE_PATTERN}" \
 			| grep -v '^pr-')
 		FILTERED_ENVS=$(echo -e "${FILTERED_ENVS}\n${PATTERN_ENVS}" | sort -u)
 	fi

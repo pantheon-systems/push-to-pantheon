@@ -82,7 +82,7 @@ teardown() {
     # Should succeed and not attempt to delete the current environment
     assert_success
     # The output should not contain deletion of the test environment
-    refute_output_contains "Deleting $(get_test_env)"
+    assert_output_not_contains "Deleting $(get_test_env)"
 }
 
 @test "cleanup: protects environments with same prefix" {

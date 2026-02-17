@@ -210,6 +210,7 @@ jobs:
       - name: Create or update PR
         if: steps.commit.outputs.has_changes == 'true'
         env:
+          GH_TOKEN: ${{ github.token }}
           NEW_VERSION: ${{ steps.version.outputs.new_version }}
           BRANCH_NAME: ${{ steps.branch.outputs.branch_name }}
           LATEST_TAG: ${{ steps.version.outputs.latest_tag }}
@@ -259,8 +260,6 @@ jobs:
               --draft
             echo "Created new draft PR"
           fi
-        env:
-          GH_TOKEN: ${{ github.token }}
 
       - name: Comment on trigger PR
         if: github.event_name == 'pull_request_target' && github.event.pull_request.merged == true

@@ -93,7 +93,7 @@ jobs:
 
       - name: Create GitHub Draft Release
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ secrets.GH_PAT }}
           VERSION: ${{ steps.version.outputs.version }}
           REPO: ${{ github.repository }}
         run: |
@@ -109,7 +109,7 @@ jobs:
       - name: Comment on merged PR
         if: github.event_name == 'pull_request_target'
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ secrets.GH_PAT }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
           REPO: ${{ github.repository }}
           VERSION: ${{ steps.version.outputs.version }}

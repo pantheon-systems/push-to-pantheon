@@ -115,31 +115,7 @@ jobs:
           echo "  actions/checkout: $CHECKOUT_VERSION"
           echo "  actions/cache: $CACHE_VERSION"
         env:
-          GH_TOKEN: ${{ github.token }}
-
-      - name: Update versions in README
-        env:
-          LATEST_TAG: ${{ steps.version.outputs.latest_tag }}
-          NEW_VERSION: ${{ steps.version.outputs.new_version }}
-          CHECKOUT_VERSION: ${{ steps.action_versions.outputs.checkout }}
-          CACHE_VERSION: ${{ steps.action_versions.outputs.cache }}
-        run: |
-          # Escape dots for sed
-          LATEST_TAG_ESCAPED=$(echo "$LATEST_TAG" | sed 's/\./\\./g')
-
-          # Update pantheon-systems/push-to-pantheon version references
-          # Only update semantic version tags, not branch references
-          sed -i "s|pantheon-systems/push-to-pantheon@${LATEST_TAG_ESCAPED}|pantheon-systems/push-to-pantheon@${NEW_VERSION}|g" readme.md
-
-          # Update actions/checkout to latest (only update major version references like @v6)
-          CHECKOUT_MAJOR=$(echo "$CHECKOUT_VERSION" | grep -oE '^v[0-9]+')
-          sed -i "s|actions/checkout@v[0-9]\+|actions/checkout@${CHECKOUT_MAJOR}|g" readme.md
-
-          # Update actions/cache to latest
-          CACHE_MAJOR=$(echo "$CACHE_VERSION" | grep -oE '^v[0-9]+')
-          sed -i "s|actions/cache@v[0-9]\+|actions/cache@${CACHE_MAJOR}|g" readme.md
-
-          echo "Updated README.md with new versions"
+          GH_TOKEN: ${{ secrets.GH_PAT }}
 
       - name: Check if release PR exists
         id: check_pr
@@ -156,7 +132,7 @@ jobs:
             echo "No existing release PR found"
           fi
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ secrets.GH_PAT }}
 
       - name: Configure Git
         run: |
@@ -185,6 +161,30 @@ jobs:
 
           echo "branch_name=$BRANCH_NAME" >> $GITHUB_OUTPUT
 
+      - name: Update versions in README
+        env:
+          LATEST_TAG: ${{ steps.version.outputs.latest_tag }}
+          NEW_VERSION: ${{ steps.version.outputs.new_version }}
+          CHECKOUT_VERSION: ${{ steps.action_versions.outputs.checkout }}
+          CACHE_VERSION: ${{ steps.action_versions.outputs.cache }}
+        run: |
+          # Escape dots for sed
+          LATEST_TAG_ESCAPED=$(echo "$LATEST_TAG" | sed 's/\./\\./g')
+
+          # Update pantheon-systems/push-to-pantheon version references
+          # Only update semantic version tags, not branch references
+          sed -i "s|pantheon-systems/push-to-pantheon@${LATEST_TAG_ESCAPED}|pantheon-systems/push-to-pantheon@${NEW_VERSION}|g" readme.md
+
+          # Update actions/checkout to latest (only update major version references like @v6)
+          CHECKOUT_MAJOR=$(echo "$CHECKOUT_VERSION" | grep -oE '^v[0-9]+')
+          sed -i "s|actions/checkout@v[0-9]\+|actions/checkout@${CHECKOUT_MAJOR}|g" readme.md
+
+          # Update actions/cache to latest
+          CACHE_MAJOR=$(echo "$CACHE_VERSION" | grep -oE '^v[0-9]+')
+          sed -i "s|actions/cache@v[0-9]\+|actions/cache@${CACHE_MAJOR}|g" readme.md
+
+          echo "Updated README.md with new versions"
+
       - name: Commit version changes
         id: commit
         env:
@@ -210,7 +210,7 @@ jobs:
       - name: Create or update PR
         if: steps.commit.outputs.has_changes == 'true'
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ secrets.GH_PAT }}
           NEW_VERSION: ${{ steps.version.outputs.new_version }}
           BRANCH_NAME: ${{ steps.branch.outputs.branch_name }}
           LATEST_TAG: ${{ steps.version.outputs.latest_tag }}
@@ -264,7 +264,7 @@ jobs:
       - name: Comment on trigger PR
         if: github.event_name == 'pull_request_target' && github.event.pull_request.merged == true
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ secrets.GH_PAT }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
           NEW_VERSION: ${{ steps.version.outputs.new_version }}
         run: |
@@ -274,7 +274,7 @@ jobs:
       - name: React to version override comment
         if: github.event_name == 'issue_comment' && steps.check_comment.outputs.has_override == 'true'
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ secrets.GH_PAT }}
           REPO: ${{ github.repository }}
           COMMENT_ID: ${{ github.event.comment.id }}
         run: |

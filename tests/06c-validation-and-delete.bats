@@ -28,34 +28,28 @@ teardown() {
 
 @test "create_multidev: PANTHEON_SITE not set exits with error" {
     unset PANTHEON_SITE
-    export MULTIDEV_NAME="test-env"
 
-    run create_multidev
+    run create_multidev "test-env"
     assert_failure
     assert_output_contains "PANTHEON_SITE environment variable is required"
 }
 
 @test "create_multidev: MULTIDEV_NAME not set exits with error" {
-    unset MULTIDEV_NAME
-
-    run create_multidev
+    run create_multidev ""
     assert_failure
     assert_output_contains "MULTIDEV_NAME environment variable is required"
 }
 
 @test "delete_multidev: PANTHEON_SITE not set exits with error" {
     unset PANTHEON_SITE
-    export MULTIDEV_NAME="test-env"
 
-    run delete_multidev
+    run delete_multidev "test-env"
     assert_failure
     assert_output_contains "PANTHEON_SITE environment variable is required"
 }
 
 @test "delete_multidev: MULTIDEV_NAME not set exits with error" {
-    unset MULTIDEV_NAME
-
-    run delete_multidev
+    run delete_multidev ""
     assert_failure
     assert_output_contains "MULTIDEV_NAME environment variable is required"
 }

@@ -87,6 +87,9 @@ teardown() {
 
     run bash -c 'source <(sed "$ d" scripts/main.sh) && set -x && push_to_pantheon 2>&1 | head -30'
 
-    # Should check for multidev existence
-    # Output will vary based on whether multidev exists
+    # Should call create_multidev which checks for multidev existence
+    # Note: Full command will fail at git push, but we only care about
+    # verifying the multidev check logic worked correctly
+    assert_output_contains "Checking if multidev"
+    assert_output_contains "already exists"
 }

@@ -74,8 +74,7 @@ jobs:
           echo "TEST_ENV=${TEST_ENV}" >> $GITHUB_OUTPUT
 
           # Create multidev using main.sh function
-          export MULTIDEV_NAME="${TEST_ENV}"
-          bash scripts/main.sh create_multidev
+          bash scripts/main.sh create_multidev "${TEST_ENV}"
 
       - name: Run Pantheon integration tests
         env:
@@ -112,8 +111,7 @@ jobs:
             echo "${EXISTING_ENVS}" | while read -r env; do
               if [ -n "${env}" ]; then
                 echo "Deleting ${env}..."
-                export MULTIDEV_NAME="${env}"
-                bash scripts/main.sh delete_multidev || true
+                bash scripts/main.sh delete_multidev "${env}" || true
               fi
             done
           else

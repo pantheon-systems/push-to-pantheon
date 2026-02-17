@@ -76,6 +76,9 @@ jobs:
         with:
           pantheon-machine-token: ${{ secrets.PANTHEON_MACHINE_TOKEN }}
 
+      - name: Install Terminus Build Tools Plugin
+        run: terminus self:plugin:install pantheon-systems/terminus-build-tools-plugin
+
       - name: Cleanup environments
         env:
           PANTHEON_MACHINE_TOKEN: ${{ secrets.PANTHEON_MACHINE_TOKEN }}

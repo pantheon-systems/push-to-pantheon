@@ -77,10 +77,12 @@ teardown() {
     export PANTHEON_TARGET_ENV="$(get_test_env)"
 
     # The test multidev should never be deleted during this test
-    # We can verify by checking the logic paths
     run cleanup
 
-    # Should see protection logic in output (when verbose)
+    # Should succeed and not attempt to delete the current environment
+    assert_success
+    # The output should not contain deletion of the test environment
+    refute_output_contains "Deleting $(get_test_env)"
 }
 
 @test "cleanup: protects environments with same prefix" {
@@ -99,6 +101,7 @@ teardown() {
 
     run cleanup
 
-    # With such a high threshold, likely no envs will match
-    # Should see message about no environments to delete
+    # With such a high threshold, no environments should match
+    assert_success
+    assert_output_contains "No old environments found older than 365 days"
 }

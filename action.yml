@@ -89,13 +89,22 @@ runs:
         env:
           PR_NUM: ${{ github.event.pull_request.number }}
           INPUT_TARGET_ENV: ${{ inputs.target_env }}
-          WORKSPACE: ${{ github.workspace }}
+          GITHUB_WORKSPACE: ${{ github.workspace }}
         run: |
           # Set target_env
-          TARGET_ENV=$("$WORKSPACE/scripts/main.sh" get_target_env)
+          # Use relative path to avoid reliance on GITHUB_WORKSPACE
+          TARGET_ENV=$(bash "${GITHUB_WORKSPACE}/scripts/main.sh" get_target_env)
+          EXIT_CODE=$?
+
           # Check if the result of get_target_env was an exit 1 code.
-          if [ $? -ne 0 ]; then
+          if [ $EXIT_CODE -ne 0 ]; then
               echo "::error::[error]: You must set the 'target_env' parameter when running this action on a branch that is not 'main' or 'master' or when not executing a workflow in a pull request."
+              exit 1
+          fi
+
+          # Additional validation: ensure TARGET_ENV is not empty and contains only safe characters
+          if [ -z "$TARGET_ENV" ] || ! echo "$TARGET_ENV" | grep -qE '^[a-zA-Z0-9_-]+$'; then
+              echo "::error::Invalid target environment name returned from get_target_env"
               exit 1
           fi
 

@@ -118,12 +118,12 @@ jobs:
           GH_TOKEN: ${{ github.token }}
 
       - name: Update versions in README
+        env:
+          LATEST_TAG: ${{ steps.version.outputs.latest_tag }}
+          NEW_VERSION: ${{ steps.version.outputs.new_version }}
+          CHECKOUT_VERSION: ${{ steps.action_versions.outputs.checkout }}
+          CACHE_VERSION: ${{ steps.action_versions.outputs.cache }}
         run: |
-          LATEST_TAG="${{ steps.version.outputs.latest_tag }}"
-          NEW_VERSION="${{ steps.version.outputs.new_version }}"
-          CHECKOUT_VERSION="${{ steps.action_versions.outputs.checkout }}"
-          CACHE_VERSION="${{ steps.action_versions.outputs.cache }}"
-
           # Escape dots for sed
           LATEST_TAG_ESCAPED=$(echo "$LATEST_TAG" | sed 's/\./\\./g')
 
@@ -165,8 +165,9 @@ jobs:
 
       - name: Create or update release branch
         id: branch
+        env:
+          NEW_VERSION: ${{ steps.version.outputs.new_version }}
         run: |
-          NEW_VERSION="${{ steps.version.outputs.new_version }}"
           BRANCH_NAME="release-${NEW_VERSION}"
 
           # Check if branch exists
@@ -186,9 +187,9 @@ jobs:
 
       - name: Commit version changes
         id: commit
+        env:
+          NEW_VERSION: ${{ steps.version.outputs.new_version }}
         run: |
-          NEW_VERSION="${{ steps.version.outputs.new_version }}"
-
           git add readme.md
 
           if ! git diff --staged --quiet; then
@@ -201,23 +202,26 @@ jobs:
 
       - name: Push release branch
         if: steps.commit.outputs.has_changes == 'true'
+        env:
+          BRANCH_NAME: ${{ steps.branch.outputs.branch_name }}
         run: |
-          BRANCH_NAME="${{ steps.branch.outputs.branch_name }}"
           git push --force origin "$BRANCH_NAME"
 
       - name: Create or update PR
         if: steps.commit.outputs.has_changes == 'true'
+        env:
+          NEW_VERSION: ${{ steps.version.outputs.new_version }}
+          BRANCH_NAME: ${{ steps.branch.outputs.branch_name }}
+          LATEST_TAG: ${{ steps.version.outputs.latest_tag }}
+          CHECKOUT_VERSION: ${{ steps.action_versions.outputs.checkout }}
+          CACHE_VERSION: ${{ steps.action_versions.outputs.cache }}
         run: |
-          NEW_VERSION="${{ steps.version.outputs.new_version }}"
-          BRANCH_NAME="${{ steps.branch.outputs.branch_name }}"
-          LATEST_TAG="${{ steps.version.outputs.latest_tag }}"
-
           PR_BODY="This PR updates version references in the README from \`$LATEST_TAG\` to \`$NEW_VERSION\`.
 
           ## Changes
           - Updated \`pantheon-systems/push-to-pantheon\` references to \`$NEW_VERSION\`
-          - Updated \`actions/checkout\` to \`${{ steps.action_versions.outputs.checkout }}\`
-          - Updated \`actions/cache\` to \`${{ steps.action_versions.outputs.cache }}\`
+          - Updated \`actions/checkout\` to \`$CHECKOUT_VERSION\`
+          - Updated \`actions/cache\` to \`$CACHE_VERSION\`
 
           ## Version Override
           You can override the version by:
@@ -263,8 +267,8 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
+          NEW_VERSION: ${{ steps.version.outputs.new_version }}
         run: |
-          NEW_VERSION="${{ steps.version.outputs.new_version }}"
           gh pr comment "$PR_NUMBER" \
             --body "🤖 A release PR for version \`$NEW_VERSION\` has been created/updated automatically."
 

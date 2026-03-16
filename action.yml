@@ -143,7 +143,7 @@ runs:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Configure SSH key
-        uses: webfactory/ssh-agent@v0.9.1
+        uses: webfactory/ssh-agent@v0.10.0
         with:
             ssh-private-key: ${{ inputs.ssh_key }}
 

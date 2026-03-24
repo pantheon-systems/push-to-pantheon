@@ -102,7 +102,7 @@ runs:
           echo "PANTHEON_TARGET_ENV<<EOF" >> $GITHUB_ENV
           echo "${TARGET_ENV}" >> $GITHUB_ENV
           echo "EOF" >> $GITHUB_ENV
-          echo "PANTHEON_TARGET_ENV=${value}" >> "$GITHUB_OUTPUT"
+          echo "PANTHEON_TARGET_ENV=${TARGET_ENV}" >> "$GITHUB_OUTPUT"
 
       - name: Set clone content flag
         shell: bash

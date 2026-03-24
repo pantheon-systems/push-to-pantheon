@@ -44,7 +44,7 @@ jobs:
     steps:
     - uses: actions/checkout@v6
     - name: Push to Pantheon
-      uses: pantheon-systems/push-to-pantheon@0.9.0
+      uses: pantheon-systems/push-to-pantheon@0.9.1
       with:
         ssh_key: ${{ secrets.PANTHEON_SSH_KEY }}
         machine_token: ${{ secrets.PANTHEON_MACHINE_TOKEN }}
@@ -76,6 +76,11 @@ jobs:
 ## Outputs
 
 <!-- AUTO-DOC-OUTPUT:START - Do not remove or modify this section -->
+
+|                                    OUTPUT                                    |  TYPE  |                              DESCRIPTION                               |
+|------------------------------------------------------------------------------|--------|------------------------------------------------------------------------|
+|       <a name="output_target_env"></a>[target_env](#output_target_env)       | string |         The target environment the branch <br>was deployed to          |
+| <a name="output_target_env_url"></a>[target_env_url](#output_target_env_url) | string | The url for the target <br>environment the branch was deployed <br>to  |
 
 <!-- AUTO-DOC-OUTPUT:END -->
 
@@ -272,7 +277,7 @@ Here's an example from a real site that uses Tailwind to prepare CSS in the site
     # to Pantheon in the later "push-to-pantheon" step.
     - run: "cd web/themes/my_custom_theme/css && rm .gitignore"
     - name: Push to Pantheon
-      uses: pantheon-systems/push-to-pantheon@0.9.0
+      uses: pantheon-systems/push-to-pantheon@0.9.1
       with:
         ssh_key: ${{ secrets.PANTHEON_SSH_KEY }}
         machine_token: ${{ secrets.PANTHEON_MACHINE_TOKEN }}
@@ -305,7 +310,7 @@ The following example shows our recommended way to run `composer install` prior 
         key: ${{ runner.os }}-composer-${{ hashFiles('**/composer.lock') }}
         restore-keys: ${{ runner.os }}-composer-
     - name: Push to Pantheon
-      uses: pantheon-systems/push-to-pantheon@0.9.0
+      uses: pantheon-systems/push-to-pantheon@0.9.1
       with:
         ssh_key: ${{ secrets.PANTHEON_SSH_KEY }}
         machine_token: ${{ secrets.PANTHEON_MACHINE_TOKEN }}
@@ -370,7 +375,7 @@ jobs:
         ref: ${{ github.event.pull_request.head.ref }}
         path: pr-code
     - name: Push to Pantheon
-      uses: pantheon-systems/push-to-pantheon@0.9.0
+      uses: pantheon-systems/push-to-pantheon@0.9.1
       with:
         ssh_key: ${{ secrets.PANTHEON_SSH_KEY }}
         machine_token: ${{ secrets.MACHINE_TOKEN }}
@@ -422,7 +427,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: Deploy to Pantheon
-      uses: pantheon-systems/push-to-pantheon@0.9.0
+      uses: pantheon-systems/push-to-pantheon@0.9.1
       with:
         ssh_key: ${{ secrets.PANTHEON_SSH_KEY }}
         machine_token: ${{ secrets.PANTHEON_MACHINE_TOKEN }}

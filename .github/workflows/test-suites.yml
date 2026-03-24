@@ -268,11 +268,28 @@ jobs:
           relative_site_root: ${{ github.event_name == 'pull_request_target' && 'pr-code/.github/testing_fixtures/dtp-nearly-empty-site' || '.github/testing_fixtures/dtp-nearly-empty-site' }}
           delete_old_environments: true
           clone_content: true
+        id: deploy_to_pantheon          
 
       - name: Verify deployment success
         run: |
           echo "Deployment completed successfully"
           echo "Environment: ${{ inputs.env_prefix }}-adv"
+      
+      - name: Verify target environment and url output from action
+        run: |
+          TARGET_ENV_URL="https://${{ inputs.env_prefix }}-adv-dtp-nearly-empty-site.pantheonsite.io"
+          TARGET_ENV="${{ inputs.env_prefix }}-adv"
+          echo "Checking whether the target environment output from the action matches ${TARGET_ENV}"
+          if [[ "${{ steps.deploy_to_pantheon.outputs.target_env }}" != "${TARGET_ENV}""]]; then
+            echo "::error::❌ deploy to pantheon output a target_env of ${{ steps.deploy_to_pantheon.outputs.target_env }}"
+            exit 1
+          fi
+          
+          echo "Checking whether the target environment url output from the action matches ${TARGET_ENV_URL}"
+          if [[ "${{ steps.deploy_to_pantheon.outputs.target_env_url }}" != "${TARGET_ENV_URL}""]]; then
+            echo "::error::❌ Environment URL is not accessible"
+            exit 1
+          fi
 
       - name: Check environment URL accessibility
         run: |

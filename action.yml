@@ -78,6 +78,13 @@ inputs:
 
   # todo checkout_repo:
   #   description: "A boolean for whether or not this composite step should checkout the git repo. Set to false if a checkout has already been perf"
+outputs:
+  target_env:
+    description: "The target environment the branch was deployed to"
+    value: ${{ env.PANTHEON_TARGET_ENV }}
+  target_env_url:
+    description: "The url for the target environment the branch was deployed to"
+    value: https://${{ env.PANTHEON_TARGET_ENV }}-${{ inputs.site }}.pantheonsite.io
 
 runs:
     using: 'composite'

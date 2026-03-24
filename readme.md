@@ -77,6 +77,11 @@ jobs:
 
 <!-- AUTO-DOC-OUTPUT:START - Do not remove or modify this section -->
 
+|                                    OUTPUT                                    |  TYPE  |                              DESCRIPTION                               |
+|------------------------------------------------------------------------------|--------|------------------------------------------------------------------------|
+|       <a name="output_target_env"></a>[target_env](#output_target_env)       | string |         The target environment the branch <br>was deployed to          |
+| <a name="output_target_env_url"></a>[target_env_url](#output_target_env_url) | string | The url for the target <br>environment the branch was deployed <br>to  |
+
 <!-- AUTO-DOC-OUTPUT:END -->
 
 ## Parameters

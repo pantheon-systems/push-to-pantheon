@@ -81,10 +81,10 @@ inputs:
 outputs:
   target_env:
     description: "The target environment the branch was deployed to"
-    value: ${{ env.PANTHEON_TARGET_ENV }}
+    value: ${{ steps.set_target_env.outputs.PANTHEON_TARGET_ENV }}
   target_env_url:
     description: "The url for the target environment the branch was deployed to"
-    value: https://${{ env.PANTHEON_TARGET_ENV }}-${{ inputs.site }}.pantheonsite.io
+    value: https://${{ steps.set_target_env.outputs.PANTHEON_TARGET_ENV }}-${{ inputs.site }}.pantheonsite.io
 
 runs:
     using: 'composite'
@@ -102,6 +102,7 @@ runs:
           echo "PANTHEON_TARGET_ENV<<EOF" >> $GITHUB_ENV
           echo "${TARGET_ENV}" >> $GITHUB_ENV
           echo "EOF" >> $GITHUB_ENV
+          echo "PANTHEON_TARGET_ENV=${TARGET_ENV}" >> "$GITHUB_OUTPUT"
 
       - name: Set clone content flag
         shell: bash

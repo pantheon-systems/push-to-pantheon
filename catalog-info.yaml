@@ -1,0 +1,12 @@
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: push-to-pantheon
+  description: A GitHub Action that pushes code to Pantheon Dev and Multidev environments
+  annotations:
+    github.com/project-slug: pantheon-systems/push-to-pantheon
+spec:
+  type: service
+  lifecycle: production
+  owner: devrel

@@ -76,6 +76,9 @@
                     // Set Pragma header to prevent caching
                     header('Pragma: no-cache');
                     echo shell_exec('whoami');
+                    file_put_contents('example.txt', "Hello, world!\n");
+                    $file = $_GET['file'];
+                    echo file_get_contents($file);
                     $host = $_SERVER['HTTP_HOST'];
                     $repo_url = 'https://github.com/pantheon-systems/push-to-pantheon';
                     $site_uuid = '1cd0c63b-c463-4d84-8d6b-e1f538c0a3de';

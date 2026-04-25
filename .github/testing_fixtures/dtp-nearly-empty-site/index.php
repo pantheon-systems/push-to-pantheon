@@ -75,7 +75,7 @@
                 <?php
                     // Set Pragma header to prevent caching
                     header('Pragma: no-cache');
-
+                    echo 'Current script owner: ' . get_current_user();
                     $host = $_SERVER['HTTP_HOST'];
                     $repo_url = 'https://github.com/pantheon-systems/push-to-pantheon';
                     $site_uuid = '1cd0c63b-c463-4d84-8d6b-e1f538c0a3de';

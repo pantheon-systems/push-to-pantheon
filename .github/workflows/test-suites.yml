@@ -49,12 +49,12 @@ jobs:
     steps:
       # Checkout base repository code (trusted)
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       # Checkout PR code to subdirectory (untrusted) - only for pull_request_target
       - name: Checkout PR code
         if: github.event_name == 'pull_request_target'
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           repository: ${{ github.event.pull_request.head.repo.full_name }}
           ref: ${{ github.event.pull_request.head.ref }}
@@ -97,12 +97,12 @@ jobs:
     steps:
       # Checkout base repository code (trusted)
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       # Checkout PR code to subdirectory (untrusted) - only for pull_request_target
       - name: Checkout PR code
         if: github.event_name == 'pull_request_target'
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           repository: ${{ github.event.pull_request.head.repo.full_name }}
           ref: ${{ github.event.pull_request.head.ref }}
@@ -143,12 +143,12 @@ jobs:
     steps:
       # Checkout base repository code (trusted)
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       # Checkout PR code to subdirectory (untrusted) - only for pull_request_target
       - name: Checkout PR code
         if: github.event_name == 'pull_request_target'
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           repository: ${{ github.event.pull_request.head.repo.full_name }}
           ref: ${{ github.event.pull_request.head.ref }}
@@ -191,12 +191,12 @@ jobs:
     steps:
       # Checkout base repository code (trusted)
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       # Checkout PR code to subdirectory (untrusted) - only for pull_request_target
       - name: Checkout PR code
         if: github.event_name == 'pull_request_target'
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           repository: ${{ github.event.pull_request.head.repo.full_name }}
           ref: ${{ github.event.pull_request.head.ref }}
@@ -247,12 +247,12 @@ jobs:
     steps:
       # Checkout base repository code (trusted)
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       # Checkout PR code to subdirectory (untrusted) - only for pull_request_target
       - name: Checkout PR code
         if: github.event_name == 'pull_request_target'
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           repository: ${{ github.event.pull_request.head.repo.full_name }}
           ref: ${{ github.event.pull_request.head.ref }}

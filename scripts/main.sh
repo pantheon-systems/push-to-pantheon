@@ -158,6 +158,8 @@ function check_missing_permissions() {
 	fi
 
 	# Check pull-requests permission (only if this is a PR event)
+	# Requires pull-requests: write; this GET only confirms read access since
+	# there's no non-mutating way to probe for write.
 	if [ -n "${PR_NUMBER}" ]; then
 		PR_RESPONSE=$(curl -s -w "\n%{http_code}" \
 			-H "Authorization: token ${GITHUB_TOKEN}" \
@@ -166,7 +168,7 @@ function check_missing_permissions() {
 		PR_HTTP_CODE=$(echo "$PR_RESPONSE" | tail -n1)
 
 		if [ "$PR_HTTP_CODE" = "403" ]; then
-			MISSING_PERMISSIONS+=("pull-requests: read")
+			MISSING_PERMISSIONS+=("pull-requests: write")
 		fi
 	fi
 
@@ -240,7 +242,7 @@ function get_missing_permissions_help() {
 	echo "    permissions:"
 	echo "      deployments: write"
 	echo "      contents: read"
-	echo "      pull-requests: read"
+	echo "      pull-requests: write"
 	echo ""
 	echo "For more information, see:"
 	echo "https://github.com/pantheon-systems/push-to-pantheon#permissions"

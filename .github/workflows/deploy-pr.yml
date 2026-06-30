@@ -35,7 +35,7 @@ jobs:
     permissions:
       deployments: write
       contents: write
-      pull-requests: read
+      pull-requests: write
     uses: ./.github/workflows/test-suites.yml
     with:
       env_prefix: ${{ github.event.pull_request.number || 'manual' }}

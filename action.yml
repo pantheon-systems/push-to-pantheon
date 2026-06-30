@@ -203,7 +203,7 @@ runs:
           fi
 
       - name: Check multidev limit
-        if: ${{ env.PANTHEON_TARGET_ENV != 'dev' && env.PANTHEON_TARGET_ENV != 'test' && env.PANTHEON_TARGET_ENV != 'live' }}
+        if: ${{ inputs.target_env == '' && env.PANTHEON_TARGET_ENV != 'dev' && env.PANTHEON_TARGET_ENV != 'test' && env.PANTHEON_TARGET_ENV != 'live' }}
         id: check_multidev_limit
         shell: bash
         env:
@@ -212,7 +212,7 @@ runs:
           ${GITHUB_ACTION_PATH}/scripts/main.sh check_multidev_limit
 
       - name: Comment on PR if multidev limit reached
-        if: ${{ env.PANTHEON_TARGET_ENV != 'dev' && env.PANTHEON_TARGET_ENV != 'test' && env.PANTHEON_TARGET_ENV != 'live' && steps.check_multidev_limit.outputs.multidev_available == 'false' }}
+        if: ${{ inputs.target_env == '' && env.PANTHEON_TARGET_ENV != 'dev' && env.PANTHEON_TARGET_ENV != 'test' && env.PANTHEON_TARGET_ENV != 'live' && steps.check_multidev_limit.outputs.multidev_available == 'false' }}
         shell: bash
         env:
           GITHUB_TOKEN: ${{ github.token }}
@@ -230,7 +230,7 @@ runs:
           For more information, see the [Pantheon Multidev documentation](https://pantheon.io/docs/multidev)."
 
       - name: Abort deployment if multidev limit reached
-        if: ${{ env.PANTHEON_TARGET_ENV != 'dev' && env.PANTHEON_TARGET_ENV != 'test' && env.PANTHEON_TARGET_ENV != 'live' && steps.check_multidev_limit.outputs.multidev_available == 'false' }}
+        if: ${{ inputs.target_env == '' && env.PANTHEON_TARGET_ENV != 'dev' && env.PANTHEON_TARGET_ENV != 'test' && env.PANTHEON_TARGET_ENV != 'live' && steps.check_multidev_limit.outputs.multidev_available == 'false' }}
         shell: bash
         run: |
           echo "::error::Aborting deployment: Multidev limit reached. Delete unused environments or contact Pantheon to increase your limit."

@@ -47,7 +47,7 @@ teardown() {
     assert_output_contains "Missing required GitHub permissions"
     assert_output_contains "deployments: write"
     assert_output_contains "contents: read"
-    assert_output_contains "pull-requests: read"
+    assert_output_contains "pull-requests: write"
     assert_output_contains "permissions:"
 }
 

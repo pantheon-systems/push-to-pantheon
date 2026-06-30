@@ -39,7 +39,7 @@ on:
 permissions:
   deployments: write
   contents: write
-  pull-requests: read
+  pull-requests: write
 
 jobs:
   standard:

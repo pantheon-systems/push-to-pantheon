@@ -39,7 +39,7 @@ jobs:
     permissions:
       deployments: write
       contents: read
-      pull-requests: read
+      pull-requests: write
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v6
@@ -325,7 +325,7 @@ This action needs permission to perform its work. Set the following permissions 
     permissions:
       deployments: write
       contents: read
-      pull-requests: read
+      pull-requests: write
 ```
 
 The `deployments: write` permission is required to notify GitHub that the deployment has been made (to a Pantheon Multidev usually).
@@ -336,7 +336,7 @@ This is required for the GitHub UI to show the deployment status of the pull req
 The `contents: read` permission is required for the job to check out the code from the GitHub repository.
 Even though this action does not checkout of the code itself, the code must be checked out prior to this step in order for the action to work.
 
-The `pull-requests: read` permission is required to delete old Multidev environments associated with closed pull requests.
+The `pull-requests: write` permission is required for two things: reading pull request state in order to delete old Multidev environments associated with closed pull requests, and posting a comment on the pull request when a site's Multidev environment limit has been reached.
 
 [See the GitHub Actions documentation for more information on permissions.](https://docs.github.com/en/actions/writing-workflows/choosing-what-your-workflow-does/controlling-permissions-for-github_token)
 
@@ -358,7 +358,7 @@ jobs:
     permissions:
       deployments: write
       contents: write # needed to checkout the PR code.
-      pull-requests: read
+      pull-requests: write
     runs-on: ubuntu-latest
     steps:
     # Checkout the base repository code into the root directory.

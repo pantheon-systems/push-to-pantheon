@@ -280,13 +280,13 @@ jobs:
           TARGET_ENV_URL="https://${{ inputs.env_prefix }}-adv-dtp-nearly-empty-site.pantheonsite.io"
           TARGET_ENV="${{ inputs.env_prefix }}-adv"
           echo "Checking whether the target environment output from the action matches ${TARGET_ENV}"
-          if [[ "${{ steps.deploy_to_pantheon.outputs.target_env }}" != "${TARGET_ENV}""]]; then
+          if [[ "${{ steps.deploy_to_pantheon.outputs.target_env }}" != "${TARGET_ENV}" ]]; then
             echo "::error::❌ deploy to pantheon output a target_env of ${{ steps.deploy_to_pantheon.outputs.target_env }}"
             exit 1
           fi
-          
+
           echo "Checking whether the target environment url output from the action matches ${TARGET_ENV_URL}"
-          if [[ "${{ steps.deploy_to_pantheon.outputs.target_env_url }}" != "${TARGET_ENV_URL}""]]; then
+          if [[ "${{ steps.deploy_to_pantheon.outputs.target_env_url }}" != "${TARGET_ENV_URL}" ]]; then
             echo "::error::❌ Environment URL is not accessible"
             exit 1
           fi

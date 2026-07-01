@@ -206,9 +206,16 @@ jobs:
             echo "has_changes=true" >> $GITHUB_OUTPUT
           fi
 
-      # Commits are created via the Contents API instead of `git commit` + `git push`
-      # so GitHub signs them automatically. Locally-created bot commits are unsigned
-      # and are rejected by the org's required_signatures ruleset on 0.x.
+      # Commits are created via the Contents API instead of `git commit` + `git push`.
+      # Note: this does NOT produce a signed/verified commit -- GitHub only auto-signs
+      # API-created commits when authored via a GitHub App installation token, not a
+      # PAT like GH_PAT. See CONTRIBUTING.md for the required manual signing step.
+      #
+      # This step is deliberately idempotent: PR comments, title edits, and pushes to
+      # this branch (e.g. the manual signing step) all re-trigger this workflow, so if
+      # we unconditionally reset+recommitted every run, we'd clobber a manually-signed
+      # commit the moment anyone touched the PR. Only reset/recommit when the branch's
+      # content doesn't already match what we're about to write.
       - name: Create/reset release branch and commit via GitHub API
         if: steps.commit.outputs.has_changes == 'true'
         env:
@@ -217,6 +224,15 @@ jobs:
           BRANCH_NAME: ${{ steps.branch.outputs.branch_name }}
           NEW_VERSION: ${{ steps.version.outputs.new_version }}
         run: |
+          EXISTING_CONTENT_B64=$(gh api "repos/${REPO}/contents/readme.md?ref=${BRANCH_NAME}" -q '.content' 2>/dev/null || true)
+          if [ -n "$EXISTING_CONTENT_B64" ]; then
+            EXISTING_CONTENT=$(echo "$EXISTING_CONTENT_B64" | tr -d '\n' | base64 -d)
+            if [ "$EXISTING_CONTENT" = "$(cat readme.md)" ]; then
+              echo "${BRANCH_NAME} already has the correct readme.md content, leaving it untouched"
+              exit 0
+            fi
+          fi
+
           BASE_SHA=$(git rev-parse HEAD)
           ORIGINAL_BLOB_SHA=$(git rev-parse HEAD:readme.md)
 
@@ -231,7 +247,6 @@ jobs:
           fi
 
           # Commit the updated README to that branch via the Contents API.
-          # GitHub signs commits made through the API with its own verified key.
           gh api --method PUT "repos/${REPO}/contents/readme.md" \
             -f message="docs: Bump version to ${NEW_VERSION}" \
             -f content="$(base64 -w0 readme.md)" \

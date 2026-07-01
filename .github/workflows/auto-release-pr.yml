@@ -165,33 +165,12 @@ jobs:
             echo "Same version, will update existing PR"
           fi
 
-      - name: Create or update release branch
+      - name: Determine release branch name
         id: branch
         env:
           NEW_VERSION: ${{ steps.version.outputs.new_version }}
-          PR_EXISTS: ${{ steps.check_pr.outputs.exists }}
-          OLD_BRANCH: ${{ steps.check_pr.outputs.head_branch }}
         run: |
-          BRANCH_NAME="release-${NEW_VERSION}"
-
-          # Check if we closed the old PR (different version)
-          if [ "$PR_EXISTS" = "true" ] && [ "$OLD_BRANCH" != "$BRANCH_NAME" ]; then
-            echo "Creating new branch for version override: $BRANCH_NAME"
-            git checkout -b "$BRANCH_NAME"
-          # Check if branch already exists
-          elif git ls-remote --heads origin "$BRANCH_NAME" | grep -q "$BRANCH_NAME"; then
-            echo "Branch $BRANCH_NAME exists, checking it out"
-            git fetch origin "$BRANCH_NAME"
-            git checkout "$BRANCH_NAME"
-
-            # Reset to latest 0.x and reapply version changes
-            git reset --hard origin/0.x
-          else
-            echo "Creating new branch $BRANCH_NAME"
-            git checkout -b "$BRANCH_NAME"
-          fi
-
-          echo "branch_name=$BRANCH_NAME" >> $GITHUB_OUTPUT
+          echo "branch_name=release-${NEW_VERSION}" >> $GITHUB_OUTPUT
 
       - name: Update versions in README
         env:
@@ -217,27 +196,47 @@ jobs:
 
           echo "Updated README.md with new versions"
 
-      - name: Commit version changes
+      - name: Check for changes
         id: commit
-        env:
-          NEW_VERSION: ${{ steps.version.outputs.new_version }}
         run: |
-          git add readme.md
-
-          if ! git diff --staged --quiet; then
-            git commit -m "docs: Bump version to $NEW_VERSION"
-            echo "has_changes=true" >> $GITHUB_OUTPUT
-          else
+          if git diff --quiet -- readme.md; then
             echo "has_changes=false" >> $GITHUB_OUTPUT
             echo "No changes to commit"
+          else
+            echo "has_changes=true" >> $GITHUB_OUTPUT
           fi
 
-      - name: Push release branch
+      # Commits are created via the Contents API instead of `git commit` + `git push`
+      # so GitHub signs them automatically. Locally-created bot commits are unsigned
+      # and are rejected by the org's required_signatures ruleset on 0.x.
+      - name: Create/reset release branch and commit via GitHub API
         if: steps.commit.outputs.has_changes == 'true'
         env:
+          GH_TOKEN: ${{ secrets.GH_PAT }}
+          REPO: ${{ github.repository }}
           BRANCH_NAME: ${{ steps.branch.outputs.branch_name }}
+          NEW_VERSION: ${{ steps.version.outputs.new_version }}
         run: |
-          git push --force origin "$BRANCH_NAME"
+          BASE_SHA=$(git rev-parse HEAD)
+          ORIGINAL_BLOB_SHA=$(git rev-parse HEAD:readme.md)
+
+          # Point the release branch at the latest 0.x commit, creating it if it
+          # doesn't exist or resetting it if it does.
+          if gh api "repos/${REPO}/git/ref/heads/${BRANCH_NAME}" >/dev/null 2>&1; then
+            gh api --method PATCH "repos/${REPO}/git/refs/heads/${BRANCH_NAME}" \
+              -f sha="$BASE_SHA" -F force=true
+          else
+            gh api --method POST "repos/${REPO}/git/refs" \
+              -f ref="refs/heads/${BRANCH_NAME}" -f sha="$BASE_SHA"
+          fi
+
+          # Commit the updated README to that branch via the Contents API.
+          # GitHub signs commits made through the API with its own verified key.
+          gh api --method PUT "repos/${REPO}/contents/readme.md" \
+            -f message="docs: Bump version to ${NEW_VERSION}" \
+            -f content="$(base64 -w0 readme.md)" \
+            -f sha="$ORIGINAL_BLOB_SHA" \
+            -f branch="$BRANCH_NAME"
 
       - name: Create or update PR
         if: steps.commit.outputs.has_changes == 'true'

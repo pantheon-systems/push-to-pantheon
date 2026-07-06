@@ -4,7 +4,7 @@
 
 ## Cutting a release
 
-Releases are **fully automated** through GitHub workflows. The process requires minimal human intervention.
+Releases are **mostly automated** through GitHub workflows, with one required manual step (signing the release PR's version-bump commit — see step 3 below).
 
 ### Automated Release Flow
 
@@ -26,7 +26,20 @@ By default, the patch version is incremented. For minor or major bumps:
 
 The workflow automatically updates the release branch with the new version.
 
-**3. Merge release PR → Draft release is created**
+**3. Manually sign the version-bump commit (required)**
+
+The org enforces a `required_signatures` ruleset on `0.x`, but the release PR's version-bump commit is created by automation and is **not** GPG/SSH signed — GitHub only auto-signs commits made via a GitHub App installation token, and this repo's automation authenticates with a personal PAT (`GH_PAT`), which doesn't qualify. This means the release PR will show as blocked (merging disabled) until the commit is manually replaced with a signed one:
+
+```bash
+git fetch origin release-X.Y.Z
+git checkout release-X.Y.Z
+git commit --amend --reset-author -S --no-edit
+git push --force-with-lease origin release-X.Y.Z
+```
+
+This requires commit signing to be configured locally (`user.signingkey` + `commit.gpgsign true`, or SSH signing). Confirm it worked with `git log -1 --format='%G?'` (should print `G` or `U`, not `N`) before pushing. There is currently no fully-automated way around this step — see the PR discussion on [#165](https://github.com/pantheon-systems/push-to-pantheon/pull/165) for why (GitHub App-based signing was considered but not pursued).
+
+**4. Merge release PR → Draft release is created**
 
 When you merge the release PR:
 1. Mark the draft PR as **Ready for review**
@@ -37,7 +50,7 @@ When you merge the release PR:
    - Creates a **draft GitHub release** with auto-generated notes
    - Comments on the merged PR with a link to the release
 
-**4. Publish the release**
+**5. Publish the release**
 
 Navigate to the [Releases page](https://github.com/pantheon-systems/push-to-pantheon/releases) and:
 1. Review the draft release notes

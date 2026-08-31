@@ -88,7 +88,10 @@ assert_failure() {
 # shellcheck disable=SC2154  # output is a BATS variable
 assert_output_contains() {
     local expected="$1"
-    if [[ ! "$output" =~ $expected ]]; then
+    # Literal substring, not a regex: patterns here routinely contain glob and
+    # regex metacharacters (e.g. "No pr-* multidevs left to check"), which =~
+    # would silently reinterpret rather than match.
+    if [[ "$output" != *"$expected"* ]]; then
         echo "Expected output to contain: $expected"
         echo "Actual output: $output"
         return 1
@@ -99,7 +102,10 @@ assert_output_contains() {
 # shellcheck disable=SC2154  # output is a BATS variable
 assert_output_not_contains() {
     local unexpected="$1"
-    if [[ "$output" =~ $unexpected ]]; then
+    # Literal substring, as above. This one fails open if left as a regex: a
+    # pattern that does not compile to a match would silently pass, so the test
+    # would assert nothing.
+    if [[ "$output" == *"$unexpected"* ]]; then
         echo "Expected output NOT to contain: $unexpected"
         echo "Actual output: $output"
         return 1

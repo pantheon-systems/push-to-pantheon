@@ -440,10 +440,16 @@ function push_to_pantheon() {
 		--message="${PANTHEON_COMMIT_MESSAGE}"
 	)
 
-	# Add --pr-id if PR_NUM is set (makes Build Tools comment on PR instead of commit)
-	if [ -n "${PR_NUM}" ]; then
-		TERMINUS_CMD+=(--pr-id="${PR_NUM}")
-	fi
+	# Deliberately not passing --pr-id. Build Tools posts a "Visit Site" notification
+	# whenever it creates a multidev, and --pr-id aims that at the pull request. This
+	# action already reports the environment through GitHub Deployments, with the site
+	# as the deployment's env_url, so the comment is redundant and adds one PR comment
+	# per suite per push. Without --pr-id the notification is aimed at the commit
+	# instead, where the Pantheon-side SHA does not exist on GitHub and the resulting
+	# 422 is suppressed below.
+	#
+	# Build Tools has no option to suppress the notification outright -- its --notify
+	# option is documented as deprecated and ignored -- so this is the available lever.
 
 	# Add clone-content flag if set
 	if [ -n "${PANTHEON_CLONE_CONTENT_FLAG}" ]; then

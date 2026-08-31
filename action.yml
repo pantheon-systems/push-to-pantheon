@@ -49,7 +49,7 @@ inputs:
     default: "bot@getpantheon.com"
 
   git_commit_message:
-    description: "A custom commit message to be used with the Git commit that will be pushed to Pantheon. Leaving this Action parameter blank will result in a generic commit message being used. This value is not used on newer 'eVCS' sites for which there is no Pantheon-provided Git repo."
+    description: "A custom commit message to be used with the Git commit that will be pushed to Pantheon. Multiline messages are supported, which is how you would pass git trailers such as Source-Commit:. Leaving this Action parameter blank will result in a generic commit message being used. This value is not used on newer 'eVCS' sites for which there is no Pantheon-provided Git repo."
     required: false
     default: ""
 
@@ -289,8 +289,18 @@ runs:
           PR_NUM: ${{ github.event.pull_request.number }}
           GITHUB_REF: ${{ github.ref }}
         run: |
-          MESSAGE=$(${GITHUB_ACTION_PATH}/scripts/main.sh get_commit_message)
-          echo "message=${MESSAGE}" >> $GITHUB_OUTPUT
+          # git_commit_message is user-supplied and may be multiline — git trailers such
+          # as Source-Commit: are newline-separated by definition — so the value has to
+          # use GITHUB_OUTPUT's heredoc form. The single-line key=value form makes the
+          # runner read line two as a new key and abort with "Invalid format".
+          # The delimiter is randomised because the message could otherwise contain it
+          # and inject arbitrary step outputs. See issue #173.
+          DELIMITER="ptp-msg-$(openssl rand -hex 16 2>/dev/null || echo "${RANDOM}${RANDOM}${RANDOM}${RANDOM}")"
+          {
+            echo "message<<${DELIMITER}"
+            "${GITHUB_ACTION_PATH}/scripts/main.sh" get_commit_message
+            echo "${DELIMITER}"
+          } >> "${GITHUB_OUTPUT}"
 
       - name: Deployment Processing
         shell: bash

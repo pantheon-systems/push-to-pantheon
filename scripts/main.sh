@@ -428,17 +428,26 @@ function push_to_pantheon() {
 	export CI_PROJECT_USERNAME
 	export CI_PROJECT_REPONAME
 
-	# Build the terminus command with optional --pr-id flag
-	TERMINUS_CMD="terminus -n build:env:create \"${PANTHEON_SITE}.${PANTHEON_SOURCE_ENV}\" \"${PANTHEON_TARGET_ENV}\" --yes --message=\"${PANTHEON_COMMIT_MESSAGE}\""
+	# Build the terminus command as an argv array rather than a string. The commit
+	# message is user-supplied — plenty of workflows pipe a PR title straight into
+	# git_commit_message — so a quote, backtick, $ or backslash in it would be a shell
+	# metacharacter if this were assembled into a string and eval'd. See issue #173.
+	TERMINUS_CMD=(
+		terminus -n build:env:create
+		"${PANTHEON_SITE}.${PANTHEON_SOURCE_ENV}"
+		"${PANTHEON_TARGET_ENV}"
+		--yes
+		--message="${PANTHEON_COMMIT_MESSAGE}"
+	)
 
 	# Add --pr-id if PR_NUM is set (makes Build Tools comment on PR instead of commit)
 	if [ -n "${PR_NUM}" ]; then
-		TERMINUS_CMD="${TERMINUS_CMD} --pr-id=\"${PR_NUM}\""
+		TERMINUS_CMD+=(--pr-id="${PR_NUM}")
 	fi
 
 	# Add clone-content flag if set
 	if [ -n "${PANTHEON_CLONE_CONTENT_FLAG}" ]; then
-		TERMINUS_CMD="${TERMINUS_CMD} ${PANTHEON_CLONE_CONTENT_FLAG}"
+		TERMINUS_CMD+=("${PANTHEON_CLONE_CONTENT_FLAG}")
 	fi
 
 	# Execute the command with output filtering to suppress non-fatal 422 errors
@@ -446,7 +455,7 @@ function push_to_pantheon() {
 	# These produce "422 Unprocessable Entity" errors that are non-fatal and can be safely suppressed
 	set +e
 	TEMP_LOG=$(mktemp)
-	eval "${TERMINUS_CMD}" 2>&1 | while IFS= read -r line; do
+	"${TERMINUS_CMD[@]}" 2>&1 | while IFS= read -r line; do
 		# Skip lines containing 422 errors about missing commits
 		if echo "$line" | grep -q "422 Unprocessable Entity"; then
 			echo "$line" >> "$TEMP_LOG"

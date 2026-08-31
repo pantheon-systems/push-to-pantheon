@@ -26,6 +26,7 @@ function main() {
 	- verify_build_tools: Verify that the Terminus Build Tools plugin is installed and available.
 	- push_to_pantheon: Push code to Pantheon, either via Git or Build Tools depending on configuration and environment state.
 	- cleanup: Clean up stale Pantheon multidev environments. This includes environments associated with closed PRs as well as old environments matching a specified pattern.
+	- cleanup_closed_pr_multidevs: Delete pr-* multidevs whose pull request is closed (workaround for terminus-build-tools-plugin#505).
 	- create_multidev: Create a multidev environment from a source environment if it doesn't already exist.
 	- delete_multidev: Delete a specific multidev environment and its Git branch.
 	"
@@ -42,7 +43,7 @@ function main() {
 	fi
 
 	# Check for a valid command.
-	if [ "$1" != 'compute_multidev_name' ] && [ "$1" != 'get_commit_message' ] && [ "$1" != 'get_target_env' ] && [ "$1" != 'check_missing_permissions' ] && [ "$1" != 'get_missing_permissions_help' ] && [ "$1" != 'check_multidev_limit' ] && [ "$1" != 'setup_ssh_hostkeys' ] && [ "$1" != 'prepare_site_root' ] && [ "$1" != 'push_to_pantheon' ] && [ "$1" != 'cleanup' ] && [ "$1" != 'verify_build_tools' ] && [ "$1" != 'create_multidev' ] && [ "$1" != 'delete_multidev' ]; then
+	if [ "$1" != 'compute_multidev_name' ] && [ "$1" != 'get_commit_message' ] && [ "$1" != 'get_target_env' ] && [ "$1" != 'check_missing_permissions' ] && [ "$1" != 'get_missing_permissions_help' ] && [ "$1" != 'check_multidev_limit' ] && [ "$1" != 'setup_ssh_hostkeys' ] && [ "$1" != 'prepare_site_root' ] && [ "$1" != 'push_to_pantheon' ] && [ "$1" != 'cleanup' ] && [ "$1" != 'cleanup_closed_pr_multidevs' ] && [ "$1" != 'verify_build_tools' ] && [ "$1" != 'create_multidev' ] && [ "$1" != 'delete_multidev' ]; then
 		echo -e "${red}Invalid command: $1${normal}"
 		echo -e "${help_msg}"
 		exit 1
@@ -510,6 +511,104 @@ delete_github_environment() {
 	gh api --method DELETE "repos/${GITHUB_REPOSITORY}/environments/${ENV_NAME}"
 }
 
+# Delete multidevs whose associated pull request is already closed.
+#
+# Workaround for terminus-build-tools-plugin#505: build:env:delete:pr walks the
+# GitHub "list pull requests" endpoint through WebAPI::pagedRequest(), which never
+# re-reads the Link header after the first follow-up request and so always stops at
+# page 2. On repos with more than ~200 pull requests the older closed PRs are never
+# seen, their pr-* multidevs are never deleted, and the site eventually hits its
+# multidev cap. See https://github.com/pantheon-systems/push-to-pantheon/issues/172
+#
+# Rather than paginate the whole repo, we invert the lookup: take the pr-N multidevs
+# that actually exist and ask GitHub about those PR numbers directly. That is one API
+# call per multidev, bounded by the site's multidev limit, instead of one per page of
+# repo history.
+#
+# Remove this once #512 lands upstream and Build Tools ships a release with the fix.
+#
+# Parameters:
+#   $1: (optional) newline-separated environment list; fetched if omitted
+# Requires environment variables:
+#   PANTHEON_SITE: The Pantheon site name
+#   GITHUB_REPOSITORY: owner/repo used to resolve PR state
+#   PANTHEON_TARGET_ENV: The environment being deployed to, never deleted
+function cleanup_closed_pr_multidevs() {
+	if [ -z "${GITHUB_REPOSITORY}" ]; then
+		echo -e "${yellow}Skipping closed-PR sweep — GITHUB_REPOSITORY is not set.${normal}"
+		return 0
+	fi
+
+	local all_envs="${1}"
+	if [ -z "${all_envs}" ]; then
+		all_envs=$(terminus multidev:list "${PANTHEON_SITE}" --format=list 2>/dev/null || echo "")
+	fi
+
+	local pr_envs
+	pr_envs=$(echo "${all_envs}" | grep -E '^pr-[0-9]+$' || true)
+
+	if [ -z "${pr_envs}" ]; then
+		echo -e "${yellow}No pr-* multidevs left to check.${normal}"
+		return 0
+	fi
+
+	echo ""
+	echo -e "${yellow}Checking pr-* multidevs Build Tools may have missed...${normal}"
+
+	local stale_envs=""
+	local env pr_num pr_state
+	for env in ${pr_envs}; do
+		if [ "${env}" = "${PANTHEON_TARGET_ENV}" ]; then
+			continue
+		fi
+
+		pr_num="${env#pr-}"
+
+		if ! pr_state=$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${pr_num}" --jq '.state' 2>/dev/null); then
+			# A PR we cannot resolve (deleted, transferred, token scope) is not
+			# evidence the environment is stale, so leave it alone.
+			echo -e "${yellow}  Could not resolve PR #${pr_num} — keeping ${normal}${bold}${env}${normal}${yellow}.${normal}"
+			continue
+		fi
+
+		if [ "${pr_state}" = "closed" ]; then
+			echo -e "${yellow}  PR #${pr_num} is closed — ${normal}${bold}${env}${normal}${yellow} is stale.${normal}"
+			stale_envs="${stale_envs}${env}"$'\n'
+		fi
+	done
+
+	stale_envs=$(echo "${stale_envs}" | grep -v '^$' || true)
+
+	if [ -z "${stale_envs}" ]; then
+		echo -e "${green}✅ No stale closed-PR multidevs found.${normal}"
+		return 0
+	fi
+
+	echo -e "${yellow}Deleting ${normal}${bold}$(echo "${stale_envs}" | wc -l | tr -d ' ')${normal}${yellow} stale closed-PR multidev(s)...${normal}"
+
+	local max_parallel="${CLEANUP_MAX_PARALLEL:-5}"
+	local pids=()
+
+	for env in ${stale_envs}; do
+		(
+			delete_multidev "${env}" || true
+			delete_github_environment "${env}" || true
+		) &
+		pids+=($!)
+
+		if [ ${#pids[@]} -ge "${max_parallel}" ]; then
+			wait "${pids[@]}"
+			pids=()
+		fi
+	done
+
+	if [ ${#pids[@]} -gt 0 ]; then
+		wait "${pids[@]}"
+	fi
+
+	echo -e "${green}✅ Closed-PR sweep complete.${normal}"
+}
+
 # Clean up stale Pantheon multidev environments. 
 # This includes environments associated with closed PRs as well as old 
 # environments matching a specified pattern.
@@ -540,6 +639,10 @@ function cleanup() {
 
 	# Get all multidevs for cleanup operations
 	ALL_ENVS=$(terminus multidev:list "${PANTHEON_SITE}" --format=list 2>/dev/null || echo "")
+
+	# Catch the closed-PR multidevs Build Tools leaves behind on repos with a lot of
+	# pull request history. See cleanup_closed_pr_multidevs() for the upstream bug.
+	cleanup_closed_pr_multidevs "${ALL_ENVS}"
 
 	# Track environments deleted in the current run to exclude them from age-based cleanup
 	DELETED_CURRENT_RUN_ENVS=""

@@ -15,6 +15,7 @@ The test suite provides comprehensive coverage of all 9 core functions in `scrip
 7. **prepare_site_root()** - Pantheon repo cloning and file sync
 8. **push_to_pantheon()** - Main deployment logic
 9. **cleanup()** - Stale environment deletion
+10. **cleanup_closed_pr_multidevs()** - Closed-PR multidev sweep (workaround for terminus-build-tools-plugin#505)
 
 ## Test Strategy
 
@@ -212,6 +213,7 @@ This structure ensures:
   - Age threshold filtering
   - Prefix protection
   - Pattern matching
+  - Closed-PR sweep: PR state resolution, target-env protection, unresolvable PRs
 
 ## Test Helpers
 

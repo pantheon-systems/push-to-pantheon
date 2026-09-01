@@ -21,10 +21,9 @@ setup() {
     # Set up required environment variables
     export PANTHEON_SITE="$(get_test_site)"
 
-    # Use unique name for this test file: tmp1-{hash}
-    local test_env="$(get_test_env)"
-    local hash="${test_env#bats-}"
-    TEST_MULTIDEV_NAME="tmp1-${hash}"
+    # Use unique name for this test file: tmp1-{hash}. Derived via the shared helper
+    # so teardown_file() can arrive at the same name without seeing this variable.
+    TEST_MULTIDEV_NAME="$(get_file_multidev_name tmp1)"
 }
 
 teardown() {
@@ -32,12 +31,26 @@ teardown() {
 }
 
 teardown_file() {
-    # Cleanup: delete test environment
-    if [ -n "${PANTHEON_MACHINE_TOKEN}" ] && [ -n "${TEST_MULTIDEV_NAME}" ]; then
-        authenticate_terminus
-        PANTHEON_SITE="$(get_test_site)"
-        terminus env:delete "${PANTHEON_SITE}.${TEST_MULTIDEV_NAME}" --delete-branch --yes 2>/dev/null || true
+    # Cleanup: delete test environment.
+    #
+    # Do not reference TEST_MULTIDEV_NAME here. It is assigned in setup(), which runs
+    # in a different process context, so it reads as empty in this function -- the
+    # guard below never passed and the environment was never deleted. Re-derive the
+    # name instead.
+    if [ -z "${PANTHEON_MACHINE_TOKEN}" ]; then
+        return 0
     fi
+
+    local env_name
+    env_name="$(get_file_multidev_name tmp1)"
+    if [ -z "${env_name}" ]; then
+        return 0
+    fi
+
+    authenticate_terminus
+    local site
+    site="$(get_test_site)"
+    terminus env:delete "${site}.${env_name}" --delete-branch --yes 2>/dev/null || true
 }
 
 @test "create_multidev and delete_multidev: create, detect existing, and delete" {
@@ -83,4 +96,44 @@ teardown_file() {
         echo "Multidev still exists after deletion"
         return 1
     fi
+}
+
+# --- guards for the cleanup leak (see get_file_multidev_name) ---
+
+@test "get_file_multidev_name: derives the name from the test environment" {
+    export PANTHEON_TEST_ENV="bats-a1b2"
+
+    run get_file_multidev_name tmp1
+    assert_success
+    [ "$output" = "tmp1-a1b2" ]
+}
+
+@test "get_file_multidev_name: is stable for the same prefix and test env" {
+    export PANTHEON_TEST_ENV="bats-a1b2"
+
+    # setup() and teardown_file() must agree, or cleanup targets the wrong name.
+    run get_file_multidev_name tmp2
+    assert_success
+    [ "$output" = "tmp2-a1b2" ]
+}
+
+@test "get_file_multidev_name: no test environment yields no name" {
+    unset PANTHEON_TEST_ENV
+
+    run get_file_multidev_name tmp1
+    assert_success
+    # Must be empty, so callers no-op rather than deleting "tmp1-".
+    [ -z "$output" ]
+}
+
+@test "teardown_file does not depend on a variable assigned in setup" {
+    # TEST_MULTIDEV_NAME is assigned in setup(), which runs in a different process
+    # context, so it reads as empty in teardown_file(). Referencing it there meant
+    # the environment was never deleted and leaked on every run.
+    for f in "${BATS_TEST_DIRNAME}/06a-create-from-live.bats" \
+             "${BATS_TEST_DIRNAME}/06b-create-from-dev.bats"; do
+        # Ignore comment lines -- the fix documents the variable by name.
+        run bash -c "sed -n '/^teardown_file()/,/^}/p' '$f' | grep -v '^[[:space:]]*#' | grep -c TEST_MULTIDEV_NAME"
+        assert_failure
+    done
 }

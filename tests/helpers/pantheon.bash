@@ -52,6 +52,29 @@ get_temp_multidev_name() {
     echo "tmp${test_id}-${suffix}"
 }
 
+# Name of the scratch multidev a test file uses, derived from the run's test
+# environment so setup() and teardown_file() always agree on it.
+#
+# teardown_file() runs in a different process context from setup(), so a variable
+# assigned in setup() reads as empty there. Deriving the name in both places is what
+# makes the cleanup actually fire -- while it did not, every run leaked one of these
+# environments and they accumulated until the site hit its multidev cap.
+#
+# Takes the file's prefix, e.g. "tmp1" -> "tmp1-a1b2" for test env "bats-a1b2".
+get_file_multidev_name() {
+    local prefix="$1"
+    local test_env
+    test_env="$(get_test_env)"
+
+    # No test environment means no derived name; callers must treat this as "nothing
+    # to do" rather than deleting "<prefix>-".
+    if [ -z "${test_env}" ]; then
+        return 0
+    fi
+
+    echo "${prefix}-${test_env#bats-}"
+}
+
 # Check if a multidev environment exists
 multidev_exists() {
     local site="$1"

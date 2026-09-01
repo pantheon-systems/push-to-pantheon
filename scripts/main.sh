@@ -762,8 +762,18 @@ function create_multidev() {
 		echo -e "${yellow}Creating multidev ${normal}${bold}${MULTIDEV_NAME}${normal}${yellow} from ${normal}${bold}${source_env}${normal}${yellow}...${normal}"
 		if terminus multidev:create "${PANTHEON_SITE}.${source_env}" "${MULTIDEV_NAME}" --yes; then
 			echo -e "${green}✅ Multidev ${normal}${bold}${MULTIDEV_NAME}${normal}${green} created successfully.${normal}"
+		elif terminus multidev:list "${PANTHEON_SITE}" --format=list | grep -q "^${MULTIDEV_NAME}$"; then
+			# Lost a race with something else creating the same environment. The only
+			# legitimate reason the create can fail and still leave us in a good state.
+			echo -e "${green}✅ Multidev ${normal}${bold}${MULTIDEV_NAME}${normal}${green} now exists; created concurrently.${normal}"
 		else
-			echo -e "${yellow}Note: Multidev ${normal}${bold}${MULTIDEV_NAME}${normal}${yellow} may already exist or creation failed.${normal}"
+			# Do not soften this. The existence check ran immediately above, so
+			# "may already exist" was never a real possibility here -- the create
+			# genuinely failed. Reporting it as a note let callers carry on: the BATS
+			# workflow's setup step passed without a test environment, and the whole
+			# integration suite then ran against an environment that was not there.
+			echo -e "${red}❌ Error: failed to create multidev ${normal}${bold}${MULTIDEV_NAME}${normal}${red} from ${normal}${bold}${source_env}${normal}${red}.${normal}"
+			exit 1
 		fi
 	fi
 }

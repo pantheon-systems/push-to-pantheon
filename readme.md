@@ -164,6 +164,28 @@ A custom commit message to be used with the Git commit that will be pushed to Pa
    default: ""
 ```
 
+Multiline messages are supported. A Pantheon repo is not a mirror of your source repo — the deploy commits a built artifact into Pantheon's own history, so that commit's SHA does not exist on GitHub. Passing the provenance as [git trailers](https://git-scm.com/docs/git-interpret-trailers) lets a Quicksilver hook recover it later on dev, and again on test and live after promotion:
+
+```yml
+      - name: Compose commit message
+        id: msg
+        run: |
+          {
+            echo "message<<EOF"
+            echo "Deploy ${GITHUB_REF_NAME} to Pantheon"
+            echo
+            echo "Source-Commit: ${GITHUB_SHA}"
+            echo "Source-Ref: ${GITHUB_REF}"
+            echo "CI-Run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - uses: pantheon-systems/push-to-pantheon@0.9.3
+        with:
+          git_commit_message: ${{ steps.msg.outputs.message }}
+          # ...
+```
+
 #### `relative_site_root`
 The root directory of the site to be deployed relative to the repository root. The vast majority of users of this action should leave this value unchanged from the default. The action will use this value to change directories after checking out the repo.
 

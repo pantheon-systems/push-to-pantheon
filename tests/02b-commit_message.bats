@@ -81,3 +81,67 @@ teardown() {
     # When GITHUB_REF is empty, it should strip "refs/heads/" prefix from empty string
     [ "$output" = "Deploy  to Pantheon" ]
 }
+
+# --- multiline / metacharacter handling (issue #173) ---
+#
+# These live here rather than in 08-push_pantheon.bats because they are about what
+# happens to the commit message, and because they need no Pantheon credentials — so
+# they run in the fast job on every PR.
+
+@test "get_commit_message: preserves newlines in PANTHEON_COMMIT_MESSAGE" {
+    export PANTHEON_COMMIT_MESSAGE="$(printf 'Deploy main to Pantheon\n\nSource-Commit: f1cb9d85d8e0\nCI-Run: 42')"
+
+    run get_commit_message
+    assert_success
+    [ "$output" = "$(printf 'Deploy main to Pantheon\n\nSource-Commit: f1cb9d85d8e0\nCI-Run: 42')" ]
+}
+
+@test "get_commit_message: preserves shell metacharacters" {
+    export PANTHEON_COMMIT_MESSAGE='Fix "login" $(id) `id` back\slash'
+
+    run get_commit_message
+    assert_success
+    [ "$output" = 'Fix "login" $(id) `id` back\slash' ]
+}
+
+@test "action.yml: commit message output uses the heredoc form, not key=value" {
+    # The single-line form makes the runner read line two of a multiline message as a
+    # new key and abort with "Invalid format".
+    run grep -n 'echo "message=' "${BATS_TEST_DIRNAME}/../action.yml"
+    assert_failure
+
+    run grep -c 'echo "message<<' "${BATS_TEST_DIRNAME}/../action.yml"
+    assert_success
+}
+
+@test "push_to_pantheon: commit message reaches terminus as one argument, unexecuted" {
+    local stub_dir="${TEST_TEMP_DIR}/bin"
+    local sentinel="${TEST_TEMP_DIR}/INJECTED"
+    mkdir -p "${stub_dir}"
+
+    cat > "${stub_dir}/terminus" <<'STUB'
+#!/bin/bash
+printf '%s\n' "$@" > "${ARGV_LOG}"
+STUB
+    chmod +x "${stub_dir}/terminus"
+
+    export ARGV_LOG="${TEST_TEMP_DIR}/argv.log"
+    export PATH="${stub_dir}:${PATH}"
+    export PANTHEON_SITE="mysite"
+    export PANTHEON_SOURCE_ENV="live"
+    export PANTHEON_TARGET_ENV="pr-9"
+    export SKIP_BUILD_TOOLS="false"
+    export LIVE_ENV_EXISTS="true"
+    export PANTHEON_COMMIT_MESSAGE="Deploy \"main\"
+Note: \$(touch ${sentinel}) \`touch ${sentinel}\`"
+
+    run bash -c 'source <(sed "$ d" scripts/main.sh) && push_to_pantheon 2>&1 | head -20'
+    assert_success
+
+    # The command substitutions embedded in the message must never have run.
+    [ ! -e "${sentinel}" ]
+
+    # The whole message must arrive as a single --message= argument.
+    assert_file_contains "${ARGV_LOG}" '--message=Deploy "main"'
+    assert_file_contains "${ARGV_LOG}" "Note: \$(touch ${sentinel})"
+}

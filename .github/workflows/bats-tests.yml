@@ -98,10 +98,29 @@ jobs:
           PANTHEON_MACHINE_TOKEN: ${{ secrets.PANTHEON_MACHINE_TOKEN }}
           PANTHEON_SITE: dtp-nearly-empty-site
           PANTHEON_TARGET_ENV: ${{ steps.test_env.outputs.TEST_ENV }}
+          TEST_ENV: ${{ steps.test_env.outputs.TEST_ENV }}
           DELETE_OLD_MULTIDEVS: true
           MULTIDEV_DELETE_PATTERN: 'bats-'
-          MULTIDEV_AGE_THRESHOLD_DAYS: 0
+          # Must not be 0. cleanup() matches the deploy suites' built-in patterns
+          # (*-std, *-cont, *-git, *-term, *-adv) unconditionally, and the prefix
+          # protection only engages when PANTHEON_TARGET_ENV itself carries a suite
+          # suffix -- which "bats-xxxx" does not. At 0 every environment counts as
+          # stale, so this step deleted the multidevs, GitHub environments and
+          # deployment records belonging to runs that were still in flight, in this
+          # PR and in others. A one-day floor keeps the janitorial sweep while
+          # leaving anything from a live run alone.
+          MULTIDEV_AGE_THRESHOLD_DAYS: 1
           GITHUB_TOKEN: ${{ github.token }}
           CI_PROJECT_USERNAME: ${{ github.repository_owner }}
           CI_PROJECT_REPONAME: ${{ github.event.repository.name }}
-        run: bash scripts/main.sh cleanup
+        run: |
+          # Delete this job's own environment explicitly -- it is younger than the
+          # age floor above, so the sweep will not pick it up.
+          if [ -n "${TEST_ENV}" ]; then
+            bash scripts/main.sh delete_multidev "${TEST_ENV}"
+          else
+            echo "No test environment was created; nothing of our own to delete."
+          fi
+
+          # Then sweep genuinely stale environments from earlier days.
+          bash scripts/main.sh cleanup

@@ -142,7 +142,9 @@ assert_file_contains() {
     local file="$1"
     local expected="$2"
 
-    if ! grep -q "$expected" "$file"; then
+    # -F -- so patterns starting with a dash (e.g. --message=...) are read as text,
+    # not as grep options, and so callers get literal-substring semantics.
+    if ! grep -qF -- "$expected" "$file"; then
         echo "Expected file $file to contain: $expected"
         echo "File contents:"
         cat "$file"

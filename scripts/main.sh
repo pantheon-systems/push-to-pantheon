@@ -614,9 +614,34 @@ delete_one_github_environment() {
 		echo -e "${red}  - No deployments found for environment ${normal}${bold}${ENV_NAME}${normal}${red}.${normal}"
 	fi
 
-	# Finally, delete the environment now that it is empty.
+	# Finally, try to delete the now-empty environment.
+	#
+	# This usually fails, and that is expected. Deleting an environment needs
+	# administration: write, which this action deliberately does not request -- it
+	# runs under pull_request_target with fork-authored code, and repository
+	# administration is far too much to hand that. Removing the deployments above is
+	# the part that matters, because that is what clears the pull request timeline;
+	# the empty environment is cosmetic.
+	#
+	# Report it plainly instead of failing. Previously the API error was neither
+	# checked nor surfaced, so every run claimed to delete environments it had not
+	# touched.
 	echo -e "${yellow}  - Deleting environment ${normal}${bold}${ENV_NAME}${normal}${yellow}...${normal}"
-	gh api --method DELETE "repos/${GITHUB_REPOSITORY}/environments/${ENV_NAME}"
+	local delete_error
+	if delete_error=$(gh api --method DELETE "repos/${GITHUB_REPOSITORY}/environments/${ENV_NAME}" 2>&1); then
+		echo -e "${green}  - Environment ${normal}${bold}${ENV_NAME}${normal}${green} deleted.${normal}"
+		return 0
+	fi
+
+	echo -e "${yellow}  - Kept environment ${normal}${bold}${ENV_NAME}${normal}${yellow} (its deployments were removed).${normal}"
+
+	# Explain the cause once per run rather than for every environment.
+	if [ -z "${GITHUB_ENV_DELETE_EXPLAINED}" ]; then
+		echo -e "${yellow}    Deleting a GitHub environment requires administration: write, which this${normal}"
+		echo -e "${yellow}    action does not request. Empty environments are left in place by design.${normal}"
+		echo -e "${yellow}    API said: ${delete_error}${normal}"
+		GITHUB_ENV_DELETE_EXPLAINED=1
+	fi
 }
 
 # Delete multidevs whose associated pull request is already closed.

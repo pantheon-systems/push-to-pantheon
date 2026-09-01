@@ -91,13 +91,5 @@ teardown() {
     # Note: Full command will fail at git push, but we only care about
     # verifying the multidev check logic worked correctly
     assert_output_contains "Checking if multidev"
-
-    # Deliberately not asserting which branch the check takes. Whether the
-    # environment already exists is a precondition this test does not own -- it
-    # depends on the workflow's setup step, on concurrent runs against the shared
-    # test site, and on Pantheon completing the create. Asserting "already exists"
-    # here made the test fail whenever setup's multidev:create did not finish, which
-    # says nothing about the check logic this test is named for. 06a covers the
-    # already-exists branch properly, by creating the environment first and waiting
-    # for it to become visible.
+    assert_output_contains "already exists"
 }

@@ -64,3 +64,20 @@ teardown_file() {
     assert_output_contains "from"
     assert_output_contains "dev"
 }
+
+@test "create_multidev: a genuine creation failure is fatal, not a note" {
+    # Previously this path printed "may already exist or creation failed" and
+    # returned success, so the BATS workflow's setup step reported success without a
+    # test environment and the whole integration suite ran against one that was not
+    # there. The existence check runs before the create, so reaching the failure
+    # branch means the create really failed.
+    export SOURCE_ENV="no-such-source-env"
+
+    # Short name: Pantheon caps environment names at 11 characters.
+    local name="tmpf-$(get_test_env | sed 's/^bats-//')"
+
+    run create_multidev "${name}"
+
+    assert_failure
+    assert_output_contains "failed to create multidev"
+}

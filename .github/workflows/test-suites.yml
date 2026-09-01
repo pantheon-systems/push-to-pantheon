@@ -74,21 +74,31 @@ jobs:
           echo "Deployment completed successfully"
           echo "Environment: ${{ inputs.env_prefix }}-std"
 
-      - name: Check environment URL accessibility
+      - name: Check environment URL is available
         run: |
           ENV_URL="https://${{ inputs.env_prefix }}-std-dtp-nearly-empty-site.pantheonsite.io"
-          echo "Checking accessibility of ${ENV_URL}"
+          echo "Waiting for ${ENV_URL} to become available"
 
-          # Wait a few seconds for environment to be fully ready
-          sleep 10
+          # A multidev is not served the instant Terminus reports it created -- the
+          # build itself regularly takes minutes on this site. A single request after
+          # a fixed 10s sleep produced spurious 404s, so retry with a real budget and
+          # only fail once the environment has genuinely had time to come up.
+          ATTEMPTS=10
+          DELAY=15
 
-          # Try to fetch the URL (fail if not accessible)
-          if curl -sSf "${ENV_URL}" > /dev/null; then
-            echo "::notice::✅ Environment URL is accessible"
-          else
-            echo "::error::❌ Environment URL is not accessible"
-            exit 1
-          fi
+          for i in $(seq 1 "${ATTEMPTS}"); do
+            if curl -sSf --max-time 30 "${ENV_URL}" > /dev/null; then
+              echo "::notice::✅ Environment URL is available (attempt ${i}/${ATTEMPTS})"
+              exit 0
+            fi
+            if [ "${i}" -lt "${ATTEMPTS}" ]; then
+              echo "Attempt ${i}/${ATTEMPTS} did not succeed; retrying in ${DELAY}s"
+              sleep "${DELAY}"
+            fi
+          done
+
+          echo "::error::❌ Environment URL did not become available after $(( (ATTEMPTS - 1) * DELAY ))s"
+          exit 1
 
   content:
     name: Clone Content
@@ -124,17 +134,31 @@ jobs:
           echo "Deployment completed successfully"
           echo "Environment: ${{ inputs.env_prefix }}-cont"
 
-      - name: Check environment URL accessibility
+      - name: Check environment URL is available
         run: |
           ENV_URL="https://${{ inputs.env_prefix }}-cont-dtp-nearly-empty-site.pantheonsite.io"
-          echo "Checking accessibility of ${ENV_URL}"
-          sleep 10
-          if curl -sSf "${ENV_URL}" > /dev/null; then
-            echo "::notice::✅ Environment URL is accessible"
-          else
-            echo "::error::❌ Environment URL is not accessible"
-            exit 1
-          fi
+          echo "Waiting for ${ENV_URL} to become available"
+
+          # A multidev is not served the instant Terminus reports it created -- the
+          # build itself regularly takes minutes on this site. A single request after
+          # a fixed 10s sleep produced spurious 404s, so retry with a real budget and
+          # only fail once the environment has genuinely had time to come up.
+          ATTEMPTS=10
+          DELAY=15
+
+          for i in $(seq 1 "${ATTEMPTS}"); do
+            if curl -sSf --max-time 30 "${ENV_URL}" > /dev/null; then
+              echo "::notice::✅ Environment URL is available (attempt ${i}/${ATTEMPTS})"
+              exit 0
+            fi
+            if [ "${i}" -lt "${ATTEMPTS}" ]; then
+              echo "Attempt ${i}/${ATTEMPTS} did not succeed; retrying in ${DELAY}s"
+              sleep "${DELAY}"
+            fi
+          done
+
+          echo "::error::❌ Environment URL did not become available after $(( (ATTEMPTS - 1) * DELAY ))s"
+          exit 1
 
   git-only:
     name: Git-Only Deployment
@@ -172,17 +196,31 @@ jobs:
           echo "Deployment completed successfully"
           echo "Environment: ${{ inputs.env_prefix }}-git"
 
-      - name: Check environment URL accessibility
+      - name: Check environment URL is available
         run: |
           ENV_URL="https://${{ inputs.env_prefix }}-git-dtp-nearly-empty-site.pantheonsite.io"
-          echo "Checking accessibility of ${ENV_URL}"
-          sleep 10
-          if curl -sSf "${ENV_URL}" > /dev/null; then
-            echo "::notice::✅ Environment URL is accessible"
-          else
-            echo "::error::❌ Environment URL is not accessible"
-            exit 1
-          fi
+          echo "Waiting for ${ENV_URL} to become available"
+
+          # A multidev is not served the instant Terminus reports it created -- the
+          # build itself regularly takes minutes on this site. A single request after
+          # a fixed 10s sleep produced spurious 404s, so retry with a real budget and
+          # only fail once the environment has genuinely had time to come up.
+          ATTEMPTS=10
+          DELAY=15
+
+          for i in $(seq 1 "${ATTEMPTS}"); do
+            if curl -sSf --max-time 30 "${ENV_URL}" > /dev/null; then
+              echo "::notice::✅ Environment URL is available (attempt ${i}/${ATTEMPTS})"
+              exit 0
+            fi
+            if [ "${i}" -lt "${ATTEMPTS}" ]; then
+              echo "Attempt ${i}/${ATTEMPTS} did not succeed; retrying in ${DELAY}s"
+              sleep "${DELAY}"
+            fi
+          done
+
+          echo "::error::❌ Environment URL did not become available after $(( (ATTEMPTS - 1) * DELAY ))s"
+          exit 1
 
   terminus-preinstalled:
     name: Terminus Pre-installed
@@ -228,17 +266,31 @@ jobs:
           echo "Deployment completed successfully"
           echo "Environment: ${{ inputs.env_prefix }}-term"
 
-      - name: Check environment URL accessibility
+      - name: Check environment URL is available
         run: |
           ENV_URL="https://${{ inputs.env_prefix }}-term-dtp-nearly-empty-site.pantheonsite.io"
-          echo "Checking accessibility of ${ENV_URL}"
-          sleep 10
-          if curl -sSf "${ENV_URL}" > /dev/null; then
-            echo "::notice::✅ Environment URL is accessible"
-          else
-            echo "::error::❌ Environment URL is not accessible"
-            exit 1
-          fi
+          echo "Waiting for ${ENV_URL} to become available"
+
+          # A multidev is not served the instant Terminus reports it created -- the
+          # build itself regularly takes minutes on this site. A single request after
+          # a fixed 10s sleep produced spurious 404s, so retry with a real budget and
+          # only fail once the environment has genuinely had time to come up.
+          ATTEMPTS=10
+          DELAY=15
+
+          for i in $(seq 1 "${ATTEMPTS}"); do
+            if curl -sSf --max-time 30 "${ENV_URL}" > /dev/null; then
+              echo "::notice::✅ Environment URL is available (attempt ${i}/${ATTEMPTS})"
+              exit 0
+            fi
+            if [ "${i}" -lt "${ATTEMPTS}" ]; then
+              echo "Attempt ${i}/${ATTEMPTS} did not succeed; retrying in ${DELAY}s"
+              sleep "${DELAY}"
+            fi
+          done
+
+          echo "::error::❌ Environment URL did not become available after $(( (ATTEMPTS - 1) * DELAY ))s"
+          exit 1
 
   advanced:
     name: Advanced Deployment
@@ -287,18 +339,32 @@ jobs:
 
           echo "Checking whether the target environment url output from the action matches ${TARGET_ENV_URL}"
           if [[ "${{ steps.deploy_to_pantheon.outputs.target_env_url }}" != "${TARGET_ENV_URL}" ]]; then
-            echo "::error::❌ Environment URL is not accessible"
+            echo "::error::❌ deploy to pantheon output a target_env_url of ${{ steps.deploy_to_pantheon.outputs.target_env_url }}"
             exit 1
           fi
 
-      - name: Check environment URL accessibility
+      - name: Check environment URL is available
         run: |
           ENV_URL="https://${{ inputs.env_prefix }}-adv-dtp-nearly-empty-site.pantheonsite.io"
-          echo "Checking accessibility of ${ENV_URL}"
-          sleep 10
-          if curl -sSf "${ENV_URL}" > /dev/null; then
-            echo "::notice::✅ Environment URL is accessible"
-          else
-            echo "::error::❌ Environment URL is not accessible"
-            exit 1
-          fi
+          echo "Waiting for ${ENV_URL} to become available"
+
+          # A multidev is not served the instant Terminus reports it created -- the
+          # build itself regularly takes minutes on this site. A single request after
+          # a fixed 10s sleep produced spurious 404s, so retry with a real budget and
+          # only fail once the environment has genuinely had time to come up.
+          ATTEMPTS=10
+          DELAY=15
+
+          for i in $(seq 1 "${ATTEMPTS}"); do
+            if curl -sSf --max-time 30 "${ENV_URL}" > /dev/null; then
+              echo "::notice::✅ Environment URL is available (attempt ${i}/${ATTEMPTS})"
+              exit 0
+            fi
+            if [ "${i}" -lt "${ATTEMPTS}" ]; then
+              echo "Attempt ${i}/${ATTEMPTS} did not succeed; retrying in ${DELAY}s"
+              sleep "${DELAY}"
+            fi
+          done
+
+          echo "::error::❌ Environment URL did not become available after $(( (ATTEMPTS - 1) * DELAY ))s"
+          exit 1

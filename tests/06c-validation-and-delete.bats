@@ -91,3 +91,43 @@ teardown() {
     assert_success
     # Output should mention the count of available environments
 }
+
+# --- limit check must not block redeploys to an existing environment ---
+#
+# The limit steps in action.yml used to be gated on `inputs.target_env == ''`, so
+# they never ran for explicitly named environments -- including every test suite
+# deployment. Removing that gate means the check now runs for those too, which makes
+# it important that an existing target does not read as "no room".
+
+@test "check_multidev_limit: existing target env does not consume a slot" {
+    export PANTHEON_TARGET_ENV="$(get_test_env)"
+
+    run check_multidev_limit
+    assert_success
+    assert_output_contains "already exists; no new multidev slot required"
+}
+
+@test "check_multidev_limit: existing target env reports availability to GITHUB_OUTPUT" {
+    export PANTHEON_TARGET_ENV="$(get_test_env)"
+    export GITHUB_OUTPUT="${TEST_TEMP_DIR}/github_output"
+    : > "${GITHUB_OUTPUT}"
+
+    run check_multidev_limit
+    assert_success
+    assert_file_contains "${GITHUB_OUTPUT}" "multidev_available=true"
+}
+
+@test "check_multidev_limit: absent target env falls through to the slot count" {
+    export PANTHEON_TARGET_ENV="definitely-not-a-real-env"
+
+    run check_multidev_limit
+    assert_success
+    assert_output_not_contains "no new multidev slot required"
+}
+
+@test "action.yml: limit steps are not gated on an empty target_env" {
+    # Regression guard: the gate meant the multidev limit warning never reached a PR
+    # that passed target_env explicitly.
+    run grep -c "inputs.target_env == ''" "${BATS_TEST_DIRNAME}/../action.yml"
+    assert_failure
+}

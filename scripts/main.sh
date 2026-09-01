@@ -200,12 +200,32 @@ function check_multidev_limit() {
 		exit 1
 	fi
 
-	# Count current multidevs (exclude dev, test, live)
-	local current_multidevs
-	if ! current_multidevs=$(terminus multidev:list "${PANTHEON_SITE}" --format=list 2>&1 | grep -cE -v '^(dev|test|live)$'); then
-		echo -e "${red}Error: Failed to count current multidevs${normal}"
+	# List current multidevs once; we need both the count and the membership test.
+	local multidev_list
+	if ! multidev_list=$(terminus multidev:list "${PANTHEON_SITE}" --format=list 2>&1); then
+		echo -e "${red}Error: Failed to list current multidevs${normal}"
+		echo -e "${red}${multidev_list}${normal}"
 		exit 1
 	fi
+
+	# Redeploying to an environment that already exists consumes no new slot, so a
+	# full site is not a reason to stop. Without this, re-pushing to an existing
+	# multidev on a site at capacity would abort a deployment that would have worked.
+	if [ -n "${PANTHEON_TARGET_ENV}" ] && echo "${multidev_list}" | grep -qx -- "${PANTHEON_TARGET_ENV}"; then
+		echo -e "${green}✅ ${normal}${bold}${PANTHEON_TARGET_ENV}${normal}${green} already exists; no new multidev slot required.${normal}"
+		if [ -n "${GITHUB_OUTPUT}" ]; then
+			echo "multidev_available=true" >> "${GITHUB_OUTPUT}"
+			echo "available_count=0" >> "${GITHUB_OUTPUT}"
+		fi
+		return 0
+	fi
+
+	# Count current multidevs (exclude dev, test, live). grep -c exits non-zero when
+	# it matches nothing, which is a legitimate count of zero, so do not treat that
+	# as a failure.
+	local current_multidevs
+	current_multidevs=$(echo "${multidev_list}" | grep -cE -v '^(dev|test|live)$' || true)
+	current_multidevs=${current_multidevs:-0}
 
 	# Calculate available slots
 	local available_count=$((max_multidevs - current_multidevs))

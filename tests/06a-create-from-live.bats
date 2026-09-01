@@ -64,9 +64,12 @@ teardown_file() {
     assert_success
     assert_output_contains "Creating multidev"
 
-    # Wait for environment to be fully created and accessible
+    # Wait for environment to be fully created and accessible.
+    # Creating from live clones the database, and the shared test site is often
+    # building several multidevs at once (five deploy suites per open PR), so this
+    # regularly takes minutes rather than seconds. 120s was not a realistic budget.
     local attempts=0
-    local max_attempts=60
+    local max_attempts=300
     while [ $attempts -lt $max_attempts ]; do
         if terminus env:info "${PANTHEON_SITE}.${TEST_MULTIDEV_NAME}" --field=id >/dev/null 2>&1; then
             break
@@ -77,6 +80,7 @@ teardown_file() {
 
     # Verify it's accessible
     if ! terminus env:info "${PANTHEON_SITE}.${TEST_MULTIDEV_NAME}" --field=id >/dev/null 2>&1; then
+        echo "Multidev ${TEST_MULTIDEV_NAME} was not accessible after $((max_attempts * 2))s" >&2
         return 1
     fi
 

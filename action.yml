@@ -21,6 +21,11 @@ inputs:
     required: false
     default: ""
 
+  deployment_environment:
+    description: 'The name of the GitHub deployment environment used to report this deployment in the pull request timeline. Defaults to the Pantheon target environment. Set this when one branch deploys to several Pantheon sites: GitHub groups the timeline by environment name, so identical names cause the deployments to overwrite one another and only the last one is visible. Unlike the Pantheon environment, this name is not limited to 11 characters, e.g. "my-site-pr-123".'
+    required: false
+    default: ""
+
   source_env:
     description: "The environment from which the database and uploaded files will be copied."
     required: false
@@ -85,6 +90,9 @@ outputs:
   target_env_url:
     description: "The url for the target environment the branch was deployed to"
     value: https://${{ steps.set_target_env.outputs.PANTHEON_TARGET_ENV }}-${{ inputs.site }}.pantheonsite.io
+  deployment_environment:
+    description: "The GitHub deployment environment used to report this deployment"
+    value: ${{ steps.set_target_env.outputs.GITHUB_DEPLOYMENT_ENV }}
 
 runs:
     using: 'composite'
@@ -96,6 +104,7 @@ runs:
         env:
           PR_NUM: ${{ github.event.pull_request.number }}
           INPUT_TARGET_ENV: ${{ inputs.target_env }}
+          INPUT_DEPLOYMENT_ENVIRONMENT: ${{ inputs.deployment_environment }}
         run: |
           TARGET_ENV=$("${GITHUB_ACTION_PATH}/scripts/main.sh" get_target_env)
           echo "PANTHEON_TARGET_ENV set to ${TARGET_ENV}"
@@ -103,6 +112,17 @@ runs:
           echo "${TARGET_ENV}" >> $GITHUB_ENV
           echo "EOF" >> $GITHUB_ENV
           echo "PANTHEON_TARGET_ENV=${TARGET_ENV}" >> "$GITHUB_OUTPUT"
+
+          # The GitHub deployment environment is a separate namespace from the
+          # Pantheon one. Keeping them identical is fine for a single site, but it
+          # makes several sites deploying the same branch collide in the pull
+          # request timeline, because GitHub groups deployments by environment name.
+          DEPLOYMENT_ENV="${INPUT_DEPLOYMENT_ENVIRONMENT:-${TARGET_ENV}}"
+          echo "GITHUB_DEPLOYMENT_ENV set to ${DEPLOYMENT_ENV}"
+          echo "GITHUB_DEPLOYMENT_ENV<<EOF" >> $GITHUB_ENV
+          echo "${DEPLOYMENT_ENV}" >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
+          echo "GITHUB_DEPLOYMENT_ENV=${DEPLOYMENT_ENV}" >> "$GITHUB_OUTPUT"
 
       - name: Set clone content flag
         shell: bash
@@ -147,8 +167,9 @@ runs:
         with:
           step: start
           token: ${{ github.token }}
-          env: ${{ env.PANTHEON_TARGET_ENV }}
+          env: ${{ env.GITHUB_DEPLOYMENT_ENV }}
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          payload: '{"pantheon_site": "${{ inputs.site }}", "pantheon_env": "${{ env.PANTHEON_TARGET_ENV }}"}'
 
       - name: Configure SSH key
         uses: webfactory/ssh-agent@v0.10.0
@@ -333,7 +354,7 @@ runs:
           status: ${{ job.status }}
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           deployment_id: ${{ steps.deployment.outputs.deployment_id }}
-          env: ${{ env.PANTHEON_TARGET_ENV }}
+          env: ${{ env.GITHUB_DEPLOYMENT_ENV }}
           env_url: https://${{ env.PANTHEON_TARGET_ENV }}-${{ inputs.site }}.pantheonsite.io
       - name: Deleting old multidevs
         if: ${{ inputs.delete_old_environments == 'true' && steps.deploy_to_pantheon.outcome == 'success' }}

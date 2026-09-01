@@ -27,6 +27,7 @@ function main() {
 	- push_to_pantheon: Push code to Pantheon, either via Git or Build Tools depending on configuration and environment state.
 	- cleanup: Clean up stale Pantheon multidev environments. This includes environments associated with closed PRs as well as old environments matching a specified pattern.
 	- cleanup_closed_pr_multidevs: Delete pr-* multidevs whose pull request is closed (workaround for terminus-build-tools-plugin#505).
+	- resolve_github_environments: Print the GitHub deployment environment(s) that belong to a Pantheon multidev.
 	- create_multidev: Create a multidev environment from a source environment if it doesn't already exist.
 	- delete_multidev: Delete a specific multidev environment and its Git branch.
 	"
@@ -43,7 +44,7 @@ function main() {
 	fi
 
 	# Check for a valid command.
-	if [ "$1" != 'compute_multidev_name' ] && [ "$1" != 'get_commit_message' ] && [ "$1" != 'get_target_env' ] && [ "$1" != 'check_missing_permissions' ] && [ "$1" != 'get_missing_permissions_help' ] && [ "$1" != 'check_multidev_limit' ] && [ "$1" != 'setup_ssh_hostkeys' ] && [ "$1" != 'prepare_site_root' ] && [ "$1" != 'push_to_pantheon' ] && [ "$1" != 'cleanup' ] && [ "$1" != 'cleanup_closed_pr_multidevs' ] && [ "$1" != 'verify_build_tools' ] && [ "$1" != 'create_multidev' ] && [ "$1" != 'delete_multidev' ]; then
+	if [ "$1" != 'compute_multidev_name' ] && [ "$1" != 'get_commit_message' ] && [ "$1" != 'get_target_env' ] && [ "$1" != 'check_missing_permissions' ] && [ "$1" != 'get_missing_permissions_help' ] && [ "$1" != 'check_multidev_limit' ] && [ "$1" != 'setup_ssh_hostkeys' ] && [ "$1" != 'prepare_site_root' ] && [ "$1" != 'push_to_pantheon' ] && [ "$1" != 'cleanup' ] && [ "$1" != 'cleanup_closed_pr_multidevs' ] && [ "$1" != 'resolve_github_environments' ] && [ "$1" != 'verify_build_tools' ] && [ "$1" != 'create_multidev' ] && [ "$1" != 'delete_multidev' ]; then
 		echo -e "${red}Invalid command: $1${normal}"
 		echo -e "${help_msg}"
 		exit 1
@@ -518,15 +519,87 @@ function push_to_pantheon() {
 # Function to delete a GitHub environment and all of its associated deployments.
 # The GitHub API requires that all deployments be deleted before an environment
 # can be deleted.
-delete_github_environment() {
-	local ENV_NAME=$1
-	echo -e "${yellow}Cleaning up GitHub environment: ${normal}${bold}${ENV_NAME}${normal}..."
+# Find the GitHub deployment environments that belong to a Pantheon multidev.
+#
+# By default the GitHub deployment environment is named after the Pantheon
+# environment, so the name alone is enough. The deployment_environment input
+# breaks that assumption on purpose -- several sites deploying the same branch
+# need distinct GitHub environments or they collide in the pull request timeline.
+# Once the names differ, cleanup can no longer find the environment by name and
+# would leave it behind for ever.
+#
+# The action records the mapping in each deployment's payload, so resolve it from
+# there. Candidates are pre-filtered by name to keep this to a couple of API calls
+# rather than one per environment on the repository.
+#
+# Parameters:
+#   $1: The Pantheon multidev name
+# Outputs: newline-separated GitHub environment names (may be empty)
+resolve_github_environments() {
+	local pantheon_env="${1}"
 
-	# Check if the environment exists before trying to delete it.
-	if ! gh api "repos/${GITHUB_REPOSITORY}/environments/${ENV_NAME}" > /dev/null 2>&1; then
-		echo -e "${red}GitHub environment ${normal}${bold}${ENV_NAME}${normal}${red} does not exist, skipping deletion.${normal}"
+	if [ -z "${pantheon_env}" ] || [ -z "${GITHUB_REPOSITORY}" ]; then
+		return 0
+	fi
+
+	# Fast path: an environment named exactly after the multidev. This is the
+	# default arrangement, so most cleanups stop here.
+	if gh api "repos/${GITHUB_REPOSITORY}/environments/${pantheon_env}" > /dev/null 2>&1; then
+		echo "${pantheon_env}"
+		return 0
+	fi
+
+	local candidates
+	candidates=$(gh api --paginate "repos/${GITHUB_REPOSITORY}/environments" \
+		--jq '.environments[].name' 2>/dev/null | grep -F -- "${pantheon_env}" || true)
+
+	if [ -z "${candidates}" ]; then
+		return 0
+	fi
+
+	# Confirm against the payload rather than trusting the name: "pr-11" is a
+	# substring of "pr-114", and a site prefix could collide across sites.
+	local candidate payload_env payload_site
+	for candidate in ${candidates}; do
+		payload_env=$(gh api \
+			"repos/${GITHUB_REPOSITORY}/deployments?environment=${candidate}&per_page=1" \
+			--jq '.[0].payload.pantheon_env // empty' 2>/dev/null || true)
+		payload_site=$(gh api \
+			"repos/${GITHUB_REPOSITORY}/deployments?environment=${candidate}&per_page=1" \
+			--jq '.[0].payload.pantheon_site // empty' 2>/dev/null || true)
+
+		if [ "${payload_env}" = "${pantheon_env}" ] &&
+			{ [ -z "${PANTHEON_SITE}" ] || [ -z "${payload_site}" ] || [ "${payload_site}" = "${PANTHEON_SITE}" ]; }; then
+			echo "${candidate}"
+		fi
+	done
+}
+
+delete_github_environment() {
+	local PANTHEON_ENV=$1
+
+	# Callers pass the Pantheon multidev name. The GitHub environment usually shares
+	# that name, but not when deployment_environment is set, so resolve it.
+	local RESOLVED
+	RESOLVED=$(resolve_github_environments "${PANTHEON_ENV}")
+
+	if [ -z "${RESOLVED}" ]; then
+		echo -e "${red}No GitHub environment found for ${normal}${bold}${PANTHEON_ENV}${normal}${red}, skipping deletion.${normal}"
 		return
 	fi
+
+	local ENV_NAME
+	for ENV_NAME in ${RESOLVED}; do
+		delete_one_github_environment "${ENV_NAME}"
+	done
+}
+
+# Delete a single GitHub deployment environment and all of its deployments.
+# The GitHub API requires that all deployments be deleted before an environment
+# can be deleted.
+delete_one_github_environment() {
+	local ENV_NAME=$1
+	echo -e "${yellow}Cleaning up GitHub environment: ${normal}${bold}${ENV_NAME}${normal}..."
 
 	# Get the list of deployment IDs for the environment.
 	DEPLOYMENT_IDS=$(gh api "repos/${GITHUB_REPOSITORY}/deployments?environment=${ENV_NAME}" --jq '.[].id')

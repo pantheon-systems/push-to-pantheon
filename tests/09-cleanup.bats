@@ -176,3 +176,134 @@ teardown() {
     assert_output_not_contains "is stale"
     assert_output_contains "No stale closed-PR multidevs found"
 }
+
+# --- resolve_github_environments() / delete_github_environment() (issue #101) ---
+#
+# The GitHub deployment environment is normally named after the Pantheon multidev,
+# but deployment_environment breaks that on purpose so that several sites deploying
+# one branch get distinct entries in the pull request timeline. Cleanup therefore
+# resolves the mapping from each deployment's payload instead of trusting the name.
+#
+# The multi-environment cases stub `gh`, because exercising them for real would mean
+# creating GitHub environments and deployments on this repository. The guard and
+# no-match cases run against the real API.
+
+@test "resolve_github_environments: empty multidev name yields nothing" {
+    run resolve_github_environments ""
+    assert_success
+    [ -z "$output" ]
+}
+
+@test "resolve_github_environments: no GITHUB_REPOSITORY yields nothing" {
+    unset GITHUB_REPOSITORY
+
+    run resolve_github_environments "pr-1"
+    assert_success
+    [ -z "$output" ]
+}
+
+@test "resolve_github_environments: unknown multidev yields nothing" {
+    run resolve_github_environments "no-such-env-$$"
+    assert_success
+    [ -z "$output" ]
+}
+
+# Stub `gh` so the environment list and deployment payloads are controllable.
+# ENVS lists environment names; ENVOF_<key>/SITEOF_<key> give each one's payload.
+_stub_gh() {
+    local dir="${TEST_TEMP_DIR}/ghstub"
+    mkdir -p "${dir}"
+    cat > "${dir}/gh" <<'STUB'
+#!/bin/bash
+path=""; jq=""; prev=""
+for a in "$@"; do
+  case "$prev" in --jq) jq="$a";; esac
+  case "$a" in repos/*) path="$a";; esac
+  prev="$a"
+done
+key() { printf '%s' "$1" | tr -c 'a-zA-Z0-9' '_'; }
+[ -n "$GH_CALL_LOG" ] && printf '%s\n' "$*" >> "$GH_CALL_LOG"
+case "$path" in
+  */deployments/*/statuses) exit 0 ;;
+  */environments/*) n="${path##*/environments/}"
+      case " $EXACT_ENVS " in *" $n "*) exit 0;; *) exit 1;; esac ;;
+  */environments) printf '%s\n' $ENVS; exit 0 ;;
+  */deployments*)
+      e="${path##*environment=}"; e="${e%%&*}"; k=$(key "$e")
+      case "$jq" in
+        *pantheon_env*)  eval "printf '%s\n' \"\${ENVOF_$k}\"" ;;
+        *pantheon_site*) eval "printf '%s\n' \"\${SITEOF_$k}\"" ;;
+        *.id*)           printf '%s\n' $DEPLOY_IDS ;;
+      esac; exit 0 ;;
+esac
+exit 1
+STUB
+    chmod +x "${dir}/gh"
+    export PATH="${dir}:${PATH}"
+}
+
+@test "resolve_github_environments: matching name short-circuits the payload lookup" {
+    _stub_gh
+    export EXACT_ENVS="pr-114" ENVS="pr-114"
+
+    run resolve_github_environments "pr-114"
+    assert_success
+    [ "$output" = "pr-114" ]
+}
+
+@test "resolve_github_environments: picks the environment belonging to this site" {
+    _stub_gh
+    export EXACT_ENVS="" ENVS="siteA-pr-114 siteB-pr-114"
+    export ENVOF_siteA_pr_114="pr-114" SITEOF_siteA_pr_114="siteA"
+    export ENVOF_siteB_pr_114="pr-114" SITEOF_siteB_pr_114="siteB"
+    export PANTHEON_SITE="siteB"
+
+    run resolve_github_environments "pr-114"
+    assert_success
+    [ "$output" = "siteB-pr-114" ]
+}
+
+@test "resolve_github_environments: does not match on a name substring alone" {
+    # "pr-11" is a substring of "siteA-pr-114"; the payload says otherwise.
+    _stub_gh
+    export EXACT_ENVS="" ENVS="siteA-pr-114"
+    export ENVOF_siteA_pr_114="pr-114" SITEOF_siteA_pr_114="siteA"
+    export PANTHEON_SITE="siteA"
+
+    run resolve_github_environments "pr-11"
+    assert_success
+    [ -z "$output" ]
+}
+
+@test "delete_github_environment: reports when nothing resolves and deletes nothing" {
+    _stub_gh
+    export EXACT_ENVS="" ENVS=""
+
+    run delete_github_environment "no-such-env-$$"
+    assert_success
+    assert_output_contains "No GitHub environment found"
+    assert_output_not_contains "Deleting environment"
+}
+
+@test "delete_github_environment: still deletes deployments then the environment" {
+    # Regression guard for the refactor that introduced resolve_github_environments:
+    # the default (matching name) path must behave exactly as before.
+    _stub_gh
+    export EXACT_ENVS="pr-114" ENVS="pr-114" DEPLOY_IDS="11 22"
+    export GH_CALL_LOG="${TEST_TEMP_DIR}/gh-calls.log"
+    : > "${GH_CALL_LOG}"
+
+    run delete_github_environment "pr-114"
+    assert_success
+    assert_output_contains "Deleting deployment ID"
+    assert_output_contains "Deleting environment"
+
+    # Deployments must be removed before the environment, or GitHub refuses.
+    assert_file_contains "${GH_CALL_LOG}" "deployments/11"
+    assert_file_contains "${GH_CALL_LOG}" "deployments/22"
+    assert_file_contains "${GH_CALL_LOG}" "environments/pr-114"
+    local last_dep last_env
+    last_dep=$(grep -n 'deployments/' "${GH_CALL_LOG}" | tail -1 | cut -d: -f1)
+    last_env=$(grep -n 'DELETE' "${GH_CALL_LOG}" | grep 'environments/' | tail -1 | cut -d: -f1)
+    [ "${last_dep}" -lt "${last_env}" ]
+}

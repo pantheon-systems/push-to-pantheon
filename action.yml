@@ -21,6 +21,11 @@ inputs:
     required: false
     default: ""
 
+  target_env_strategy:
+    description: 'How to derive the Pantheon environment name when target_env is blank. "pr" (the default) names pull request environments "pr-[NUMBER]". "branch" uses the branch name as-is, which requires it to be a valid Pantheon Multidev name: all lowercase, letters, numbers and hyphens only, starting with a letter or number, at most 11 characters, and not reserved by Pantheon. Pushes to main/master deploy to the Pantheon "dev" environment under either strategy, because the Dev environment is fed by the master branch rather than by a Multidev.'
+    required: false
+    default: "pr"
+
   source_env:
     description: "The environment from which the database and uploaded files will be copied."
     required: false
@@ -96,6 +101,9 @@ runs:
         env:
           PR_NUM: ${{ github.event.pull_request.number }}
           INPUT_TARGET_ENV: ${{ inputs.target_env }}
+          INPUT_TARGET_ENV_STRATEGY: ${{ inputs.target_env_strategy }}
+          GITHUB_HEAD_REF: ${{ github.head_ref }}
+          GITHUB_REF: ${{ github.ref }}
         run: |
           TARGET_ENV=$("${GITHUB_ACTION_PATH}/scripts/main.sh" get_target_env)
           echo "PANTHEON_TARGET_ENV set to ${TARGET_ENV}"

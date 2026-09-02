@@ -125,6 +125,37 @@ The Pantheon environment to which the deployment will be made. If left blank, th
    default: ""
 ```
 
+#### `target_env_strategy`
+How to derive the Pantheon environment name when `target_env` is blank.
+
+```yml
+   default: "pr"
+```
+
+| Value | Behaviour |
+|---|---|
+| `pr` (default) | Pull requests deploy to `pr-${NUMBER}`. |
+| `branch` | Pull requests and branch pushes deploy to a Multidev named after the branch. |
+
+Under `branch`, the branch name is used exactly as-is. It is not sanitised or truncated, so it must already be a valid Pantheon Multidev name:
+
+- all lowercase
+- only letters, numbers and hyphens
+- starts with a letter or number
+- maximum of 11 characters
+- not one of Pantheon's reserved names: `master`, `settings`, `team`, `support`, `debug`, `multidev`, `multi`, `files`, `tags`, `billing`
+
+A branch that does not qualify fails the deployment with those requirements listed, rather than being silently rewritten. Truncating to fit would make `feature-a` and `feature-b` collide on the same environment, and adding a hash to keep them distinct would discard the readability that makes branch naming worth using.
+
+```yml
+      - uses: pantheon-systems/push-to-pantheon@0.9.3
+        with:
+          target_env_strategy: branch
+          # a PR from branch "redesign" deploys to the "redesign" Multidev
+```
+
+Pushes to `main`/`master` deploy to the Pantheon `dev` environment under either strategy. Pantheon's Dev environment is fed by the `master` branch rather than by a Multidev, so there is no environment name to derive.
+
 #### `source_env`
 
 The environment from which the database and uploaded files will be copied.

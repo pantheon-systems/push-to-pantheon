@@ -106,27 +106,116 @@ function get_commit_message() {
 	fi
 }
 
+# Print the rules Pantheon applies to a Multidev environment name.
+# https://docs.pantheon.io/guides/multidev/multidev-faq
+function get_env_name_requirements() {
+	echo "  - all lowercase" >&2
+	echo "  - only letters, numbers and hyphens" >&2
+	echo "  - starts with a letter or number" >&2
+	echo "  - maximum of 11 characters" >&2
+	echo "  - not one of Pantheon's reserved names: master, settings, team," >&2
+	echo "    support, debug, multidev, multi, files, tags, billing" >&2
+}
+
+# Check a name against Pantheon's environment naming rules.
+#
+# The previous check here allowed uppercase, underscores and any length, none of
+# which Pantheon accepts, so an invalid name passed validation and then failed at
+# Terminus with a much less useful message.
+#
+# Parameters:
+#   $1: The environment name to check
+# Exit codes:
+#   0: Usable
+#   1: Does not satisfy the Multidev naming rules
+#   2: Reserved by Pantheon
+function validate_pantheon_env_name() {
+	local name="${1}"
+
+	# dev, test and live are Pantheon's core environments rather than Multidevs,
+	# and the Multidev naming rules do not apply to them.
+	case "${name}" in
+		dev|test|live)
+			return 0
+			;;
+	esac
+
+	# Pantheon refuses to create environments with these names.
+	case "${name}" in
+		master|settings|team|support|debug|multidev|multi|files|tags|billing)
+			return 2
+			;;
+	esac
+
+	if [[ ! "${name}" =~ ^[a-z0-9][a-z0-9-]{0,10}$ ]]; then
+		return 1
+	fi
+
+	return 0
+}
+
+# Print the current branch name: the pull request's source branch when there is
+# one, otherwise the pushed ref.
+function get_branch_name() {
+	if [ -n "${GITHUB_HEAD_REF}" ]; then
+		echo "${GITHUB_HEAD_REF}"
+	elif [ -n "${GITHUB_REF}" ]; then
+		echo "${GITHUB_REF#refs/heads/}"
+	fi
+}
+
 # Function to determine the target environment based on the context of the
 # GitHub Actions workflow.
 function get_target_env() {
+	local strategy="${INPUT_TARGET_ENV_STRATEGY:-pr}"
+
+	case "${strategy}" in
+		pr|branch) ;;
+		*)
+			echo -e "${red}Error: Invalid target_env_strategy '${strategy}'${normal}" >&2
+			echo -e "${yellow}Supported values are 'pr' (default) and 'branch'.${normal}" >&2
+			exit 1
+			;;
+	esac
+
 	if [ -n "${INPUT_TARGET_ENV}" ]; then
 		TARGET_ENV="${INPUT_TARGET_ENV}"
-	elif [ -n "${PR_NUM}" ]; then
+	elif [ -n "${PR_NUM}" ] && [ "${strategy}" != 'branch' ]; then
 		TARGET_ENV="pr-${PR_NUM}"
 	elif [ "${GITHUB_REF}" == "refs/heads/main" ] || [ "${GITHUB_REF}" == "refs/heads/master" ]; then
+		# Pantheon's Dev environment is fed by the master branch, so there is no
+		# Multidev to name here and the branch strategy does not apply.
+		# push_to_pantheon() maps this to a push to master.
 		TARGET_ENV='dev'
+	elif [ "${strategy}" == 'branch' ]; then
+		TARGET_ENV="$(get_branch_name)"
+		if [ -z "${TARGET_ENV}" ]; then
+			echo -e "${red}Error: Could not determine the branch name${normal}" >&2
+			echo -e "${yellow}target_env_strategy is 'branch' but neither GITHUB_HEAD_REF nor GITHUB_REF is set.${normal}" >&2
+			exit 1
+		fi
 	else
+		# Previously this exited 1 with no explanation at all.
+		echo -e "${red}Error: Could not determine a target environment${normal}" >&2
+		echo -e "${yellow}This is not a pull request and the branch is not main or master, so there is${normal}" >&2
+		echo -e "${yellow}nothing to derive a name from. Set the target_env input, or set${normal}" >&2
+		echo -e "${yellow}target_env_strategy to 'branch' to deploy to a Multidev named after the branch.${normal}" >&2
 		exit 1
 	fi
 
-	# Validate that TARGET_ENV only contains safe characters (alphanumeric, hyphens, underscores)
-	# This prevents injection attacks and ensures compatibility with Pantheon environment naming
-	# Use bash regex matching instead of grep to properly handle multi-line input
-	if ! [[ "${TARGET_ENV}" =~ ^[a-zA-Z0-9_-]+$ ]]; then
-		echo -e "${red}Error: Invalid target environment name '${TARGET_ENV}'${normal}" >&2
-		echo -e "${yellow}Environment names must contain only alphanumeric characters, hyphens, and underscores${normal}" >&2
-		exit 1
-	fi
+	validate_pantheon_env_name "${TARGET_ENV}"
+	case "$?" in
+		1)
+			echo -e "${red}Error: '${TARGET_ENV}' is not a valid Pantheon environment name${normal}" >&2
+			get_env_name_requirements
+			exit 1
+			;;
+		2)
+			echo -e "${red}Error: '${TARGET_ENV}' is reserved by Pantheon and cannot be used${normal}" >&2
+			get_env_name_requirements
+			exit 1
+			;;
+	esac
 
 	echo "${TARGET_ENV}"
 }

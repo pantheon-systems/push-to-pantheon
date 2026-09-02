@@ -795,13 +795,17 @@ resolve_github_environments() {
 	# Confirm against the payload rather than trusting the name: "pr-11" is a
 	# substring of "pr-114", and a site prefix could collide across sites.
 	local candidate payload_env payload_site
+	local payload
 	for candidate in ${candidates}; do
-		payload_env=$(gh api \
+		# Read both fields from one response. Two calls could disagree if either
+		# came back empty, and an empty site is treated as a match below, so a
+		# single transient failure would claim an environment belonging to another
+		# site.
+		payload=$(gh api \
 			"repos/${GITHUB_REPOSITORY}/deployments?environment=${candidate}&per_page=1" \
-			--jq '.[0].payload.pantheon_env // empty' 2>/dev/null || true)
-		payload_site=$(gh api \
-			"repos/${GITHUB_REPOSITORY}/deployments?environment=${candidate}&per_page=1" \
-			--jq '.[0].payload.pantheon_site // empty' 2>/dev/null || true)
+			--jq '[.[0].payload.pantheon_env // "", .[0].payload.pantheon_site // ""] | @tsv' 2>/dev/null || true)
+		payload_env=$(printf '%s' "${payload}" | cut -f1)
+		payload_site=$(printf '%s' "${payload}" | cut -f2)
 
 		if [ "${payload_env}" = "${pantheon_env}" ] &&
 			{ [ -z "${PANTHEON_SITE}" ] || [ -z "${payload_site}" ] || [ "${payload_site}" = "${PANTHEON_SITE}" ]; }; then

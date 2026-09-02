@@ -17,6 +17,7 @@ on:
           - git
           - terminus
           - advanced
+          - branch-naming
           - build-tools-advanced
         default: all
 
@@ -51,7 +52,10 @@ jobs:
     permissions:
       deployments: write
       contents: write
-      pull-requests: read
+      # test-suites.yml requests write, and a called workflow cannot be granted
+      # less than it asks for. #164 raised this in deploy-pr.yml and test-suites.yml
+      # but not here, which left every manual deploy failing at startup.
+      pull-requests: write
     uses: ./.github/workflows/test-suites.yml
     with:
       env_prefix: ${{ needs.compute_env_prefix.outputs.env_prefix }}

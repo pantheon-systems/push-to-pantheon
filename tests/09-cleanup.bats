@@ -228,6 +228,27 @@ JSON
     CREATED_ENVS="${CREATED_ENVS}${env_name}"$'\n'
 }
 
+# Wait until a fixture deployment's payload reads back.
+#
+# Creating a deployment and immediately querying it is not guaranteed to return
+# the payload, and resolve_github_environments treats an unreadable site as a
+# match -- so a slow read would make an environment look like it belonged to
+# whichever site was asking. That is correct for real cleanup but makes these
+# assertions racy, so settle first.
+_await_payload() {
+    local env_name="$1" expected_site="$2" attempts=20 i site
+    for ((i = 0; i < attempts; i++)); do
+        site=$(gh api "repos/${GITHUB_REPOSITORY}/deployments?environment=${env_name}&per_page=1" \
+            --jq '.[0].payload.pantheon_site // empty' 2>/dev/null || true)
+        if [ "${site}" = "${expected_site}" ]; then
+            return 0
+        fi
+        sleep 1
+    done
+    echo "payload for ${env_name} never reported site '${expected_site}'" >&2
+    return 1
+}
+
 # Remove every fixture environment this test created, deployments first.
 _cleanup_fixtures() {
     local env_name dep
@@ -286,6 +307,7 @@ _cleanup_fixtures() {
     env_name="mysite-${multidev}"
 
     _make_deployment "${env_name}" "${multidev}" "$(get_test_site)"
+    _await_payload "${env_name}" "$(get_test_site)"
 
     run resolve_github_environments "${multidev}"
     _cleanup_fixtures
@@ -304,6 +326,8 @@ _cleanup_fixtures() {
 
     _make_deployment "${env_a}" "${multidev}" "site-a"
     _make_deployment "${env_b}" "${multidev}" "site-b"
+    _await_payload "${env_a}" "site-a"
+    _await_payload "${env_b}" "site-b"
 
     PANTHEON_SITE="site-b" run resolve_github_environments "${multidev}"
     _cleanup_fixtures
@@ -322,6 +346,7 @@ _cleanup_fixtures() {
     env_name="mysite-${multidev}9"
 
     _make_deployment "${env_name}" "${multidev}9" "$(get_test_site)"
+    _await_payload "${env_name}" "$(get_test_site)"
 
     run resolve_github_environments "${multidev}"
     _cleanup_fixtures

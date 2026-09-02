@@ -21,6 +21,11 @@ inputs:
     required: false
     default: ""
 
+  target_env_strategy:
+    description: 'How to derive the Pantheon environment name when target_env is blank. "pr" (the default) names pull request environments "pr-[NUMBER]". "branch" uses the branch name as-is, which requires it to be a valid Pantheon Multidev name: all lowercase, letters, numbers and hyphens only, starting with a letter or number, at most 11 characters, and not reserved by Pantheon. Pushes to main/master deploy to the Pantheon "dev" environment under either strategy, because the Dev environment is fed by the master branch rather than by a Multidev.'
+    required: false
+    default: "pr"
+
   deployment_environment:
     description: 'The name of the GitHub deployment environment used to report this deployment in the pull request timeline. Defaults to the Pantheon target environment. Set this when one branch deploys to several Pantheon sites: GitHub groups the timeline by environment name, so identical names cause the deployments to overwrite one another and only the last one is visible. Unlike the Pantheon environment, this name is not limited to 11 characters, e.g. "my-site-pr-123".'
     required: false
@@ -104,6 +109,13 @@ runs:
         env:
           PR_NUM: ${{ github.event.pull_request.number }}
           INPUT_TARGET_ENV: ${{ inputs.target_env }}
+          INPUT_TARGET_ENV_STRATEGY: ${{ inputs.target_env_strategy }}
+          GITHUB_HEAD_REF: ${{ github.head_ref }}
+          GITHUB_REF: ${{ github.ref }}
+          # Needed to read back which branch owns an environment when the branch
+          # strategy has to step around a name another branch already holds.
+          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
           INPUT_DEPLOYMENT_ENVIRONMENT: ${{ inputs.deployment_environment }}
         run: |
           TARGET_ENV=$("${GITHUB_ACTION_PATH}/scripts/main.sh" get_target_env)
@@ -169,7 +181,12 @@ runs:
           token: ${{ github.token }}
           env: ${{ env.GITHUB_DEPLOYMENT_ENV }}
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
-          payload: '{"pantheon_site": "${{ inputs.site }}", "pantheon_env": "${{ env.PANTHEON_TARGET_ENV }}"}'
+          # pantheon_site and pantheon_env let cleanup find this environment again
+          # when deployment_environment has given it a different name.
+          # source_branch records which branch owns it, so the branch strategy can
+          # tell its own environment from one another branch truncated to the same
+          # name.
+          payload: '{"pantheon_site": "${{ inputs.site }}", "pantheon_env": "${{ env.PANTHEON_TARGET_ENV }}", "source_branch": "${{ github.head_ref || github.ref_name }}"}'
 
       - name: Configure SSH key
         uses: webfactory/ssh-agent@v0.10.0

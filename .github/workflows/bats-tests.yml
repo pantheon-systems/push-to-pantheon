@@ -86,7 +86,7 @@ jobs:
           PANTHEON_TEST_ENV: ${{ steps.test_env.outputs.TEST_ENV }}
         run: |
           # Run tests that interact with Pantheon (slower integration tests)
-          bats --jobs 4 tests/05-build_tools.bats tests/06a-create-from-live.bats tests/06b-create-from-dev.bats tests/06c-validation-and-delete.bats tests/07-site_root.bats tests/08-push_pantheon.bats tests/09-cleanup.bats
+          bats --jobs 4 tests/02c-branch-collisions.bats tests/05-build_tools.bats tests/06a-create-from-live.bats tests/06b-create-from-dev.bats tests/06c-validation-and-delete.bats tests/07-site_root.bats tests/08-push_pantheon.bats tests/09-cleanup.bats
 
       - name: Install Terminus Build Tools Plugin
         if: always()

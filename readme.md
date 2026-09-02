@@ -125,6 +125,58 @@ The Pantheon environment to which the deployment will be made. If left blank, th
    default: ""
 ```
 
+#### `target_env_strategy`
+How to derive the Pantheon environment name when `target_env` is blank.
+
+```yml
+   default: "pr"
+```
+
+| Value | Behaviour |
+|---|---|
+| `pr` (default) | Pull requests deploy to `pr-${NUMBER}`. |
+| `branch` | Pull requests and branch pushes deploy to a Multidev named after the branch. |
+
+Under `branch`, the branch name is used exactly as-is. It is not sanitised or truncated, so it must already be a valid Pantheon Multidev name:
+
+- all lowercase
+- only letters, numbers and hyphens
+- starts with a letter or number
+- maximum of 11 characters
+- not one of Pantheon's reserved names: `master`, `settings`, `team`, `support`, `debug`, `multidev`, `multi`, `files`, `tags`, `billing`
+
+Names that do not qualify are normalised rather than refused: lowercased, unusable characters folded to hyphens, and trimmed to length.
+
+| Branch | Environment |
+|---|---|
+| `redesign` | `redesign` |
+| `MyBranch` | `mybranch` |
+| `release_2.1` | `release-2-1` |
+| `feat/102-branch-name-strategy` | `feat-102-br` |
+
+Reserved names are the exception. `debug`, `files`, `multi` and the rest are reported rather than renamed, because renaming them would invent an environment name that was never asked for.
+
+**Truncation and collisions.** Trimming to 11 characters means long branches sharing a prefix reduce to the same name — `feature/login-a` and `feature/login-b` both give `feature-log`. Rather than let the second branch deploy over the first, the last character is traded for a digit:
+
+| Branch | Environment |
+|---|---|
+| `feature/login-a` | `feature-log` |
+| `feature/login-b` | `feature-lo0` |
+| `feature/login-c` | `feature-lo1` |
+
+A branch always returns to its own environment, so re-pushing never allocates a second one. Ownership is recorded on each deployment, so this only accounts for environments this action created — a Multidev made by hand is not visible and will collide.
+
+That allows ten variants of any truncated name. Sites are commonly capped at ten Multidevs, so the digits are not usually the binding limit; if they run out, the deployment fails and asks for an unused Multidev to be removed or a more distinct branch name.
+
+```yml
+      - uses: pantheon-systems/push-to-pantheon@0.9.3
+        with:
+          target_env_strategy: branch
+          # a PR from branch "redesign" deploys to the "redesign" Multidev
+```
+
+Pushes to `main`/`master` deploy to the Pantheon `dev` environment under either strategy. Pantheon's Dev environment is fed by the `master` branch rather than by a Multidev, so there is no environment name to derive.
+
 #### `deployment_environment`
 The name of the GitHub deployment environment used to report this deployment in the pull request timeline. Defaults to the Pantheon target environment.
 
@@ -149,6 +201,7 @@ Giving each site its own name keeps them separate. Unlike the Pantheon environme
 ```
 
 The action records the site and Pantheon environment on each deployment, so `delete_old_environments` still finds and removes these environments even though their names no longer match the multidev.
+
 
 #### `source_env`
 

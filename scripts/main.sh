@@ -18,6 +18,11 @@ function main() {
 	- compute_multidev_name: Compute a multidev name for PR or branch-based workflows (respects 11-char limit).
 	- get_commit_message: Generate a context-appropriate commit message for Pantheon deployments.
 	- get_target_env: Determine the target environment based on the context of the GitHub Actions workflow.
+	- sanitize_pantheon_env_name: Normalise a branch name into a usable Pantheon environment name.
+	- resolve_branch_env_name: Resolve the environment name for a branch, avoiding names another branch owns.
+	- get_env_owner_branch: Print the branch that owns an environment, if any.
+	- validate_pantheon_env_name: Check a name against Pantheon's environment naming rules.
+	- get_branch_name: Print the pull request source branch, or the pushed ref.
 	- check_missing_permissions: Check for missing GitHub permissions and return a list of any that are missing.
 	- get_missing_permissions_help: Print a help message with instructions for how to add the missing permissions to your workflow.
 	- check_multidev_limit: Check if there are available multidev slots and output availability status.
@@ -44,7 +49,7 @@ function main() {
 	fi
 
 	# Check for a valid command.
-	if [ "$1" != 'compute_multidev_name' ] && [ "$1" != 'get_commit_message' ] && [ "$1" != 'get_target_env' ] && [ "$1" != 'check_missing_permissions' ] && [ "$1" != 'get_missing_permissions_help' ] && [ "$1" != 'check_multidev_limit' ] && [ "$1" != 'setup_ssh_hostkeys' ] && [ "$1" != 'prepare_site_root' ] && [ "$1" != 'push_to_pantheon' ] && [ "$1" != 'cleanup' ] && [ "$1" != 'cleanup_closed_pr_multidevs' ] && [ "$1" != 'resolve_github_environments' ] && [ "$1" != 'verify_build_tools' ] && [ "$1" != 'create_multidev' ] && [ "$1" != 'delete_multidev' ]; then
+	if [ "$1" != 'compute_multidev_name' ] && [ "$1" != 'sanitize_pantheon_env_name' ] && [ "$1" != 'resolve_branch_env_name' ] && [ "$1" != 'get_env_owner_branch' ] && [ "$1" != 'validate_pantheon_env_name' ] && [ "$1" != 'get_branch_name' ] && [ "$1" != 'get_commit_message' ] && [ "$1" != 'get_target_env' ] && [ "$1" != 'check_missing_permissions' ] && [ "$1" != 'get_missing_permissions_help' ] && [ "$1" != 'check_multidev_limit' ] && [ "$1" != 'setup_ssh_hostkeys' ] && [ "$1" != 'prepare_site_root' ] && [ "$1" != 'push_to_pantheon' ] && [ "$1" != 'cleanup' ] && [ "$1" != 'cleanup_closed_pr_multidevs' ] && [ "$1" != 'resolve_github_environments' ] && [ "$1" != 'verify_build_tools' ] && [ "$1" != 'create_multidev' ] && [ "$1" != 'delete_multidev' ]; then
 		echo -e "${red}Invalid command: $1${normal}"
 		echo -e "${help_msg}"
 		exit 1
@@ -107,27 +112,257 @@ function get_commit_message() {
 	fi
 }
 
+# Print the rules Pantheon applies to a Multidev environment name.
+# https://docs.pantheon.io/guides/multidev/multidev-faq
+function get_env_name_requirements() {
+	echo "  - all lowercase" >&2
+	echo "  - only letters, numbers and hyphens" >&2
+	echo "  - starts with a letter or number" >&2
+	echo "  - maximum of 11 characters" >&2
+	echo "  - not one of Pantheon's reserved names: master, settings, team," >&2
+	echo "    support, debug, multidev, multi, files, tags, billing" >&2
+}
+
+# Turn an arbitrary branch name into a usable Pantheon environment name.
+#
+# Branch names routinely contain characters Pantheon rejects and run well past its
+# 11 character limit, so they are normalised rather than refused: lowercased, any
+# unusable character folded to a hyphen, and trimmed to length.
+#
+# Note that trimming means long branches sharing a prefix converge on one name --
+# "feature/login-a" and "feature/login-b" both become "feature-log". Pantheon's
+# limit leaves no way around that; a hash suffix would keep them apart but throw
+# away the readability that makes branch naming worth using.
+#
+# Reserved names are not sanitised. Normalising form is one thing; renaming
+# "debug" to something else would be inventing a name the caller did not ask for,
+# so those are reported instead.
+#
+# Parameters:
+#   $1: The branch name
+# Outputs: A name satisfying Pantheon's rules, or nothing if none can be derived
+function sanitize_pantheon_env_name() {
+	local name="${1}"
+
+	# Lowercase. Done with tr rather than ${name,,} so this still works under the
+	# bash 3.2 that ships with macOS.
+	name=$(printf '%s' "${name}" | tr '[:upper:]' '[:lower:]')
+
+	# Fold anything Pantheon will not accept into a hyphen. This is what turns
+	# "feat/102-thing" into "feat-102-thing".
+	name=$(printf '%s' "${name}" | tr -c 'a-z0-9-' '-')
+
+	# Collapse the runs of hyphens that folding tends to produce.
+	while [ "${name}" != "${name//--/-}" ]; do
+		name="${name//--/-}"
+	done
+
+	# Must begin with a letter or number.
+	name="${name#-}"
+
+	# Pantheon allows at most 11 characters.
+	name="${name:0:11}"
+
+	# Trimming can leave a trailing hyphen, which carries no meaning.
+	name="${name%-}"
+
+	echo "${name}"
+}
+
+# Print the branch that owns a candidate environment, if any.
+#
+# Every deployment this action starts records its source branch, so the
+# deployment history doubles as a register of which branch owns which
+# environment. Printing nothing means no branch has claimed the name.
+#
+# This deliberately only knows about environments this action created. An
+# environment made by hand is invisible here and will collide, which is the
+# expected outcome for a site being driven by this action.
+#
+# Parameters:
+#   $1: Candidate environment name
+# Outputs: The owning branch, or nothing
+function get_env_owner_branch() {
+	local candidate="${1}"
+
+	# Without a repository or gh there is nothing to consult; treat every name as
+	# unclaimed so naming still works locally and in tests.
+	if [ -z "${candidate}" ] || [ -z "${GITHUB_REPOSITORY}" ] || ! command -v gh > /dev/null 2>&1; then
+		return 0
+	fi
+
+	gh api "repos/${GITHUB_REPOSITORY}/deployments?environment=${candidate}&per_page=1" \
+		--jq '.[0].payload.source_branch // empty' 2>/dev/null || true
+}
+
+# Resolve the environment name for a branch, stepping around names that another
+# branch already owns.
+#
+# Pantheon's 11 character limit means long branches that share a prefix sanitise
+# to the same name: "feature/login-a" and "feature/login-b" both reduce to
+# "feature-log". Rather than let the second branch deploy over the first, trade
+# the last character for a digit -- feature-lo0, feature-lo1, and so on.
+#
+# The branch's own environment is always reused, so re-pushing a branch does not
+# allocate a new one. Ten variants is not many, but sites are commonly capped at
+# ten Multidevs, so the digits are not the binding limit.
+#
+# Parameters:
+#   $1: The branch name
+# Exit codes:
+#   0: Resolved; the name is printed
+#   1: No usable name can be derived from the branch
+#   2: Every variant is owned by another branch
+function resolve_branch_env_name() {
+	local branch="${1}"
+	local base owner candidate i
+
+	base="$(sanitize_pantheon_env_name "${branch}")"
+	if [ -z "${base}" ]; then
+		return 1
+	fi
+
+	owner="$(get_env_owner_branch "${base}")"
+	if [ -z "${owner}" ] || [ "${owner}" = "${branch}" ]; then
+		echo "${base}"
+		return 0
+	fi
+
+	for i in 0 1 2 3 4 5 6 7 8 9; do
+		candidate="${base:0:10}${i}"
+		owner="$(get_env_owner_branch "${candidate}")"
+		if [ -z "${owner}" ] || [ "${owner}" = "${branch}" ]; then
+			echo "${candidate}"
+			return 0
+		fi
+	done
+
+	return 2
+}
+
+# Check a name against Pantheon's environment naming rules.
+#
+# The previous check here allowed uppercase, underscores and any length, none of
+# which Pantheon accepts, so an invalid name passed validation and then failed at
+# Terminus with a much less useful message.
+#
+# Parameters:
+#   $1: The environment name to check
+# Exit codes:
+#   0: Usable
+#   1: Does not satisfy the Multidev naming rules
+#   2: Reserved by Pantheon
+function validate_pantheon_env_name() {
+	local name="${1}"
+
+	# dev, test and live are Pantheon's core environments rather than Multidevs,
+	# and the Multidev naming rules do not apply to them.
+	case "${name}" in
+		dev|test|live)
+			return 0
+			;;
+	esac
+
+	# Pantheon refuses to create environments with these names.
+	case "${name}" in
+		master|settings|team|support|debug|multidev|multi|files|tags|billing)
+			return 2
+			;;
+	esac
+
+	if [[ ! "${name}" =~ ^[a-z0-9][a-z0-9-]{0,10}$ ]]; then
+		return 1
+	fi
+
+	return 0
+}
+
+# Print the current branch name: the pull request's source branch when there is
+# one, otherwise the pushed ref.
+function get_branch_name() {
+	if [ -n "${GITHUB_HEAD_REF}" ]; then
+		echo "${GITHUB_HEAD_REF}"
+	elif [ -n "${GITHUB_REF}" ]; then
+		echo "${GITHUB_REF#refs/heads/}"
+	fi
+}
+
 # Function to determine the target environment based on the context of the
 # GitHub Actions workflow.
 function get_target_env() {
-	if [ -n "${INPUT_TARGET_ENV}" ]; then
+	local strategy="${INPUT_TARGET_ENV_STRATEGY:-pr}"
+
+	case "${strategy}" in
+		pr|branch) ;;
+		*)
+			echo -e "${red}Error: Invalid target_env_strategy '${strategy}'${normal}" >&2
+			echo -e "${yellow}Supported values are 'pr' (default) and 'branch'.${normal}" >&2
+			exit 1
+			;;
+	esac
+
+	# Pantheon's Dev environment is fed by the master branch, so there is no
+	# Multidev to name for a default-branch push and no strategy to apply.
+	# push_to_pantheon() maps 'dev' to a push to that branch.
+	if [ "${GITHUB_REF}" == "refs/heads/main" ] || [ "${GITHUB_REF}" == "refs/heads/master" ]; then
+		TARGET_ENV='dev'
+	elif [ "${strategy}" == 'branch' ]; then
+		# The strategy is authoritative once chosen: it overrides target_env rather
+		# than only filling in when that is blank, so selecting it is enough to
+		# change naming without also having to unset an existing target_env.
+		local branch_name
+		branch_name="$(get_branch_name)"
+		if [ -z "${branch_name}" ]; then
+			echo -e "${red}Error: Could not determine the branch name${normal}" >&2
+			echo -e "${yellow}target_env_strategy is 'branch' but neither GITHUB_HEAD_REF nor GITHUB_REF is set.${normal}" >&2
+			exit 1
+		fi
+
+		TARGET_ENV="$(resolve_branch_env_name "${branch_name}")"
+		case "$?" in
+			1)
+				echo -e "${red}Error: Could not derive an environment name from branch '${branch_name}'${normal}" >&2
+				get_env_name_requirements
+				exit 1
+				;;
+			2)
+				echo -e "${red}Error: Every environment name derived from '${branch_name}' is already in use by another branch${normal}" >&2
+				echo -e "${yellow}Pantheon allows 11 characters, which leaves ten numbered variants of a${normal}" >&2
+				echo -e "${yellow}truncated branch name. Delete an unused Multidev, or use a shorter and more${normal}" >&2
+				echo -e "${yellow}distinct branch name.${normal}" >&2
+				exit 1
+				;;
+		esac
+
+		if [ "${TARGET_ENV}" != "${branch_name}" ]; then
+			echo -e "${yellow}Branch '${branch_name}' adjusted to '${TARGET_ENV}' to satisfy Pantheon's environment naming rules.${normal}" >&2
+		fi
+	elif [ -n "${INPUT_TARGET_ENV}" ]; then
 		TARGET_ENV="${INPUT_TARGET_ENV}"
 	elif [ -n "${PR_NUM}" ]; then
 		TARGET_ENV="pr-${PR_NUM}"
-	elif [ "${GITHUB_REF}" == "refs/heads/main" ] || [ "${GITHUB_REF}" == "refs/heads/master" ]; then
-		TARGET_ENV='dev'
 	else
+		# Previously this exited 1 with no explanation at all.
+		echo -e "${red}Error: Could not determine a target environment${normal}" >&2
+		echo -e "${yellow}This is not a pull request and the branch is not main or master, so there is${normal}" >&2
+		echo -e "${yellow}nothing to derive a name from. Set the target_env input, or set${normal}" >&2
+		echo -e "${yellow}target_env_strategy to 'branch' to deploy to a Multidev named after the branch.${normal}" >&2
 		exit 1
 	fi
 
-	# Validate that TARGET_ENV only contains safe characters (alphanumeric, hyphens, underscores)
-	# This prevents injection attacks and ensures compatibility with Pantheon environment naming
-	# Use bash regex matching instead of grep to properly handle multi-line input
-	if ! [[ "${TARGET_ENV}" =~ ^[a-zA-Z0-9_-]+$ ]]; then
-		echo -e "${red}Error: Invalid target environment name '${TARGET_ENV}'${normal}" >&2
-		echo -e "${yellow}Environment names must contain only alphanumeric characters, hyphens, and underscores${normal}" >&2
-		exit 1
-	fi
+	validate_pantheon_env_name "${TARGET_ENV}"
+	case "$?" in
+		1)
+			echo -e "${red}Error: '${TARGET_ENV}' is not a valid Pantheon environment name${normal}" >&2
+			get_env_name_requirements
+			exit 1
+			;;
+		2)
+			echo -e "${red}Error: '${TARGET_ENV}' is reserved by Pantheon and cannot be used${normal}" >&2
+			get_env_name_requirements
+			exit 1
+			;;
+	esac
 
 	echo "${TARGET_ENV}"
 }
@@ -560,13 +795,17 @@ resolve_github_environments() {
 	# Confirm against the payload rather than trusting the name: "pr-11" is a
 	# substring of "pr-114", and a site prefix could collide across sites.
 	local candidate payload_env payload_site
+	local payload
 	for candidate in ${candidates}; do
-		payload_env=$(gh api \
+		# Read both fields from one response. Two calls could disagree if either
+		# came back empty, and an empty site is treated as a match below, so a
+		# single transient failure would claim an environment belonging to another
+		# site.
+		payload=$(gh api \
 			"repos/${GITHUB_REPOSITORY}/deployments?environment=${candidate}&per_page=1" \
-			--jq '.[0].payload.pantheon_env // empty' 2>/dev/null || true)
-		payload_site=$(gh api \
-			"repos/${GITHUB_REPOSITORY}/deployments?environment=${candidate}&per_page=1" \
-			--jq '.[0].payload.pantheon_site // empty' 2>/dev/null || true)
+			--jq '[.[0].payload.pantheon_env // "", .[0].payload.pantheon_site // ""] | @tsv' 2>/dev/null || true)
+		payload_env=$(printf '%s' "${payload}" | cut -f1)
+		payload_site=$(printf '%s' "${payload}" | cut -f2)
 
 		if [ "${payload_env}" = "${pantheon_env}" ] &&
 			{ [ -z "${PANTHEON_SITE}" ] || [ -z "${payload_site}" ] || [ "${payload_site}" = "${PANTHEON_SITE}" ]; }; then

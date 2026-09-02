@@ -177,6 +177,32 @@ That allows ten variants of any truncated name. Sites are commonly capped at ten
 
 Pushes to `main`/`master` deploy to the Pantheon `dev` environment under either strategy. Pantheon's Dev environment is fed by the `master` branch rather than by a Multidev, so there is no environment name to derive.
 
+#### `deployment_environment`
+The name of the GitHub deployment environment used to report this deployment in the pull request timeline. Defaults to the Pantheon target environment.
+
+```yml
+   default: ""
+```
+
+Set this when one branch deploys to more than one Pantheon site. GitHub groups the timeline by environment name, and the Pantheon environment is derived from the pull request number alone — so every site in a matrix produces `pr-123`, the deployments land in the same GitHub environment, and each one overwrites the last. Only the site that finished most recently stays visible.
+
+Giving each site its own name keeps them separate. Unlike the Pantheon environment, this value is not limited to 11 characters:
+
+```yml
+    strategy:
+      matrix:
+        site: [ my-first-site, my-second-site ]
+    steps:
+      - uses: pantheon-systems/push-to-pantheon@0.9.3
+        with:
+          site: ${{ matrix.site }}
+          deployment_environment: ${{ matrix.site }}-pr-${{ github.event.pull_request.number }}
+          # ...
+```
+
+The action records the site and Pantheon environment on each deployment, so `delete_old_environments` still finds and removes these environments even though their names no longer match the multidev.
+
+
 #### `source_env`
 
 The environment from which the database and uploaded files will be copied.

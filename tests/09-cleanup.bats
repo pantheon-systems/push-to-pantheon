@@ -176,3 +176,215 @@ teardown() {
     assert_output_not_contains "is stale"
     assert_output_contains "No stale closed-PR multidevs found"
 }
+
+# --- resolve_github_environments() / delete_github_environment() (issue #101) ---
+#
+# The GitHub deployment environment is normally named after the Pantheon multidev,
+# but deployment_environment breaks that on purpose so several sites deploying one
+# branch get distinct entries in the pull request timeline. Cleanup therefore
+# resolves the mapping from each deployment's payload rather than trusting the name.
+#
+# These create real deployments and environments on this repository and remove them
+# again in teardown. Names are suffixed with the commit SHA so concurrent runs on
+# different commits cannot collide.
+
+# Unique suffix for this run's fixtures.
+_fixture_suffix() {
+    local sha="${GITHUB_SHA:-}"
+    if [ -z "${sha}" ]; then
+        sha=$(git -C "${BATS_TEST_DIRNAME}/.." rev-parse HEAD 2>/dev/null || echo "local")
+    fi
+    echo "${sha:0:7}"
+}
+
+# A ref that definitely exists on the remote, for the deployment to point at.
+_fixture_ref() {
+    gh api "repos/${GITHUB_REPOSITORY}/commits/0.x" --jq '.sha' 2>/dev/null
+}
+
+# Create a real deployment carrying our payload. Creating a deployment in a new
+# environment creates the environment too.
+_make_deployment() {
+    local env_name="$1" pantheon_env="$2" pantheon_site="$3" ref
+    ref=$(_fixture_ref)
+    [ -n "${ref}" ] || return 1
+
+    # Write the body to a file rather than piping it on stdin.
+    local body="${TEST_TEMP_DIR}/deployment-${env_name}.json"
+    cat > "${body}" <<JSON
+{"ref": "${ref}",
+ "environment": "${env_name}",
+ "auto_merge": false,
+ "required_contexts": [],
+ "transient_environment": true,
+ "description": "push-to-pantheon BATS fixture",
+ "payload": {"pantheon_site": "${pantheon_site}", "pantheon_env": "${pantheon_env}"}}
+JSON
+
+    gh api --method POST "repos/${GITHUB_REPOSITORY}/deployments" --input "${body}" >/dev/null 2>&1
+
+    # Newline-separated: main.sh sets IFS to newline+tab, so a space-joined list
+    # would never split and the whole string would be treated as one name.
+    CREATED_ENVS="${CREATED_ENVS}${env_name}"$'\n'
+}
+
+# Remove every fixture environment this test created, deployments first.
+_cleanup_fixtures() {
+    local env_name dep
+    for env_name in ${CREATED_ENVS}; do
+        [ -n "${env_name}" ] || continue
+        for dep in $(gh api "repos/${GITHUB_REPOSITORY}/deployments?environment=${env_name}" --jq '.[].id' 2>/dev/null); do
+            gh api --method POST "repos/${GITHUB_REPOSITORY}/deployments/${dep}/statuses" \
+                -f state=inactive -f description='fixture teardown' >/dev/null 2>&1 || true
+            gh api --method DELETE "repos/${GITHUB_REPOSITORY}/deployments/${dep}" >/dev/null 2>&1 || true
+        done
+        gh api --method DELETE "repos/${GITHUB_REPOSITORY}/environments/${env_name}" >/dev/null 2>&1 || true
+    done
+    CREATED_ENVS=""
+}
+
+@test "resolve_github_environments: empty multidev name yields nothing" {
+    run resolve_github_environments ""
+    assert_success
+    [ -z "$output" ]
+}
+
+@test "resolve_github_environments: no GITHUB_REPOSITORY yields nothing" {
+    unset GITHUB_REPOSITORY
+
+    run resolve_github_environments "pr-1"
+    assert_success
+    [ -z "$output" ]
+}
+
+@test "resolve_github_environments: unknown multidev yields nothing" {
+    run resolve_github_environments "no-such-env-$$"
+    assert_success
+    [ -z "$output" ]
+}
+
+@test "resolve_github_environments: matching name short-circuits the payload lookup" {
+    CREATED_ENVS=""
+    local suffix env_name
+    suffix=$(_fixture_suffix)
+    env_name="ptp-same-${suffix}"
+
+    _make_deployment "${env_name}" "${env_name}" "$(get_test_site)"
+
+    run resolve_github_environments "${env_name}"
+    _cleanup_fixtures
+
+    assert_success
+    [ "$output" = "${env_name}" ]
+}
+
+@test "resolve_github_environments: finds a differently named environment via payload" {
+    CREATED_ENVS=""
+    local suffix multidev env_name
+    suffix=$(_fixture_suffix)
+    multidev="ptp-diff-${suffix}"
+    env_name="mysite-${multidev}"
+
+    _make_deployment "${env_name}" "${multidev}" "$(get_test_site)"
+
+    run resolve_github_environments "${multidev}"
+    _cleanup_fixtures
+
+    assert_success
+    [ "$output" = "${env_name}" ]
+}
+
+@test "resolve_github_environments: picks the environment belonging to this site" {
+    CREATED_ENVS=""
+    local suffix multidev env_a env_b
+    suffix=$(_fixture_suffix)
+    multidev="ptp-two-${suffix}"
+    env_a="site-a-${multidev}"
+    env_b="site-b-${multidev}"
+
+    _make_deployment "${env_a}" "${multidev}" "site-a"
+    _make_deployment "${env_b}" "${multidev}" "site-b"
+
+    PANTHEON_SITE="site-b" run resolve_github_environments "${multidev}"
+    _cleanup_fixtures
+
+    assert_success
+    [ "$output" = "${env_b}" ]
+}
+
+@test "resolve_github_environments: does not match on a name substring alone" {
+    CREATED_ENVS=""
+    local suffix multidev env_name
+    suffix=$(_fixture_suffix)
+    # The environment belongs to "<multidev>9", so a lookup for "<multidev>" must
+    # not claim it even though the name contains that string.
+    multidev="ptp-sub-${suffix}"
+    env_name="mysite-${multidev}9"
+
+    _make_deployment "${env_name}" "${multidev}9" "$(get_test_site)"
+
+    run resolve_github_environments "${multidev}"
+    _cleanup_fixtures
+
+    assert_success
+    [ -z "$output" ]
+}
+
+@test "delete_github_environment: reports when nothing resolves and deletes nothing" {
+    run delete_github_environment "no-such-env-$$"
+    assert_success
+    assert_output_contains "No GitHub environment found"
+    assert_output_not_contains "Deleting environment"
+}
+
+@test "delete_github_environment: removes the environment and its deployments" {
+    CREATED_ENVS=""
+    local suffix env_name
+    suffix=$(_fixture_suffix)
+    env_name="ptp-del-${suffix}"
+
+    _make_deployment "${env_name}" "${env_name}" "$(get_test_site)"
+
+    # Sanity: it exists before we delete it.
+    run gh api "repos/${GITHUB_REPOSITORY}/environments/${env_name}"
+    assert_success
+
+    run delete_github_environment "${env_name}"
+
+    # Must never fail the job, whether or not the token may delete environments.
+    assert_success
+    assert_output_contains "Deleting deployment ID"
+    assert_output_contains "Deleting environment"
+
+    # The deployments are the part that matters -- they are what appears in the
+    # pull request timeline -- and they must be gone regardless.
+    run gh api "repos/${GITHUB_REPOSITORY}/deployments?environment=${env_name}" --jq 'length'
+    assert_success
+    [ "$output" = "0" ]
+
+    _cleanup_fixtures
+}
+
+@test "delete_github_environment: surfaces a failed environment deletion without failing" {
+    # Deleting an environment needs administration: write, which the action does not
+    # request. That must be reported rather than swallowed -- it used to be neither
+    # checked nor surfaced, so runs claimed to delete environments they had not.
+    CREATED_ENVS=""
+    local suffix env_name
+    suffix=$(_fixture_suffix)
+    env_name="ptp-perm-${suffix}"
+
+    _make_deployment "${env_name}" "${env_name}" "$(get_test_site)"
+
+    run delete_github_environment "${env_name}"
+    _cleanup_fixtures
+
+    assert_success
+    if [ "${status}" -eq 0 ] && [[ "$output" == *"Kept environment"* ]]; then
+        # Token cannot delete environments: the reason must be explained.
+        assert_output_contains "administration: write"
+    else
+        # Token can: it must say so rather than silently doing nothing.
+        assert_output_contains "deleted"
+    fi
+}

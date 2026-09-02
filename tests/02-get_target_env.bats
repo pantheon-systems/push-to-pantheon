@@ -1,6 +1,10 @@
 #!/usr/bin/env bats
 # Tests for get_target_env() function
 
+# `run --separate-stderr` needs 1.5.0; CI installs 1.10.0. Declaring it turns a
+# silent misparse on an older bats into an explicit failure.
+bats_require_minimum_version 1.5.0
+
 load helpers/common
 
 setup() {

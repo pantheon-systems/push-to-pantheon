@@ -104,6 +104,10 @@ runs:
           INPUT_TARGET_ENV_STRATEGY: ${{ inputs.target_env_strategy }}
           GITHUB_HEAD_REF: ${{ github.head_ref }}
           GITHUB_REF: ${{ github.ref }}
+          # Needed to read back which branch owns an environment when the branch
+          # strategy has to step around a name another branch already holds.
+          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
         run: |
           TARGET_ENV=$("${GITHUB_ACTION_PATH}/scripts/main.sh" get_target_env)
           echo "PANTHEON_TARGET_ENV set to ${TARGET_ENV}"
@@ -157,6 +161,10 @@ runs:
           token: ${{ github.token }}
           env: ${{ env.PANTHEON_TARGET_ENV }}
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          # Records which branch owns this environment. get_env_owner_branch()
+          # reads it back so the branch strategy can tell its own environment from
+          # one another branch truncated to the same name.
+          payload: '{"source_branch": "${{ github.head_ref || github.ref_name }}"}'
 
       - name: Configure SSH key
         uses: webfactory/ssh-agent@v0.10.0

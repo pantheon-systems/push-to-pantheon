@@ -117,21 +117,20 @@ newline"
 
 # --- target_env_strategy: branch (issue #102) ---
 #
-# Follows KameleonCI: the branch name is used verbatim and validated against
-# Pantheon's rules, rather than sanitised or truncated. Truncating would make
-# distinct branches collide; a hash suffix would throw away the readability that
-# makes branch naming worth having. So an unusable branch name is an error with
-# the requirements spelled out.
+# Branch names routinely contain characters Pantheon rejects and run past its 11
+# character limit, so they are normalised rather than refused. Reserved names are
+# the exception: normalising form is one thing, but renaming "debug" to something
+# else would invent a name the caller never asked for.
 
-@test "get_target_env: branch strategy uses the PR source branch verbatim" {
+@test "get_target_env: branch strategy uses the PR source branch" {
     export INPUT_TARGET_ENV_STRATEGY="branch"
     export PR_NUM="123"
-    export GITHUB_HEAD_REF="my-feature"
+    export GITHUB_HEAD_REF="redesign"
     export GITHUB_REF="refs/pull/123/merge"
 
     run get_target_env
     assert_success
-    [ "$output" = "my-feature" ]
+    [ "$output" = "redesign" ]
 }
 
 @test "get_target_env: branch strategy uses the pushed branch when there is no PR" {
@@ -143,9 +142,54 @@ newline"
     [ "$output" = "short" ]
 }
 
-@test "get_target_env: pr strategy is the default and is unchanged" {
+@test "get_target_env: branch strategy sanitises an unusable branch name" {
+    export INPUT_TARGET_ENV_STRATEGY="branch"
+    export GITHUB_HEAD_REF="feat/102-branch-name-strategy"
+
+    # The adjustment notice goes to stderr so it stays out of the captured value;
+    # bats' `run` merges the two, hence comparing the last line rather than $output.
+    run get_target_env
+    assert_success
+    [ "${lines[-1]}" = "feat-102-br" ]
+    assert_output_contains "adjusted to"
+}
+
+@test "get_target_env: the adjustment notice stays off stdout" {
+    # action.yml captures this with command substitution, so anything explanatory
+    # must go to stderr or it would be taken as part of the environment name.
+    export INPUT_TARGET_ENV_STRATEGY="branch"
+    export GITHUB_HEAD_REF="feat/102-branch-name-strategy"
+
+    run --separate-stderr get_target_env
+    assert_success
+    [ "$output" = "feat-102-br" ]
+    [[ "$stderr" == *"adjusted to"* ]]
+}
+
+@test "get_target_env: branch strategy overrides target_env" {
+    # Choosing the strategy is enough; an existing target_env need not be unset.
+    export INPUT_TARGET_ENV_STRATEGY="branch"
+    export INPUT_TARGET_ENV="some-env"
+    export GITHUB_REF="refs/heads/redesign"
+
+    run get_target_env
+    assert_success
+    [ "$output" = "redesign" ]
+}
+
+@test "get_target_env: pr strategy is the default and target_env still wins" {
+    export INPUT_TARGET_ENV="some-env"
     export PR_NUM="123"
-    export GITHUB_HEAD_REF="my-feature"
+    export GITHUB_HEAD_REF="redesign"
+
+    run get_target_env
+    assert_success
+    [ "$output" = "some-env" ]
+}
+
+@test "get_target_env: pr strategy is unchanged for pull requests" {
+    export PR_NUM="123"
+    export GITHUB_HEAD_REF="redesign"
     export GITHUB_REF="refs/pull/123/merge"
 
     run get_target_env
@@ -173,41 +217,22 @@ newline"
     [ "$output" = "dev" ]
 }
 
-@test "get_target_env: branch strategy rejects a branch name over 11 characters" {
+@test "get_target_env: branch strategy reports a reserved branch name" {
     export INPUT_TARGET_ENV_STRATEGY="branch"
-    export GITHUB_REF="refs/heads/feature-xyz1"
+    export GITHUB_REF="refs/heads/debug"
 
     run get_target_env
     assert_failure
-    assert_output_contains "is not a valid Pantheon environment name"
-    assert_output_contains "maximum of 11 characters"
+    assert_output_contains "reserved by Pantheon"
 }
 
-@test "get_target_env: branch strategy rejects uppercase" {
+@test "get_target_env: branch strategy fails when nothing can be derived" {
     export INPUT_TARGET_ENV_STRATEGY="branch"
-    export GITHUB_REF="refs/heads/MyBranch"
+    export GITHUB_HEAD_REF="///"
 
     run get_target_env
     assert_failure
-    assert_output_contains "all lowercase"
-}
-
-@test "get_target_env: branch strategy rejects a slash" {
-    export INPUT_TARGET_ENV_STRATEGY="branch"
-    export GITHUB_REF="refs/heads/feat/x"
-
-    run get_target_env
-    assert_failure
-    assert_output_contains "is not a valid Pantheon environment name"
-}
-
-@test "get_target_env: branch strategy rejects a leading hyphen" {
-    export INPUT_TARGET_ENV_STRATEGY="branch"
-    export GITHUB_REF="refs/heads/-nope"
-
-    run get_target_env
-    assert_failure
-    assert_output_contains "starts with a letter or number"
+    assert_output_contains "Could not derive an environment name"
 }
 
 @test "get_target_env: rejects an unknown strategy" {
@@ -229,8 +254,67 @@ newline"
     assert_output_contains "target_env_strategy"
 }
 
-# --- validate_pantheon_env_name() ---
+# --- sanitize_pantheon_env_name() ---
 
+@test "sanitize_pantheon_env_name: leaves a valid name alone" {
+    run sanitize_pantheon_env_name "redesign"
+    assert_success
+    [ "$output" = "redesign" ]
+}
+
+@test "sanitize_pantheon_env_name: lowercases" {
+    run sanitize_pantheon_env_name "MyBranch"
+    assert_success
+    [ "$output" = "mybranch" ]
+}
+
+@test "sanitize_pantheon_env_name: folds unusable characters to hyphens" {
+    run sanitize_pantheon_env_name "release_2.1"
+    assert_success
+    [ "$output" = "release-2-1" ]
+}
+
+@test "sanitize_pantheon_env_name: collapses hyphen runs and trims the edges" {
+    run sanitize_pantheon_env_name "feat//x"
+    assert_success
+    [ "$output" = "feat-x" ]
+
+    run sanitize_pantheon_env_name "-leading"
+    assert_success
+    [ "$output" = "leading" ]
+}
+
+@test "sanitize_pantheon_env_name: trims to 11 characters" {
+    run sanitize_pantheon_env_name "feat/102-branch-name-strategy"
+    assert_success
+    [ "$output" = "feat-102-br" ]
+    [ "${#output}" -le 11 ]
+}
+
+@test "sanitize_pantheon_env_name: long branches sharing a prefix converge" {
+    # Documented consequence of Pantheon's 11 character limit.
+    run sanitize_pantheon_env_name "feature/login-a"
+    local a="$output"
+    run sanitize_pantheon_env_name "feature/login-b"
+    [ "$a" = "$output" ]
+}
+
+@test "sanitize_pantheon_env_name: yields nothing when there is nothing usable" {
+    run sanitize_pantheon_env_name "///"
+    assert_success
+    [ -z "$output" ]
+}
+
+@test "sanitize_pantheon_env_name: output always satisfies the validator" {
+    for branch in "Feature/My-Thing" "release_2.1" "-x" "UPPER" "a/b/c/d/e/f/g/h"; do
+        run sanitize_pantheon_env_name "$branch"
+        assert_success
+        run validate_pantheon_env_name "$output"
+        assert_success
+    done
+}
+
+# --- validate_pantheon_env_name() ---
 @test "validate_pantheon_env_name: accepts the core environments" {
     for name in dev test live; do
         run validate_pantheon_env_name "$name"

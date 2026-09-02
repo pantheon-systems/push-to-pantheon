@@ -145,7 +145,28 @@ Under `branch`, the branch name is used exactly as-is. It is not sanitised or tr
 - maximum of 11 characters
 - not one of Pantheon's reserved names: `master`, `settings`, `team`, `support`, `debug`, `multidev`, `multi`, `files`, `tags`, `billing`
 
-A branch that does not qualify fails the deployment with those requirements listed, rather than being silently rewritten. Truncating to fit would make `feature-a` and `feature-b` collide on the same environment, and adding a hash to keep them distinct would discard the readability that makes branch naming worth using.
+Names that do not qualify are normalised rather than refused: lowercased, unusable characters folded to hyphens, and trimmed to length.
+
+| Branch | Environment |
+|---|---|
+| `redesign` | `redesign` |
+| `MyBranch` | `mybranch` |
+| `release_2.1` | `release-2-1` |
+| `feat/102-branch-name-strategy` | `feat-102-br` |
+
+Reserved names are the exception. `debug`, `files`, `multi` and the rest are reported rather than renamed, because renaming them would invent an environment name that was never asked for.
+
+**Truncation and collisions.** Trimming to 11 characters means long branches sharing a prefix reduce to the same name — `feature/login-a` and `feature/login-b` both give `feature-log`. Rather than let the second branch deploy over the first, the last character is traded for a digit:
+
+| Branch | Environment |
+|---|---|
+| `feature/login-a` | `feature-log` |
+| `feature/login-b` | `feature-lo0` |
+| `feature/login-c` | `feature-lo1` |
+
+A branch always returns to its own environment, so re-pushing never allocates a second one. Ownership is recorded on each deployment, so this only accounts for environments this action created — a Multidev made by hand is not visible and will collide.
+
+That allows ten variants of any truncated name. Sites are commonly capped at ten Multidevs, so the digits are not usually the binding limit; if they run out, the deployment fails and asks for an unused Multidev to be removed or a more distinct branch name.
 
 ```yml
       - uses: pantheon-systems/push-to-pantheon@0.9.3

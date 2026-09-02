@@ -29,6 +29,7 @@ on:
           - git
           - terminus
           - advanced
+          - branch-naming
           - build-tools-advanced
         default: all
       env_prefix:
@@ -368,3 +369,103 @@ jobs:
 
           echo "::error::❌ Environment URL did not become available after $(( (ATTEMPTS - 1) * DELAY ))s"
           exit 1
+
+  branch-naming:
+    name: Branch Naming Strategy
+    if: inputs.suite == 'all' || inputs.suite == 'branch-naming'
+    runs-on: ubuntu-latest
+    steps:
+      # Checkout base repository code (trusted)
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      # Checkout PR code to subdirectory (untrusted) - only for pull_request_target
+      - name: Checkout PR code
+        if: github.event_name == 'pull_request_target'
+        uses: actions/checkout@v7
+        with:
+          repository: ${{ github.event.pull_request.head.repo.full_name }}
+          ref: ${{ github.event.pull_request.head.ref }}
+          path: pr-code
+
+      # Unlike the other suites this one cannot choose its environment name: the
+      # whole point of the strategy is that the branch decides it. Work out the
+      # name the action should arrive at so the assertions below have something to
+      # compare against, using the same rules the action applies.
+      - name: Work out the expected environment name
+        id: expected
+        env:
+          BRANCH_NAME: ${{ github.head_ref || github.ref_name }}
+          # resolve_branch_env_name consults the deployment history to avoid a name
+          # another branch owns, so it needs to reach the API just as the action does.
+          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: |
+          echo "Branch under test: ${BRANCH_NAME}"
+          EXPECTED=$(bash scripts/main.sh resolve_branch_env_name "${BRANCH_NAME}")
+
+          if [ -z "${EXPECTED}" ]; then
+            echo "::error::No environment name can be derived from '${BRANCH_NAME}'"
+            exit 1
+          fi
+
+          echo "name=${EXPECTED}" >> "$GITHUB_OUTPUT"
+          echo "::notice::Expecting the branch strategy to deploy to '${EXPECTED}'"
+
+      - name: Deploy using the branch name
+        id: deploy_branch
+        uses: ./
+        with:
+          ssh_key: ${{ secrets.PANTHEON_SSH_KEY }}
+          machine_token: ${{ secrets.PANTHEON_MACHINE_TOKEN }}
+          site: dtp-nearly-empty-site
+          target_env_strategy: branch
+          # target_env is deliberately omitted so the strategy is what names the
+          # environment. The suite that covers the strategy overriding an explicit
+          # target_env is in tests/02-get_target_env.bats.
+          relative_site_root: ${{ github.event_name == 'pull_request_target' && 'pr-code/.github/testing_fixtures/dtp-nearly-empty-site' || '.github/testing_fixtures/dtp-nearly-empty-site' }}
+
+      - name: Verify the environment is named after the branch
+        env:
+          EXPECTED: ${{ steps.expected.outputs.name }}
+          ACTUAL: ${{ steps.deploy_branch.outputs.target_env }}
+        run: |
+          if [ "${ACTUAL}" != "${EXPECTED}" ]; then
+            echo "::error::target_env was '${ACTUAL}', expected '${EXPECTED}' derived from the branch"
+            exit 1
+          fi
+          echo "::notice::✅ Deployed to the branch-named environment '${ACTUAL}'"
+
+      - name: Check environment URL is available
+        env:
+          ENV_URL: https://${{ steps.expected.outputs.name }}-dtp-nearly-empty-site.pantheonsite.io
+        run: |
+          echo "Waiting for ${ENV_URL} to become available"
+          ATTEMPTS=10
+          DELAY=15
+
+          for i in $(seq 1 "${ATTEMPTS}"); do
+            if curl -sSf --max-time 30 "${ENV_URL}" > /dev/null; then
+              echo "::notice::✅ Environment URL is available (attempt ${i}/${ATTEMPTS})"
+              exit 0
+            fi
+            if [ "${i}" -lt "${ATTEMPTS}" ]; then
+              echo "Attempt ${i}/${ATTEMPTS} did not succeed; retrying in ${DELAY}s"
+              sleep "${DELAY}"
+            fi
+          done
+
+          echo "::error::❌ Environment URL did not become available after $(( (ATTEMPTS - 1) * DELAY ))s"
+          exit 1
+
+      # The cleanup job removes {prefix}-* environments, and a branch-derived name
+      # does not carry that prefix, so hand the name straight to delete_multidev.
+      - name: Delete the branch-named environment
+        if: always() && steps.expected.outputs.name != ''
+        env:
+          PANTHEON_MACHINE_TOKEN: ${{ secrets.PANTHEON_MACHINE_TOKEN }}
+          PANTHEON_SITE: dtp-nearly-empty-site
+          TARGET_ENV: ${{ steps.expected.outputs.name }}
+        run: |
+          terminus auth:login --machine-token="${PANTHEON_MACHINE_TOKEN}" >/dev/null 2>&1 || true
+          bash scripts/main.sh delete_multidev "${TARGET_ENV}" || true

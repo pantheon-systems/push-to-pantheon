@@ -17,6 +17,7 @@ on:
           - git
           - terminus
           - advanced
+          - branch-naming
           - build-tools-advanced
         default: all
 

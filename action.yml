@@ -17,12 +17,12 @@ inputs:
     required: true
 
   target_env:
-    description: 'The Pantheon environment to which the deployment will be made. If left blank, the value used will be automatically derived. Pull requests will deploy to environments named "pr-[NUMBER]" and main/master branch commits will deploy to the Pantheon "dev" environment'
+    description: 'The Pantheon environment to which the deployment will be made. If left blank, the value used will be automatically derived. Pull requests will deploy to environments named "pr-[NUMBER]" and main/master branch commits will deploy to the Pantheon "dev" environment. This input does not apply to main/master pushes, which always deploy to dev. Setting target_env_strategy to "branch" also takes precedence over this value'
     required: false
     default: ""
 
   target_env_strategy:
-    description: 'How to derive the Pantheon environment name when target_env is blank. "pr" (the default) names pull request environments "pr-[NUMBER]". "branch" derives the name from the branch, normalising it to satisfy Pantheon rules -- lowercased, unusable characters folded to hyphens, trimmed to 11 characters -- and appending a digit if another branch already holds that name. Reserved names are reported rather than renamed. Pushes to main/master deploy to the Pantheon "dev" environment under either strategy, because the Dev environment is fed by the master branch rather than by a Multidev.'
+    description: 'How to derive the Pantheon environment name. "pr" (the default) names pull request environments "pr-[NUMBER]". "branch" derives the name from the branch, normalising it to satisfy Pantheon rules -- lowercased, unusable characters folded to hyphens, trimmed to 11 characters -- and appending a digit if another branch already holds that name. Reserved names are reported rather than renamed. Pushes to main/master deploy to the Pantheon "dev" environment under either strategy, because the Dev environment is fed by the master branch rather than by a Multidev.'
     required: false
     default: "pr"
 

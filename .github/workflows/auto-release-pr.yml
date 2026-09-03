@@ -209,9 +209,15 @@ jobs:
             echo "has_changes=true" >> $GITHUB_OUTPUT
           fi
 
-      # Commits are created via the Contents API instead of `git commit` + `git push`
-      # so GitHub signs them automatically. Locally-created bot commits are unsigned
-      # and are rejected by the org's required_signatures ruleset on 0.x.
+      # Created via the Contents API rather than `git commit` + `git push`, which keeps
+      # the branch reset and the commit in one place.
+      #
+      # Note this does NOT produce a signed commit. GitHub only signs API commits it
+      # can attribute to an identity it controls -- a GitHub App installation token,
+      # or the web flow -- and this authenticates with a personal PAT, so the commit
+      # is attributed to the PAT owner and left unsigned. The org enforces
+      # required_signatures on 0.x, so the version-bump commit has to be amended and
+      # signed by hand before the release PR can merge. See CONTRIBUTING.md step 3.
       - name: Create/reset release branch and commit via GitHub API
         if: steps.commit.outputs.has_changes == 'true'
         env:

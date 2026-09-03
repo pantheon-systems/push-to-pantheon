@@ -119,6 +119,18 @@ runs:
           INPUT_DEPLOYMENT_ENVIRONMENT: ${{ inputs.deployment_environment }}
         run: |
           TARGET_ENV=$("${GITHUB_ACTION_PATH}/scripts/main.sh" get_target_env)
+
+          # An empty value means there is nowhere to deploy -- a push to a branch
+          # that is neither main/master nor a pull request. That is not a failure,
+          # so flag it and let the remaining steps skip rather than failing a job
+          # that had no work to do. get_target_env still exits non-zero for a
+          # genuine misconfiguration.
+          if [ -z "${TARGET_ENV}" ]; then
+            echo "PANTHEON_DEPLOY_SKIPPED=true" >> $GITHUB_ENV
+            echo "::notice::No Pantheon environment applies to this ref; skipping deployment."
+            exit 0
+          fi
+
           echo "PANTHEON_TARGET_ENV set to ${TARGET_ENV}"
           echo "PANTHEON_TARGET_ENV<<EOF" >> $GITHUB_ENV
           echo "${TARGET_ENV}" >> $GITHUB_ENV
@@ -137,6 +149,7 @@ runs:
           echo "GITHUB_DEPLOYMENT_ENV=${DEPLOYMENT_ENV}" >> "$GITHUB_OUTPUT"
 
       - name: Set clone content flag
+        if: ${{ env.PANTHEON_DEPLOY_SKIPPED != 'true' }}
         shell: bash
         env:
           CLONE_CONTENT: ${{ inputs.clone_content }}
@@ -154,6 +167,7 @@ runs:
           echo "PANTHEON_CLONE_CONTENT_FLAG=${CLONE_CONTENT_FLAG}" >> $GITHUB_ENV
 
       - name: Check required permissions
+        if: ${{ env.PANTHEON_DEPLOY_SKIPPED != 'true' }}
         shell: bash
         env:
           GITHUB_TOKEN: ${{ github.token }}
@@ -174,6 +188,7 @@ runs:
           echo "::notice::✅ All required permissions are properly configured"
 
       - name: Start deployment
+        if: ${{ env.PANTHEON_DEPLOY_SKIPPED != 'true' }}
         uses: bobheadxi/deployments@v1
         id: deployment
         with:
@@ -189,11 +204,13 @@ runs:
           payload: '{"pantheon_site": "${{ inputs.site }}", "pantheon_env": "${{ env.PANTHEON_TARGET_ENV }}", "source_branch": "${{ github.head_ref || github.ref_name }}"}'
 
       - name: Configure SSH key
+        if: ${{ env.PANTHEON_DEPLOY_SKIPPED != 'true' }}
         uses: webfactory/ssh-agent@v0.10.0
         with:
             ssh-private-key: ${{ inputs.ssh_key }}
 
       - name: Set up host keys for Pantheon
+        if: ${{ env.PANTHEON_DEPLOY_SKIPPED != 'true' }}
         shell: bash
         env:
           SSH_KEY: ${{ inputs.ssh_key }}
@@ -202,7 +219,7 @@ runs:
           ${GITHUB_ACTION_PATH}/scripts/main.sh setup_ssh_hostkeys
 
       - name: Check for Terminus
-        if: ${{ inputs.skip_terminus_install != 'true' }}
+        if: ${{ env.PANTHEON_DEPLOY_SKIPPED != 'true' && inputs.skip_terminus_install != 'true' }}
         id: check_terminus
         shell: bash
         run: |
@@ -216,13 +233,13 @@ runs:
           fi
 
       - name: Install Terminus
-        if: ${{ inputs.skip_terminus_install != 'true' && steps.check_terminus.outputs.should_install_terminus == 'true' }}
+        if: ${{ env.PANTHEON_DEPLOY_SKIPPED != 'true' && inputs.skip_terminus_install != 'true' && steps.check_terminus.outputs.should_install_terminus == 'true' }}
         uses: pantheon-systems/terminus-github-actions@v1
         with:
           pantheon-machine-token: ${{ inputs.machine_token }}
 
       - name: Check live environment
-        if: ${{ inputs.skip_build_tools != 'true' }}
+        if: ${{ env.PANTHEON_DEPLOY_SKIPPED != 'true' && inputs.skip_build_tools != 'true' }}
         shell: bash
         id: check_live_env
         env:
@@ -241,7 +258,7 @@ runs:
           fi
 
       - name: Check multidev limit
-        if: ${{ env.PANTHEON_TARGET_ENV != 'dev' && env.PANTHEON_TARGET_ENV != 'test' && env.PANTHEON_TARGET_ENV != 'live' }}
+        if: ${{ env.PANTHEON_DEPLOY_SKIPPED != 'true' && env.PANTHEON_TARGET_ENV != 'dev' && env.PANTHEON_TARGET_ENV != 'test' && env.PANTHEON_TARGET_ENV != 'live' }}
         id: check_multidev_limit
         shell: bash
         env:
@@ -250,7 +267,7 @@ runs:
           ${GITHUB_ACTION_PATH}/scripts/main.sh check_multidev_limit
 
       - name: Comment on PR if multidev limit reached
-        if: ${{ env.PANTHEON_TARGET_ENV != 'dev' && env.PANTHEON_TARGET_ENV != 'test' && env.PANTHEON_TARGET_ENV != 'live' && steps.check_multidev_limit.outputs.multidev_available == 'false' && github.event.pull_request.number }}
+        if: ${{ env.PANTHEON_DEPLOY_SKIPPED != 'true' && env.PANTHEON_TARGET_ENV != 'dev' && env.PANTHEON_TARGET_ENV != 'test' && env.PANTHEON_TARGET_ENV != 'live' && steps.check_multidev_limit.outputs.multidev_available == 'false' && github.event.pull_request.number }}
         shell: bash
         env:
           GITHUB_TOKEN: ${{ github.token }}
@@ -268,7 +285,7 @@ runs:
           For more information, see the [Pantheon Multidev documentation](https://pantheon.io/docs/multidev)."
 
       - name: Abort deployment if multidev limit reached
-        if: ${{ env.PANTHEON_TARGET_ENV != 'dev' && env.PANTHEON_TARGET_ENV != 'test' && env.PANTHEON_TARGET_ENV != 'live' && steps.check_multidev_limit.outputs.multidev_available == 'false' }}
+        if: ${{ env.PANTHEON_DEPLOY_SKIPPED != 'true' && env.PANTHEON_TARGET_ENV != 'dev' && env.PANTHEON_TARGET_ENV != 'test' && env.PANTHEON_TARGET_ENV != 'live' && steps.check_multidev_limit.outputs.multidev_available == 'false' }}
         shell: bash
         run: |
           echo "::error::Aborting deployment: Multidev limit reached. Delete unused environments or contact Pantheon to increase your limit."
@@ -276,7 +293,7 @@ runs:
 
       - name: Install Terminus Plugin
         shell: bash
-        if: ${{ inputs.skip_build_tools != 'true' && steps.check_live_env.outputs.live_env_exists == 'true' }}
+        if: ${{ env.PANTHEON_DEPLOY_SKIPPED != 'true' && inputs.skip_build_tools != 'true' && steps.check_live_env.outputs.live_env_exists == 'true' }}
         env:
           BUILD_TOOLS_VERSION_INPUT: ${{ inputs.build_tools_version }}
         run: |
@@ -292,12 +309,13 @@ runs:
 
       - name: Verify Build Tools Plugin Installation
         shell: bash
-        if: ${{ inputs.skip_build_tools != 'true' && steps.check_live_env.outputs.live_env_exists == 'true' }}
+        if: ${{ env.PANTHEON_DEPLOY_SKIPPED != 'true' && inputs.skip_build_tools != 'true' && steps.check_live_env.outputs.live_env_exists == 'true' }}
         run: |
           # Verify Build Tools plugin installation
           ${GITHUB_ACTION_PATH}/scripts/main.sh verify_build_tools
 
       - name: Configure Git User
+        if: ${{ env.PANTHEON_DEPLOY_SKIPPED != 'true' }}
         shell: bash
         env:
           PANTHEON_GIT_USER_NAME: ${{ inputs.git_user_name }}
@@ -309,6 +327,7 @@ runs:
           git config --global user.name "${PANTHEON_GIT_USER_NAME}"
 
       - name: Prepare site root
+        if: ${{ env.PANTHEON_DEPLOY_SKIPPED != 'true' }}
         shell: bash
         env:
           SITE_ROOT: ${{ inputs.relative_site_root }}
@@ -320,6 +339,7 @@ runs:
 
 
       - name: Set commit message
+        if: ${{ env.PANTHEON_DEPLOY_SKIPPED != 'true' }}
         id: commit_message
         shell: bash
         env:
@@ -341,6 +361,7 @@ runs:
           } >> "${GITHUB_OUTPUT}"
 
       - name: Deployment Processing
+        if: ${{ env.PANTHEON_DEPLOY_SKIPPED != 'true' }}
         shell: bash
         id: deploy_to_pantheon
         env:
@@ -364,7 +385,7 @@ runs:
 
       - name: Update deployment status
         uses: bobheadxi/deployments@v1
-        if: always()
+        if: ${{ always() && env.PANTHEON_DEPLOY_SKIPPED != 'true' }}
         with:
           step: finish
           token: ${{ github.token }}
@@ -374,7 +395,7 @@ runs:
           env: ${{ env.GITHUB_DEPLOYMENT_ENV }}
           env_url: https://${{ env.PANTHEON_TARGET_ENV }}-${{ inputs.site }}.pantheonsite.io
       - name: Deleting old multidevs
-        if: ${{ inputs.delete_old_environments == 'true' && steps.deploy_to_pantheon.outcome == 'success' }}
+        if: ${{ env.PANTHEON_DEPLOY_SKIPPED != 'true' && inputs.delete_old_environments == 'true' && steps.deploy_to_pantheon.outcome == 'success' }}
         shell: bash
         env:
           DELETE_OLD_MULTIDEVS: ${{ inputs.delete_old_environments }}

@@ -135,7 +135,9 @@ Precedence, highest first:
 3. `target_env`, if set.
 4. Otherwise derived: `pr-${NUMBER}` for pull requests.
 
-If none of those apply — a push to a branch other than `main`/`master`, with no `target_env`, under the default `pr` strategy — there is no environment to deploy to, and the action stops with an explanation rather than deploying.
+If none of those apply — a push to a branch other than `main`/`master`, with no `target_env`, under the default `pr` strategy — there is no environment to deploy to. The action **skips the deployment and the job succeeds**: a Multidev comes from a pull request, so this is nothing to do rather than anything wrong. The step log records why.
+
+A misconfiguration still fails the job rather than skipping — a `target_env` Pantheon will not accept, an unknown `target_env_strategy`, or the `branch` strategy with no branch to read.
 
 #### `target_env_strategy`
 How to derive the Pantheon environment name. See [`target_env`](#target_env) for how the two interact.

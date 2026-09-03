@@ -32,11 +32,19 @@ jobs:
         if: steps.verify-changed-files.outputs.files_changed == 'true'
         uses: peter-evans/create-pull-request@v8.1.1
         with:
-          token: ${{ secrets.GH_PAT }}
-          # Commit through the API so GitHub signs it. Committing with git on the
-          # runner produces an unsigned commit, which this repository rejects, and
-          # every auto-doc run then needed its commit amending by hand before it
-          # could merge.
+          # GITHUB_TOKEN rather than GH_PAT, because sign-commits only signs when
+          # the token is GITHUB_TOKEN (as github-actions[bot]) or a GitHub App
+          # token. With a personal PAT the commit is attributed to the PAT owner
+          # and left unsigned, which the org's required_signatures ruleset on 0.x
+          # rejects -- so every auto-doc pull request needed its commit amending
+          # by hand.
+          #
+          # The trade-off: GitHub does not start workflow runs for events raised
+          # by GITHUB_TOKEN, so the checks required to merge may not run on the
+          # pull request this opens. Closing and reopening it raises `reopened`
+          # from a real account, which is in the default set of pull_request
+          # activity types and does start them.
+          token: ${{ secrets.GITHUB_TOKEN }}
           sign-commits: true
           base: "0.x"
           title: "[auto-doc] Update README.md"

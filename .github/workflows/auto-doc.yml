@@ -33,6 +33,11 @@ jobs:
         uses: peter-evans/create-pull-request@v8.1.1
         with:
           token: ${{ secrets.GH_PAT }}
+          # Commit through the API so GitHub signs it. Committing with git on the
+          # runner produces an unsigned commit, which this repository rejects, and
+          # every auto-doc run then needed its commit amending by hand before it
+          # could merge.
+          sign-commits: true
           base: "0.x"
           title: "[auto-doc] Update README.md"
           branch: "chore/auto-doc-update-readme"

@@ -70,8 +70,8 @@ jobs:
 |    <a name="input_skip_terminus_install"></a>[skip_terminus_install](#input_skip_terminus_install)    | string |  false   |        `"false"`        |                                                                          If set to true, the <br>action will skip the installation <br>of Terminus. This is useful <br>if you are using a <br>custom Docker image that already <br>has Terminus installed or you <br>are installing it earlier in <br>the workflow. By default, the <br>action will check for the <br>presence of Terminus and install <br>it if it is not <br>found, but if this is <br>set to true, the action <br>will bypass the check and <br>skip the Terminus install.                                                                           |
 |                    <a name="input_source_env"></a>[source_env](#input_source_env)                     | string |  false   |        `"live"`         |                                                                                                                                                                                                                                                                   The environment from which the <br>database and uploaded files will <br>be copied.                                                                                                                                                                                                                                                                    |
 |                         <a name="input_ssh_key"></a>[ssh_key](#input_ssh_key)                         | string |   true   |                         |                                                                                                                                                                                                                                                         A private key that corresponds <br>to a public key on <br>Pantheon: https://docs.pantheon.io/ssh-keys                                                                                                                                                                                                                                                           |
-|                    <a name="input_target_env"></a>[target_env](#input_target_env)                     | string |  false   |                         |                                                                                                                                                           The Pantheon environment to which <br>the deployment will be made. <br>If left blank, the value <br>used will be automatically derived. <br>Pull requests will deploy to <br>environments named "pr-[NUMBER]" and main/master <br>branch commits will deploy to <br>the Pantheon "dev" environment                                                                                                                                                            |
-|       <a name="input_target_env_strategy"></a>[target_env_strategy](#input_target_env_strategy)       | string |  false   |         `"pr"`          | How to derive the Pantheon <br>environment name when target_env is <br>blank. "pr" (the default) names pull <br>request environments "pr-[NUMBER]". "branch" uses <br>the branch name as-is, which <br>requires it to be a <br>valid Pantheon Multidev name: all <br>lowercase, letters, numbers and hyphens <br>only, starting with a letter <br>or number, at most 11 <br>characters, and not reserved by <br>Pantheon. Pushes to main/master deploy <br>to the Pantheon "dev" environment <br>under either strategy, because the <br>Dev environment is fed by <br>the master branch rather than <br>by a Multidev.  |
+|                    <a name="input_target_env"></a>[target_env](#input_target_env)                     | string |  false   |                         | The Pantheon environment to which <br>the deployment will be made. <br>If left blank, the value <br>used will be automatically derived. <br>Pull requests will deploy to <br>environments named "pr-[NUMBER]" and main/master <br>branch commits will deploy to <br>the Pantheon "dev" environment. This <br>input does not apply to <br>main/master pushes, which always deploy <br>to dev. Setting target_env_strategy to <br>"branch" also takes precedence over <br>this value |
+|       <a name="input_target_env_strategy"></a>[target_env_strategy](#input_target_env_strategy)       | string |  false   |         `"pr"`          | How to derive the Pantheon <br>environment name. "pr" (the default) <br>names pull request environments "pr-[NUMBER]". <br>"branch" derives the name from <br>the branch, normalising it to <br>satisfy Pantheon rules -- lowercased, <br>unusable characters folded to hyphens, <br>trimmed to 11 characters -- <br>and appending a digit if <br>another branch already holds that <br>name. Reserved names are reported <br>rather than renamed. Pushes to <br>main/master deploy to the Pantheon <br>"dev" environment under either strategy, <br>because the Dev environment is <br>fed by the master branch <br>rather than by a Multidev. |
 
 <!-- AUTO-DOC-INPUT:END -->
 
@@ -128,8 +128,19 @@ The Pantheon environment to which the deployment will be made. If left blank, th
    default: ""
 ```
 
+Precedence, highest first:
+
+1. Pushes to `main`/`master` always deploy to `dev`. Neither this input nor `target_env_strategy` applies there — Pantheon's Dev environment is fed by the `master` branch, and that is where a default-branch push belongs.
+2. [`target_env_strategy: branch`](#target_env_strategy), if set, names the environment after the branch and overrides this input.
+3. `target_env`, if set.
+4. Otherwise derived: `pr-${NUMBER}` for pull requests.
+
+If none of those apply — a push to a branch other than `main`/`master`, with no `target_env`, under the default `pr` strategy — there is no environment to deploy to. The action **skips the deployment and the job succeeds**: a Multidev comes from a pull request, so this is nothing to do rather than anything wrong. The step log records why.
+
+A misconfiguration still fails the job rather than skipping — a `target_env` Pantheon will not accept, an unknown `target_env_strategy`, or the `branch` strategy with no branch to read.
+
 #### `target_env_strategy`
-How to derive the Pantheon environment name when `target_env` is blank.
+How to derive the Pantheon environment name. See [`target_env`](#target_env) for how the two interact.
 
 ```yml
    default: "pr"
@@ -140,7 +151,7 @@ How to derive the Pantheon environment name when `target_env` is blank.
 | `pr` (default) | Pull requests deploy to `pr-${NUMBER}`. |
 | `branch` | Pull requests and branch pushes deploy to a Multidev named after the branch. |
 
-Under `branch`, the branch name is used exactly as-is. It is not sanitised or truncated, so it must already be a valid Pantheon Multidev name:
+Under `branch`, the branch name becomes the multidev environment name. Pantheon requires that name to be:
 
 - all lowercase
 - only letters, numbers and hyphens
@@ -167,18 +178,12 @@ Reserved names are the exception. `debug`, `files`, `multi` and the rest are rep
 | `feature/login-b` | `feature-lo0` |
 | `feature/login-c` | `feature-lo1` |
 
-A branch always returns to its own environment, so re-pushing never allocates a second one. Ownership is recorded on each deployment, so this only accounts for environments this action created — a Multidev made by hand is not visible and will collide.
-
-That allows ten variants of any truncated name. Sites are commonly capped at ten Multidevs, so the digits are not usually the binding limit; if they run out, the deployment fails and asks for an unused Multidev to be removed or a more distinct branch name.
-
 ```yml
       - uses: pantheon-systems/push-to-pantheon@0.9.4
         with:
           target_env_strategy: branch
           # a PR from branch "redesign" deploys to the "redesign" Multidev
 ```
-
-Pushes to `main`/`master` deploy to the Pantheon `dev` environment under either strategy. Pantheon's Dev environment is fed by the `master` branch rather than by a Multidev, so there is no environment name to derive.
 
 #### `deployment_environment`
 The name of the GitHub deployment environment used to report this deployment in the pull request timeline. Defaults to the Pantheon target environment.

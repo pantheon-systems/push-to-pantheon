@@ -44,7 +44,7 @@ jobs:
     steps:
     - uses: actions/checkout@v7
     - name: Push to Pantheon
-      uses: pantheon-systems/push-to-pantheon@0.9.5
+      uses: pantheon-systems/push-to-pantheon@0.9.6
       with:
         ssh_key: ${{ secrets.PANTHEON_SSH_KEY }}
         machine_token: ${{ secrets.PANTHEON_MACHINE_TOKEN }}
@@ -179,7 +179,7 @@ Reserved names are the exception. `debug`, `files`, `multi` and the rest are rep
 | `feature/login-c` | `feature-lo1` |
 
 ```yml
-      - uses: pantheon-systems/push-to-pantheon@0.9.5
+      - uses: pantheon-systems/push-to-pantheon@0.9.6
         with:
           target_env_strategy: branch
           # a PR from branch "redesign" deploys to the "redesign" Multidev
@@ -201,7 +201,7 @@ Giving each site its own name keeps them separate. Unlike the Pantheon environme
       matrix:
         site: [ my-first-site, my-second-site ]
     steps:
-      - uses: pantheon-systems/push-to-pantheon@0.9.5
+      - uses: pantheon-systems/push-to-pantheon@0.9.6
         with:
           site: ${{ matrix.site }}
           deployment_environment: ${{ matrix.site }}-pr-${{ github.event.pull_request.number }}
@@ -266,7 +266,7 @@ Multiline messages are supported. A Pantheon repo is not a mirror of your source
             echo "EOF"
           } >> "$GITHUB_OUTPUT"
 
-      - uses: pantheon-systems/push-to-pantheon@0.9.5
+      - uses: pantheon-systems/push-to-pantheon@0.9.6
         with:
           git_commit_message: ${{ steps.msg.outputs.message }}
           # ...
@@ -385,7 +385,7 @@ Here's an example from a real site that uses Tailwind to prepare CSS in the site
     # to Pantheon in the later "push-to-pantheon" step.
     - run: "cd web/themes/my_custom_theme/css && rm .gitignore"
     - name: Push to Pantheon
-      uses: pantheon-systems/push-to-pantheon@0.9.5
+      uses: pantheon-systems/push-to-pantheon@0.9.6
       with:
         ssh_key: ${{ secrets.PANTHEON_SSH_KEY }}
         machine_token: ${{ secrets.PANTHEON_MACHINE_TOKEN }}
@@ -418,7 +418,7 @@ The following example shows our recommended way to run `composer install` prior 
         key: ${{ runner.os }}-composer-${{ hashFiles('**/composer.lock') }}
         restore-keys: ${{ runner.os }}-composer-
     - name: Push to Pantheon
-      uses: pantheon-systems/push-to-pantheon@0.9.5
+      uses: pantheon-systems/push-to-pantheon@0.9.6
       with:
         ssh_key: ${{ secrets.PANTHEON_SSH_KEY }}
         machine_token: ${{ secrets.PANTHEON_MACHINE_TOKEN }}
@@ -483,7 +483,7 @@ jobs:
         ref: ${{ github.event.pull_request.head.ref }}
         path: pr-code
     - name: Push to Pantheon
-      uses: pantheon-systems/push-to-pantheon@0.9.5
+      uses: pantheon-systems/push-to-pantheon@0.9.6
       with:
         ssh_key: ${{ secrets.PANTHEON_SSH_KEY }}
         machine_token: ${{ secrets.MACHINE_TOKEN }}
@@ -535,7 +535,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: Deploy to Pantheon
-      uses: pantheon-systems/push-to-pantheon@0.9.5
+      uses: pantheon-systems/push-to-pantheon@0.9.6
       with:
         ssh_key: ${{ secrets.PANTHEON_SSH_KEY }}
         machine_token: ${{ secrets.PANTHEON_MACHINE_TOKEN }}

@@ -64,16 +64,19 @@ teardown() {
     [ "$output" = "dev" ]
 }
 
-@test "get_target_env: no env vars set exits with failure" {
-    run get_target_env
-    assert_failure
+@test "get_target_env: no env vars set yields no environment" {
+    # Nothing to derive a name from is a skip, not a failure.
+    run --separate-stderr get_target_env
+    assert_success
+    [ -z "$output" ]
 }
 
-@test "get_target_env: other branch without PR_NUM exits with failure" {
+@test "get_target_env: other branch without PR_NUM yields no environment" {
     export GITHUB_REF="refs/heads/feature-branch"
 
-    run get_target_env
-    assert_failure
+    run --separate-stderr get_target_env
+    assert_success
+    [ -z "$output" ]
 }
 
 @test "get_target_env: rejects INPUT_TARGET_ENV with special characters" {
@@ -248,14 +251,41 @@ newline"
     assert_output_contains "Invalid target_env_strategy"
 }
 
-@test "get_target_env: a branch with no PR and pr strategy explains itself" {
-    # This used to exit 1 with no output at all.
+@test "get_target_env: a branch with no PR and pr strategy is a skip, not a failure" {
+    # A Multidev comes from a pull request, so a push to another branch has
+    # nowhere to go. That is not a misconfiguration, so it must not fail the job.
     export GITHUB_REF="refs/heads/my-feature"
 
+    run --separate-stderr get_target_env
+    assert_success
+    [ -z "$output" ]
+    [[ "$stderr" == *"No target environment to deploy to"* ]]
+    [[ "$stderr" == *"target_env_strategy"* ]]
+}
+
+@test "get_target_env: a misconfiguration still fails rather than skipping" {
+    # The skip above must not swallow genuine errors.
+    export INPUT_TARGET_ENV="My_Env"
     run get_target_env
     assert_failure
-    assert_output_contains "Could not determine a target environment"
-    assert_output_contains "target_env_strategy"
+
+    unset INPUT_TARGET_ENV
+    export INPUT_TARGET_ENV_STRATEGY="nonsense"
+    export GITHUB_REF="refs/heads/main"
+    run get_target_env
+    assert_failure
+}
+
+@test "action.yml: every step but the first is gated on the skip flag" {
+    # The skip only works if the remaining steps honour it; a new step added
+    # without the guard would deploy to an empty environment name.
+    run ruby -ryaml -e '
+      steps = YAML.safe_load(File.read("'"${BATS_TEST_DIRNAME}"'/../action.yml"), aliases: true)["runs"]["steps"]
+      ungated = steps.reject { |s| s["if"].to_s.include?("PANTHEON_DEPLOY_SKIPPED") }
+      puts ungated.map { |s| s["name"] }.join(",")
+    '
+    assert_success
+    [ "$output" = "Set target_env" ]
 }
 
 # --- sanitize_pantheon_env_name() ---

@@ -342,12 +342,18 @@ function get_target_env() {
 	elif [ -n "${PR_NUM}" ]; then
 		TARGET_ENV="pr-${PR_NUM}"
 	else
-		# Previously this exited 1 with no explanation at all.
-		echo -e "${red}Error: Could not determine a target environment${normal}" >&2
+		# Nothing to derive a name from, which is not a misconfiguration: a
+		# Multidev comes from a pull request, so a push to some other branch simply
+		# has nowhere to go. Print nothing and exit cleanly so the caller can skip
+		# the deployment rather than fail a job that had no work to do.
+		#
+		# Genuine misconfigurations above -- an unusable target_env, an unknown
+		# strategy, a branch strategy with no branch -- still exit non-zero.
+		echo -e "${yellow}No target environment to deploy to.${normal}" >&2
 		echo -e "${yellow}This is not a pull request and the branch is not main or master, so there is${normal}" >&2
 		echo -e "${yellow}nothing to derive a name from. Set the target_env input, or set${normal}" >&2
 		echo -e "${yellow}target_env_strategy to 'branch' to deploy to a Multidev named after the branch.${normal}" >&2
-		exit 1
+		exit 0
 	fi
 
 	validate_pantheon_env_name "${TARGET_ENV}"

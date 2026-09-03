@@ -42,9 +42,9 @@ jobs:
       pull-requests: write
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
     - name: Push to Pantheon
-      uses: pantheon-systems/push-to-pantheon@0.9.3
+      uses: pantheon-systems/push-to-pantheon@0.9.4
       with:
         ssh_key: ${{ secrets.PANTHEON_SSH_KEY }}
         machine_token: ${{ secrets.PANTHEON_MACHINE_TOKEN }}
@@ -172,7 +172,7 @@ A branch always returns to its own environment, so re-pushing never allocates a 
 That allows ten variants of any truncated name. Sites are commonly capped at ten Multidevs, so the digits are not usually the binding limit; if they run out, the deployment fails and asks for an unused Multidev to be removed or a more distinct branch name.
 
 ```yml
-      - uses: pantheon-systems/push-to-pantheon@0.9.3
+      - uses: pantheon-systems/push-to-pantheon@0.9.4
         with:
           target_env_strategy: branch
           # a PR from branch "redesign" deploys to the "redesign" Multidev
@@ -196,7 +196,7 @@ Giving each site its own name keeps them separate. Unlike the Pantheon environme
       matrix:
         site: [ my-first-site, my-second-site ]
     steps:
-      - uses: pantheon-systems/push-to-pantheon@0.9.3
+      - uses: pantheon-systems/push-to-pantheon@0.9.4
         with:
           site: ${{ matrix.site }}
           deployment_environment: ${{ matrix.site }}-pr-${{ github.event.pull_request.number }}
@@ -261,7 +261,7 @@ Multiline messages are supported. A Pantheon repo is not a mirror of your source
             echo "EOF"
           } >> "$GITHUB_OUTPUT"
 
-      - uses: pantheon-systems/push-to-pantheon@0.9.3
+      - uses: pantheon-systems/push-to-pantheon@0.9.4
         with:
           git_commit_message: ${{ steps.msg.outputs.message }}
           # ...
@@ -371,7 +371,7 @@ Here's an example from a real site that uses Tailwind to prepare CSS in the site
   push-to-pantheon:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
     # The custom theme for this site uses Tailwind to build the
     # appropriate CSS file.
     - run: "cd web/themes/my_custom_theme && npm ci && npm run build"
@@ -380,7 +380,7 @@ Here's an example from a real site that uses Tailwind to prepare CSS in the site
     # to Pantheon in the later "push-to-pantheon" step.
     - run: "cd web/themes/my_custom_theme/css && rm .gitignore"
     - name: Push to Pantheon
-      uses: pantheon-systems/push-to-pantheon@0.9.3
+      uses: pantheon-systems/push-to-pantheon@0.9.4
       with:
         ssh_key: ${{ secrets.PANTHEON_SSH_KEY }}
         machine_token: ${{ secrets.PANTHEON_MACHINE_TOKEN }}
@@ -397,9 +397,9 @@ The following example shows our recommended way to run `composer install` prior 
   push-to-pantheon:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
     - name: Fetch cached Composer dependencies
-      uses: actions/cache@v5
+      uses: actions/cache@v6
       with:
         path: vendor
         key: ${{ runner.os }}-composer-${{ hashFiles('**/composer.lock') }}
@@ -407,13 +407,13 @@ The following example shows our recommended way to run `composer install` prior 
     - name: Composer install
       run: composer install --no-dev --optimize-autoloader
     - name: Save Composer cache
-      uses: actions/cache@v5
+      uses: actions/cache@v6
       with:
         path: vendor
         key: ${{ runner.os }}-composer-${{ hashFiles('**/composer.lock') }}
         restore-keys: ${{ runner.os }}-composer-
     - name: Push to Pantheon
-      uses: pantheon-systems/push-to-pantheon@0.9.3
+      uses: pantheon-systems/push-to-pantheon@0.9.4
       with:
         ssh_key: ${{ secrets.PANTHEON_SSH_KEY }}
         machine_token: ${{ secrets.PANTHEON_MACHINE_TOKEN }}
@@ -467,18 +467,18 @@ jobs:
     # Checkout the base repository code into the root directory.
     # This is the code that will be used to run the workflow.
     - name: Checkout base repository code
-      uses: actions/checkout@v6
+      uses: actions/checkout@v7
 
     # Checkout the pull request code into a subdirectory.
     # This is the code that will be deployed.
     - name: Checkout PR code
-      uses: actions/checkout@v6
+      uses: actions/checkout@v7
       with:
         repository: ${{ github.event.pull_request.head.repo.full_name }}
         ref: ${{ github.event.pull_request.head.ref }}
         path: pr-code
     - name: Push to Pantheon
-      uses: pantheon-systems/push-to-pantheon@0.9.3
+      uses: pantheon-systems/push-to-pantheon@0.9.4
       with:
         ssh_key: ${{ secrets.PANTHEON_SSH_KEY }}
         machine_token: ${{ secrets.MACHINE_TOKEN }}
@@ -530,7 +530,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: Deploy to Pantheon
-      uses: pantheon-systems/push-to-pantheon@0.9.3
+      uses: pantheon-systems/push-to-pantheon@0.9.4
       with:
         ssh_key: ${{ secrets.PANTHEON_SSH_KEY }}
         machine_token: ${{ secrets.PANTHEON_MACHINE_TOKEN }}
@@ -539,7 +539,7 @@ jobs:
   code_standards_check:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
     - name: Composer install
       run: composer install
     - name: Check coding standards
@@ -550,7 +550,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: Check out the repository
-      uses: actions/checkout@v6
+      uses: actions/checkout@v7
     - uses: ./.github/actions/playwright-against-pantheon
       with:
         ssh_key: ${{ secrets.PANTHEON_SSH_KEY }}

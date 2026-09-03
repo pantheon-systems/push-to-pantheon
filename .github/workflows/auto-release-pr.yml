@@ -11,9 +11,12 @@ on:
   issue_comment:
     types: [created]
 
-  # Trigger when PR title is edited (for version override)
+  # Trigger when PR title is edited (for version override).
+  # Deliberately not on synchronize: a push to the release branch would re-run
+  # this workflow, which resets that branch and closes the pull request. Signing
+  # the release commit requires a push, so that made the release unmergeable.
   pull_request:
-    types: [edited, synchronize]
+    types: [edited]
     branches:
       - 0.x
 

@@ -22,7 +22,7 @@ inputs:
     default: ""
 
   target_env_strategy:
-    description: 'How to derive the Pantheon environment name when target_env is blank. "pr" (the default) names pull request environments "pr-[NUMBER]". "branch" uses the branch name as-is, which requires it to be a valid Pantheon Multidev name: all lowercase, letters, numbers and hyphens only, starting with a letter or number, at most 11 characters, and not reserved by Pantheon. Pushes to main/master deploy to the Pantheon "dev" environment under either strategy, because the Dev environment is fed by the master branch rather than by a Multidev.'
+    description: 'How to derive the Pantheon environment name when target_env is blank. "pr" (the default) names pull request environments "pr-[NUMBER]". "branch" derives the name from the branch, normalising it to satisfy Pantheon rules -- lowercased, unusable characters folded to hyphens, trimmed to 11 characters -- and appending a digit if another branch already holds that name. Reserved names are reported rather than renamed. Pushes to main/master deploy to the Pantheon "dev" environment under either strategy, because the Dev environment is fed by the master branch rather than by a Multidev.'
     required: false
     default: "pr"
 

@@ -140,7 +140,7 @@ How to derive the Pantheon environment name when `target_env` is blank.
 | `pr` (default) | Pull requests deploy to `pr-${NUMBER}`. |
 | `branch` | Pull requests and branch pushes deploy to a Multidev named after the branch. |
 
-Under `branch`, the branch name is used exactly as-is. It is not sanitised or truncated, so it must already be a valid Pantheon Multidev name:
+Under `branch`, the branch name becomes the multidev environment name. Pantheon requires that name to be:
 
 - all lowercase
 - only letters, numbers and hyphens
@@ -167,18 +167,12 @@ Reserved names are the exception. `debug`, `files`, `multi` and the rest are rep
 | `feature/login-b` | `feature-lo0` |
 | `feature/login-c` | `feature-lo1` |
 
-A branch always returns to its own environment, so re-pushing never allocates a second one. Ownership is recorded on each deployment, so this only accounts for environments this action created — a Multidev made by hand is not visible and will collide.
-
-That allows ten variants of any truncated name. Sites are commonly capped at ten Multidevs, so the digits are not usually the binding limit; if they run out, the deployment fails and asks for an unused Multidev to be removed or a more distinct branch name.
-
 ```yml
       - uses: pantheon-systems/push-to-pantheon@0.9.4
         with:
           target_env_strategy: branch
           # a PR from branch "redesign" deploys to the "redesign" Multidev
 ```
-
-Pushes to `main`/`master` deploy to the Pantheon `dev` environment under either strategy. Pantheon's Dev environment is fed by the `master` branch rather than by a Multidev, so there is no environment name to derive.
 
 #### `deployment_environment`
 The name of the GitHub deployment environment used to report this deployment in the pull request timeline. Defaults to the Pantheon target environment.

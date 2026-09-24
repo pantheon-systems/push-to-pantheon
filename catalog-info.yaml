@@ -1,12 +1,14 @@
+# Managed by github-terraform — do not edit manually
 ---
 apiVersion: backstage.io/v1alpha1
 kind: Component
 metadata:
-  name: push-to-pantheon
-  description: A GitHub Action that pushes code to Pantheon Dev and Multidev environments
+  name: "push-to-pantheon"
+  description: "A GitHub Action that pushes code to Pantheon Dev and Multidev environments"
   annotations:
-    github.com/project-slug: pantheon-systems/push-to-pantheon
+    "backstage.io/techdocs-ref": "dir:docs/"
+    "github.com/project-slug": "pantheon-systems/push-to-pantheon"
 spec:
-  type: service
-  lifecycle: production
-  owner: devrel
+  type: "gcp-service"
+  lifecycle: "production"
+  owner: "devrel"

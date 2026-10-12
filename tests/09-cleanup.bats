@@ -422,6 +422,13 @@ _cleanup_fixtures() {
 # environments directly, so a multidev removed any other way still gets its
 # leftover deployments cleared. Fixture names end in "-std" so the sweep's own
 # environment-name filter picks them up, the same as real test-suite envs.
+#
+# The sweep walks every matching environment in the real repository, and these
+# tests hand it a made-up multidev list, so anything it is allowed to look at
+# reads as orphaned. Each fixture therefore carries a unique pantheon_site and
+# PANTHEON_SITE is set to match: the sweep skips every other site's deployments,
+# including a concurrent run's suite environments (an earlier version without this
+# deleted a finished PR suite's deployments).
 
 @test "cleanup_orphaned_github_deployments: skips when GITHUB_REPOSITORY is unset" {
     unset GITHUB_REPOSITORY
@@ -433,12 +440,14 @@ _cleanup_fixtures() {
 
 @test "cleanup_orphaned_github_deployments: leaves an environment whose multidev still exists" {
     CREATED_ENVS=""
-    local suffix env_name
+    local suffix env_name site
     suffix=$(_fixture_suffix)
+    site="ptp-orph-${suffix}"
+    export PANTHEON_SITE="${site}"
     env_name="ptp-orph-live-${suffix}-std"
 
-    _make_deployment "${env_name}" "${env_name}" "$(get_test_site)"
-    _await_payload "${env_name}" "$(get_test_site)"
+    _make_deployment "${env_name}" "${env_name}" "${site}"
+    _await_payload "${env_name}" "${site}"
 
     run cleanup_orphaned_github_deployments "$(printf '%s\n' "${env_name}")" 0
     assert_success
@@ -453,12 +462,14 @@ _cleanup_fixtures() {
 
 @test "cleanup_orphaned_github_deployments: deletes deployments once past the age threshold" {
     CREATED_ENVS=""
-    local suffix env_name
+    local suffix env_name site
     suffix=$(_fixture_suffix)
+    site="ptp-orph-${suffix}"
+    export PANTHEON_SITE="${site}"
     env_name="ptp-orph-old-${suffix}-std"
 
-    _make_deployment "${env_name}" "${env_name}" "$(get_test_site)"
-    _await_payload "${env_name}" "$(get_test_site)"
+    _make_deployment "${env_name}" "${env_name}" "${site}"
+    _await_payload "${env_name}" "${site}"
 
     run cleanup_orphaned_github_deployments "$(printf 'dev\ntest\nlive')" 0
     assert_success
@@ -473,12 +484,14 @@ _cleanup_fixtures() {
 
 @test "cleanup_orphaned_github_deployments: leaves a recent orphaned deployment alone" {
     CREATED_ENVS=""
-    local suffix env_name
+    local suffix env_name site
     suffix=$(_fixture_suffix)
+    site="ptp-orph-${suffix}"
+    export PANTHEON_SITE="${site}"
     env_name="ptp-orph-recent-${suffix}-std"
 
-    _make_deployment "${env_name}" "${env_name}" "$(get_test_site)"
-    _await_payload "${env_name}" "$(get_test_site)"
+    _make_deployment "${env_name}" "${env_name}" "${site}"
+    _await_payload "${env_name}" "${site}"
 
     # A 31-year threshold keeps a just-created fixture well inside the window.
     run cleanup_orphaned_github_deployments "$(printf 'dev\ntest\nlive')" 999999999
@@ -493,13 +506,15 @@ _cleanup_fixtures() {
 
 @test "cleanup_orphaned_github_deployments: never touches the current target environment" {
     CREATED_ENVS=""
-    local suffix env_name
+    local suffix env_name site
     suffix=$(_fixture_suffix)
+    site="ptp-orph-${suffix}"
+    export PANTHEON_SITE="${site}"
     env_name="ptp-orph-target-${suffix}-std"
     export PANTHEON_TARGET_ENV="${env_name}"
 
-    _make_deployment "${env_name}" "${env_name}" "$(get_test_site)"
-    _await_payload "${env_name}" "$(get_test_site)"
+    _make_deployment "${env_name}" "${env_name}" "${site}"
+    _await_payload "${env_name}" "${site}"
 
     run cleanup_orphaned_github_deployments "$(printf 'dev\ntest\nlive')" 0
     assert_success
@@ -513,8 +528,10 @@ _cleanup_fixtures() {
 
 @test "cleanup_orphaned_github_deployments: skips an environment belonging to another Pantheon site" {
     CREATED_ENVS=""
-    local suffix env_name
+    local suffix env_name site
     suffix=$(_fixture_suffix)
+    site="ptp-orph-${suffix}"
+    export PANTHEON_SITE="${site}"
     env_name="ptp-orph-site-${suffix}-std"
 
     _make_deployment "${env_name}" "${env_name}" "some-other-site"
@@ -568,9 +585,10 @@ _deployment_count() {
     [ "$output" = "1" ]
 
     run gh api "repos/${GITHUB_REPOSITORY}/deployments?environment=${env_name}&per_page=1" \
-        --jq '[.[0].payload.pantheon_site, .[0].payload.pantheon_env, .[0].payload.source_branch] | @tsv'
+        --jq '.[0].payload | .pantheon_site + "|" + .pantheon_env + "|" + .source_branch'
     assert_success
-    [ "$output" = "$(printf '%s\t%s\t%s' "${PANTHEON_SITE}" "${env_name}" "${DEPLOYMENT_SOURCE_BRANCH}")" ]
+    # Not @tsv: it escapes the backslash this branch name deliberately contains.
+    [ "$output" = "${PANTHEON_SITE}|${env_name}|${DEPLOYMENT_SOURCE_BRANCH}" ]
 
     _cleanup_fixtures
 }

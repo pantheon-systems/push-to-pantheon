@@ -529,3 +529,181 @@ _cleanup_fixtures() {
 
     _cleanup_fixtures
 }
+
+# --- start/finish/prune_github_deployments (issue #195) ---
+#
+# These replaced bobheadxi/deployments, whose finish step made one unretried call
+# per old deployment and died on the first empty response. Reporting must never
+# fail a deploy, and an environment's history must not grow without bound.
+
+_deploy_env() {
+    export GITHUB_DEPLOYMENT_ENV="$1"
+    export CI_COMMIT_SHA
+    CI_COMMIT_SHA=$(_fixture_ref)
+    export CI_BUILD_URL="https://github.com/${GITHUB_REPOSITORY}/actions/runs/1"
+    export GITHUB_OUTPUT="${TEST_TEMP_DIR}/github_output"
+    export GITHUB_API_RETRY_DELAY=0
+    export GITHUB_PRUNE_DELAY=0
+    : > "${GITHUB_OUTPUT}"
+}
+
+_deployment_count() {
+    gh api --paginate "repos/${GITHUB_REPOSITORY}/deployments?environment=$1&per_page=100" --jq '.[].id' | wc -l | tr -d ' '
+}
+
+@test "start_github_deployment: records the payload and exposes the deployment id" {
+    CREATED_ENVS=""
+    local env_name
+    env_name="ptp-start-$(_fixture_suffix)-std"
+    _deploy_env "${env_name}"
+    CREATED_ENVS="${env_name}"$'\n'
+    export PANTHEON_TARGET_ENV="${env_name}"
+    # A quote in the branch name is what broke the old interpolated JSON payload.
+    export DEPLOYMENT_SOURCE_BRANCH='fix/"quoted"\branch'
+
+    run start_github_deployment
+    assert_success
+
+    run grep -c '^deployment_id=[0-9]\+$' "${GITHUB_OUTPUT}"
+    [ "$output" = "1" ]
+
+    run gh api "repos/${GITHUB_REPOSITORY}/deployments?environment=${env_name}&per_page=1" \
+        --jq '[.[0].payload.pantheon_site, .[0].payload.pantheon_env, .[0].payload.source_branch] | @tsv'
+    assert_success
+    [ "$output" = "$(printf '%s\t%s\t%s' "${PANTHEON_SITE}" "${env_name}" "${DEPLOYMENT_SOURCE_BRANCH}")" ]
+
+    _cleanup_fixtures
+}
+
+@test "start_github_deployment: an API failure warns but never fails the run" {
+    _deploy_env "ptp-start-fail-$(_fixture_suffix)-std"
+    export GITHUB_REPOSITORY="pantheon-systems/no-such-repo-$$"
+
+    run start_github_deployment
+    assert_success
+    assert_output_contains "::warning::"
+    ! grep -q deployment_id "${GITHUB_OUTPUT}"
+}
+
+@test "finish_github_deployment: no deployment id is a no-op" {
+    unset GITHUB_DEPLOYMENT_ID
+
+    run finish_github_deployment
+    assert_success
+    assert_output_contains "No GitHub deployment to update"
+}
+
+@test "finish_github_deployment: maps job status to deployment state" {
+    CREATED_ENVS=""
+    local env_name id
+    env_name="ptp-finish-$(_fixture_suffix)-std"
+    _deploy_env "${env_name}"
+    CREATED_ENVS="${env_name}"$'\n'
+    export PANTHEON_TARGET_ENV="${env_name}"
+    start_github_deployment > /dev/null
+    id=$(sed -n 's/^deployment_id=//p' "${GITHUB_OUTPUT}")
+    export GITHUB_DEPLOYMENT_ID="${id}"
+
+    local pair status expected state
+    for pair in success:success failure:failure cancelled:inactive; do
+        status="${pair%%:*}"
+        expected="${pair##*:}"
+        DEPLOYMENT_JOB_STATUS="${status}" run finish_github_deployment
+        assert_success
+        state=$(gh api "repos/${GITHUB_REPOSITORY}/deployments/${id}/statuses" --jq '.[0].state')
+        [ "${state}" = "${expected}" ]
+    done
+
+    _cleanup_fixtures
+}
+
+@test "finish_github_deployment: an API failure warns but never fails the run" {
+    export GITHUB_DEPLOYMENT_ID="1"
+    export DEPLOYMENT_JOB_STATUS="success"
+    export GITHUB_API_RETRY_DELAY=0
+    export GITHUB_REPOSITORY="pantheon-systems/no-such-repo-$$"
+
+    run finish_github_deployment
+    assert_success
+    assert_output_contains "::warning::"
+}
+
+@test "prune_github_deployments: keeps the newest N and deletes the rest" {
+    CREATED_ENVS=""
+    local env_name i
+    env_name="ptp-prune-$(_fixture_suffix)-std"
+    _deploy_env "${env_name}"
+    for i in 1 2 3 4; do
+        _make_deployment "${env_name}" "${env_name}" "${PANTHEON_SITE}"
+    done
+    _await_payload "${env_name}" "${PANTHEON_SITE}"
+
+    run prune_github_deployments "${env_name}" 2
+    assert_success
+    [ "$(_deployment_count "${env_name}")" = "2" ]
+
+    _cleanup_fixtures
+}
+
+@test "prune_github_deployments: caps deletions per run" {
+    CREATED_ENVS=""
+    local env_name i
+    env_name="ptp-prune-cap-$(_fixture_suffix)-std"
+    _deploy_env "${env_name}"
+    for i in 1 2 3 4; do
+        _make_deployment "${env_name}" "${env_name}" "${PANTHEON_SITE}"
+    done
+    _await_payload "${env_name}" "${PANTHEON_SITE}"
+
+    run prune_github_deployments "${env_name}" 0 1
+    assert_success
+    [ "$(_deployment_count "${env_name}")" = "3" ]
+
+    _cleanup_fixtures
+}
+
+@test "prune_github_deployments: never deletes the deployment just made" {
+    CREATED_ENVS=""
+    local env_name i
+    env_name="ptp-prune-cur-$(_fixture_suffix)-std"
+    _deploy_env "${env_name}"
+    for i in 1 2 3; do
+        _make_deployment "${env_name}" "${env_name}" "${PANTHEON_SITE}"
+    done
+    _await_payload "${env_name}" "${PANTHEON_SITE}"
+    export GITHUB_DEPLOYMENT_ID
+    GITHUB_DEPLOYMENT_ID=$(gh api "repos/${GITHUB_REPOSITORY}/deployments?environment=${env_name}" --jq '.[-1].id')
+
+    run prune_github_deployments "${env_name}" 0
+    assert_success
+
+    run gh api "repos/${GITHUB_REPOSITORY}/deployments?environment=${env_name}" --jq '.[].id'
+    [ "$output" = "${GITHUB_DEPLOYMENT_ID}" ]
+
+    _cleanup_fixtures
+}
+
+@test "prune_github_deployments: leaves another Pantheon site's deployments alone" {
+    CREATED_ENVS=""
+    local env_name i
+    env_name="ptp-prune-site-$(_fixture_suffix)-std"
+    _deploy_env "${env_name}"
+    for i in 1 2; do
+        _make_deployment "${env_name}" "${env_name}" "some-other-site"
+    done
+    _await_payload "${env_name}" "some-other-site"
+
+    run prune_github_deployments "${env_name}" 0
+    assert_success
+    [ "$(_deployment_count "${env_name}")" = "2" ]
+
+    _cleanup_fixtures
+}
+
+@test "prune_github_deployments: a listing failure warns and does not fail" {
+    export GITHUB_REPOSITORY="pantheon-systems/no-such-repo-$$"
+
+    run prune_github_deployments "whatever" 0
+    assert_success
+    assert_output_contains "skipping prune"
+}

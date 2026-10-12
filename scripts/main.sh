@@ -32,6 +32,7 @@ function main() {
 	- push_to_pantheon: Push code to Pantheon, either via Git or Build Tools depending on configuration and environment state.
 	- cleanup: Clean up stale Pantheon multidev environments. This includes environments associated with closed PRs as well as old environments matching a specified pattern.
 	- cleanup_closed_pr_multidevs: Delete pr-* multidevs whose pull request is closed (workaround for terminus-build-tools-plugin#505).
+	- cleanup_orphaned_github_deployments: Delete GitHub deployments left behind after their Pantheon multidev no longer exists.
 	- resolve_github_environments: Print the GitHub deployment environment(s) that belong to a Pantheon multidev.
 	- create_multidev: Create a multidev environment from a source environment if it doesn't already exist.
 	- delete_multidev: Delete a specific multidev environment and its Git branch.
@@ -49,7 +50,7 @@ function main() {
 	fi
 
 	# Check for a valid command.
-	if [ "$1" != 'compute_multidev_name' ] && [ "$1" != 'sanitize_pantheon_env_name' ] && [ "$1" != 'resolve_branch_env_name' ] && [ "$1" != 'get_env_owner_branch' ] && [ "$1" != 'validate_pantheon_env_name' ] && [ "$1" != 'get_branch_name' ] && [ "$1" != 'get_commit_message' ] && [ "$1" != 'get_target_env' ] && [ "$1" != 'check_missing_permissions' ] && [ "$1" != 'get_missing_permissions_help' ] && [ "$1" != 'check_multidev_limit' ] && [ "$1" != 'setup_ssh_hostkeys' ] && [ "$1" != 'prepare_site_root' ] && [ "$1" != 'push_to_pantheon' ] && [ "$1" != 'cleanup' ] && [ "$1" != 'cleanup_closed_pr_multidevs' ] && [ "$1" != 'resolve_github_environments' ] && [ "$1" != 'verify_build_tools' ] && [ "$1" != 'create_multidev' ] && [ "$1" != 'delete_multidev' ]; then
+	if [ "$1" != 'compute_multidev_name' ] && [ "$1" != 'sanitize_pantheon_env_name' ] && [ "$1" != 'resolve_branch_env_name' ] && [ "$1" != 'get_env_owner_branch' ] && [ "$1" != 'validate_pantheon_env_name' ] && [ "$1" != 'get_branch_name' ] && [ "$1" != 'get_commit_message' ] && [ "$1" != 'get_target_env' ] && [ "$1" != 'check_missing_permissions' ] && [ "$1" != 'get_missing_permissions_help' ] && [ "$1" != 'check_multidev_limit' ] && [ "$1" != 'setup_ssh_hostkeys' ] && [ "$1" != 'prepare_site_root' ] && [ "$1" != 'push_to_pantheon' ] && [ "$1" != 'cleanup' ] && [ "$1" != 'cleanup_closed_pr_multidevs' ] && [ "$1" != 'cleanup_orphaned_github_deployments' ] && [ "$1" != 'resolve_github_environments' ] && [ "$1" != 'verify_build_tools' ] && [ "$1" != 'create_multidev' ] && [ "$1" != 'delete_multidev' ]; then
 		echo -e "${red}Invalid command: $1${normal}"
 		echo -e "${help_msg}"
 		exit 1
@@ -987,8 +988,99 @@ function cleanup_closed_pr_multidevs() {
 	echo -e "${green}✅ Closed-PR sweep complete.${normal}"
 }
 
-# Clean up stale Pantheon multidev environments. 
-# This includes environments associated with closed PRs as well as old 
+# Delete GitHub deployments for environments whose Pantheon multidev no longer
+# exists, closing the door on future backlogs like issue #172.
+#
+# Every other GitHub cleanup path in this file is multidev-driven:
+# delete_github_environment only ever runs as a side effect of this run deleting a
+# specific Pantheon multidev (see cleanup_closed_pr_multidevs and the age-based
+# block in cleanup()). That leaves a gap -- a multidev removed any other way
+# (manually, by an older version of this script, by build:env:delete:pr before
+# this file grew GitHub cleanup at all) leaves behind a GitHub environment and
+# deployments that nothing ever revisits, because nothing here ever checks GitHub
+# state against what Pantheon currently has. This closes that gap by walking
+# GitHub's environments directly instead of starting from Pantheon's.
+#
+# Parameters:
+#   $1: newline-separated list of Pantheon multidevs that currently exist
+#   $2: (optional) age threshold in seconds; deployments younger than this are
+#       left alone in case $1 was captured a moment before a concurrent run's
+#       multidev finished being created. Defaults to 14 days.
+# Requires environment variables:
+#   GITHUB_REPOSITORY: owner/repo used to query GitHub
+#   PANTHEON_SITE: (optional) restricts deletion to this site's deployments
+#   PANTHEON_TARGET_ENV: (optional) the environment being deployed to, never touched
+function cleanup_orphaned_github_deployments() {
+	local all_envs="${1}"
+	local age_threshold_seconds="${2:-1209600}" # 14 days
+
+	if [ -z "${GITHUB_REPOSITORY}" ]; then
+		echo -e "${yellow}Skipping orphaned-deployment sweep — GITHUB_REPOSITORY is not set.${normal}"
+		return 0
+	fi
+
+	echo ""
+	echo -e "${yellow}Checking for GitHub deployments whose Pantheon multidev no longer exists...${normal}"
+
+	# Only inspect environments this action could plausibly have created, so a
+	# transient failure elsewhere in the sweep can never reach something unrelated
+	# that happens to share the repo. Same patterns as the age-based block below.
+	local gh_envs
+	gh_envs=$(gh api --paginate "repos/${GITHUB_REPOSITORY}/environments" --jq '.environments[].name' 2>/dev/null \
+		| grep -E -- '(^pr-[0-9]+$|^wd-|-std$|-cont$|-git$|-term$|-adv$)' || true)
+
+	if [ -z "${gh_envs}" ]; then
+		echo -e "${green}✅ No candidate GitHub environments found.${normal}"
+		return 0
+	fi
+
+	local current_ts
+	current_ts=$(date +%s)
+
+	local gh_env payload payload_env payload_site created_ts age_seconds
+	for gh_env in ${gh_envs}; do
+		payload=$(gh api "repos/${GITHUB_REPOSITORY}/deployments?environment=${gh_env}&per_page=1" \
+			--jq '[.[0].payload.pantheon_env // "", .[0].payload.pantheon_site // "", (.[0].created_at // null | if . then fromdateiso8601 else 0 end)] | @tsv' 2>/dev/null || true)
+
+		[ -z "${payload}" ] && continue
+
+		payload_env=$(printf '%s' "${payload}" | cut -f1)
+		payload_site=$(printf '%s' "${payload}" | cut -f2)
+		created_ts=$(printf '%s' "${payload}" | cut -f3)
+
+		# No deployments, or none carrying our payload -- not one of ours.
+		[ -z "${payload_env}" ] && continue
+
+		# Belongs to a different Pantheon site sharing this repo.
+		if [ -n "${PANTHEON_SITE}" ] && [ -n "${payload_site}" ] && [ "${payload_site}" != "${PANTHEON_SITE}" ]; then
+			continue
+		fi
+
+		# Never touch the environment this run is deploying to.
+		if [ -n "${PANTHEON_TARGET_ENV}" ] && [ "${payload_env}" = "${PANTHEON_TARGET_ENV}" ]; then
+			continue
+		fi
+
+		# The multidev still exists in Pantheon -- not orphaned.
+		if echo "${all_envs}" | grep -qx -- "${payload_env}"; then
+			continue
+		fi
+
+		# Leave recent deployments alone -- see the age_threshold_seconds note above.
+		age_seconds=$((current_ts - created_ts))
+		if [ "${created_ts}" != "0" ] && [ "${age_seconds}" -lt "${age_threshold_seconds}" ]; then
+			continue
+		fi
+
+		echo -e "${yellow}  ${normal}${bold}${gh_env}${normal}${yellow} has no matching Pantheon multidev (was ${normal}${bold}${payload_env}${normal}${yellow}) -- orphaned.${normal}"
+		delete_one_github_environment "${gh_env}"
+	done
+
+	echo -e "${green}✅ Orphaned-deployment sweep complete.${normal}"
+}
+
+# Clean up stale Pantheon multidev environments.
+# This includes environments associated with closed PRs as well as old
 # environments matching a specified pattern.
 function cleanup() {
 	if [ -n "$SITE_ROOT" ]; then
@@ -1092,6 +1184,13 @@ function cleanup() {
 	CURRENT_TIMESTAMP=$(date +%s)
 	AGE_THRESHOLD_SECONDS=$((AGE_THRESHOLD_DAYS * 86400))
 	echo -e "${yellow}Age threshold: ${normal}${bold}${AGE_THRESHOLD_DAYS} days${normal}"
+
+	# Catch deployments left behind by multidevs that no longer exist in Pantheon,
+	# however they went away. See cleanup_orphaned_github_deployments() for why
+	# this can't just be folded into the age-based block below.
+	if [ -n "$GITHUB_REPOSITORY" ]; then
+		cleanup_orphaned_github_deployments "${ALL_ENVS}" "${AGE_THRESHOLD_SECONDS}"
+	fi
 
 	# List all environments, filter out the standard dev/test/live, find the ones
 	# that match our deletion patterns (both legacy and new), and exclude the current target env.

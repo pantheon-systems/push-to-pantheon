@@ -413,3 +413,119 @@ _cleanup_fixtures() {
         assert_output_contains "deleted"
     fi
 }
+
+# --- cleanup_orphaned_github_deployments() (issue #172 follow-up) ---
+#
+# Every other GitHub cleanup path is multidev-driven: it only reaches a GitHub
+# environment as a side effect of this run deleting the matching Pantheon
+# multidev. cleanup_orphaned_github_deployments instead walks GitHub's
+# environments directly, so a multidev removed any other way still gets its
+# leftover deployments cleared. Fixture names end in "-std" so the sweep's own
+# environment-name filter picks them up, the same as real test-suite envs.
+
+@test "cleanup_orphaned_github_deployments: skips when GITHUB_REPOSITORY is unset" {
+    unset GITHUB_REPOSITORY
+
+    run cleanup_orphaned_github_deployments "dev"
+    assert_success
+    assert_output_contains "GITHUB_REPOSITORY is not set"
+}
+
+@test "cleanup_orphaned_github_deployments: leaves an environment whose multidev still exists" {
+    CREATED_ENVS=""
+    local suffix env_name
+    suffix=$(_fixture_suffix)
+    env_name="ptp-orph-live-${suffix}-std"
+
+    _make_deployment "${env_name}" "${env_name}" "$(get_test_site)"
+    _await_payload "${env_name}" "$(get_test_site)"
+
+    run cleanup_orphaned_github_deployments "$(printf '%s\n' "${env_name}")" 0
+    assert_success
+    assert_output_not_contains "orphaned"
+
+    run gh api "repos/${GITHUB_REPOSITORY}/deployments?environment=${env_name}" --jq 'length'
+    assert_success
+    [ "$output" = "1" ]
+
+    _cleanup_fixtures
+}
+
+@test "cleanup_orphaned_github_deployments: deletes deployments once past the age threshold" {
+    CREATED_ENVS=""
+    local suffix env_name
+    suffix=$(_fixture_suffix)
+    env_name="ptp-orph-old-${suffix}-std"
+
+    _make_deployment "${env_name}" "${env_name}" "$(get_test_site)"
+    _await_payload "${env_name}" "$(get_test_site)"
+
+    run cleanup_orphaned_github_deployments "$(printf 'dev\ntest\nlive')" 0
+    assert_success
+    assert_output_contains "orphaned"
+
+    run gh api "repos/${GITHUB_REPOSITORY}/deployments?environment=${env_name}" --jq 'length'
+    assert_success
+    [ "$output" = "0" ]
+
+    _cleanup_fixtures
+}
+
+@test "cleanup_orphaned_github_deployments: leaves a recent orphaned deployment alone" {
+    CREATED_ENVS=""
+    local suffix env_name
+    suffix=$(_fixture_suffix)
+    env_name="ptp-orph-recent-${suffix}-std"
+
+    _make_deployment "${env_name}" "${env_name}" "$(get_test_site)"
+    _await_payload "${env_name}" "$(get_test_site)"
+
+    # A 31-year threshold keeps a just-created fixture well inside the window.
+    run cleanup_orphaned_github_deployments "$(printf 'dev\ntest\nlive')" 999999999
+    assert_success
+
+    run gh api "repos/${GITHUB_REPOSITORY}/deployments?environment=${env_name}" --jq 'length'
+    assert_success
+    [ "$output" = "1" ]
+
+    _cleanup_fixtures
+}
+
+@test "cleanup_orphaned_github_deployments: never touches the current target environment" {
+    CREATED_ENVS=""
+    local suffix env_name
+    suffix=$(_fixture_suffix)
+    env_name="ptp-orph-target-${suffix}-std"
+    export PANTHEON_TARGET_ENV="${env_name}"
+
+    _make_deployment "${env_name}" "${env_name}" "$(get_test_site)"
+    _await_payload "${env_name}" "$(get_test_site)"
+
+    run cleanup_orphaned_github_deployments "$(printf 'dev\ntest\nlive')" 0
+    assert_success
+
+    run gh api "repos/${GITHUB_REPOSITORY}/deployments?environment=${env_name}" --jq 'length'
+    assert_success
+    [ "$output" = "1" ]
+
+    _cleanup_fixtures
+}
+
+@test "cleanup_orphaned_github_deployments: skips an environment belonging to another Pantheon site" {
+    CREATED_ENVS=""
+    local suffix env_name
+    suffix=$(_fixture_suffix)
+    env_name="ptp-orph-site-${suffix}-std"
+
+    _make_deployment "${env_name}" "${env_name}" "some-other-site"
+    _await_payload "${env_name}" "some-other-site"
+
+    run cleanup_orphaned_github_deployments "$(printf 'dev\ntest\nlive')" 0
+    assert_success
+
+    run gh api "repos/${GITHUB_REPOSITORY}/deployments?environment=${env_name}" --jq 'length'
+    assert_success
+    [ "$output" = "1" ]
+
+    _cleanup_fixtures
+}

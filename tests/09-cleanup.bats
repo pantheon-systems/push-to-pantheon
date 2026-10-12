@@ -194,7 +194,12 @@ _fixture_suffix() {
     if [ -z "${sha}" ]; then
         sha=$(git -C "${BATS_TEST_DIRNAME}/.." rev-parse HEAD 2>/dev/null || echo "local")
     fi
-    echo "${sha:0:7}"
+    # The test number keeps fixtures apart. CI runs bats with --jobs, which also
+    # parallelizes tests *within* this file, and several tests share an environment
+    # or site name derived from this suffix. Without it a sweep in one test (which
+    # deletes everything for its site) removes the fixtures of another running at
+    # the same moment.
+    echo "${sha:0:7}-t${BATS_TEST_NUMBER:-0}"
 }
 
 # A ref that definitely exists on the remote, for the deployment to point at.

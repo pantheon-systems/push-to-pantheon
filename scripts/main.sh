@@ -32,6 +32,10 @@ function main() {
 	- push_to_pantheon: Push code to Pantheon, either via Git or Build Tools depending on configuration and environment state.
 	- cleanup: Clean up stale Pantheon multidev environments. This includes environments associated with closed PRs as well as old environments matching a specified pattern.
 	- cleanup_closed_pr_multidevs: Delete pr-* multidevs whose pull request is closed (workaround for terminus-build-tools-plugin#505).
+	- cleanup_orphaned_github_deployments: Delete GitHub deployments left behind after their Pantheon multidev no longer exists.
+	- start_github_deployment: Create a GitHub deployment for the Pantheon environment and mark it in progress.
+	- finish_github_deployment: Record the outcome of the GitHub deployment started by start_github_deployment.
+	- prune_github_deployments: Delete an environment's old GitHub deployments, keeping the newest few.
 	- resolve_github_environments: Print the GitHub deployment environment(s) that belong to a Pantheon multidev.
 	- create_multidev: Create a multidev environment from a source environment if it doesn't already exist.
 	- delete_multidev: Delete a specific multidev environment and its Git branch.
@@ -49,7 +53,7 @@ function main() {
 	fi
 
 	# Check for a valid command.
-	if [ "$1" != 'compute_multidev_name' ] && [ "$1" != 'sanitize_pantheon_env_name' ] && [ "$1" != 'resolve_branch_env_name' ] && [ "$1" != 'get_env_owner_branch' ] && [ "$1" != 'validate_pantheon_env_name' ] && [ "$1" != 'get_branch_name' ] && [ "$1" != 'get_commit_message' ] && [ "$1" != 'get_target_env' ] && [ "$1" != 'check_missing_permissions' ] && [ "$1" != 'get_missing_permissions_help' ] && [ "$1" != 'check_multidev_limit' ] && [ "$1" != 'setup_ssh_hostkeys' ] && [ "$1" != 'prepare_site_root' ] && [ "$1" != 'push_to_pantheon' ] && [ "$1" != 'cleanup' ] && [ "$1" != 'cleanup_closed_pr_multidevs' ] && [ "$1" != 'resolve_github_environments' ] && [ "$1" != 'verify_build_tools' ] && [ "$1" != 'create_multidev' ] && [ "$1" != 'delete_multidev' ]; then
+	if [ "$1" != 'compute_multidev_name' ] && [ "$1" != 'sanitize_pantheon_env_name' ] && [ "$1" != 'resolve_branch_env_name' ] && [ "$1" != 'get_env_owner_branch' ] && [ "$1" != 'validate_pantheon_env_name' ] && [ "$1" != 'get_branch_name' ] && [ "$1" != 'get_commit_message' ] && [ "$1" != 'get_target_env' ] && [ "$1" != 'check_missing_permissions' ] && [ "$1" != 'get_missing_permissions_help' ] && [ "$1" != 'check_multidev_limit' ] && [ "$1" != 'setup_ssh_hostkeys' ] && [ "$1" != 'prepare_site_root' ] && [ "$1" != 'push_to_pantheon' ] && [ "$1" != 'cleanup' ] && [ "$1" != 'cleanup_closed_pr_multidevs' ] && [ "$1" != 'cleanup_orphaned_github_deployments' ] && [ "$1" != 'start_github_deployment' ] && [ "$1" != 'finish_github_deployment' ] && [ "$1" != 'prune_github_deployments' ] && [ "$1" != 'resolve_github_environments' ] && [ "$1" != 'verify_build_tools' ] && [ "$1" != 'create_multidev' ] && [ "$1" != 'delete_multidev' ]; then
 		echo -e "${red}Invalid command: $1${normal}"
 		echo -e "${help_msg}"
 		exit 1
@@ -987,8 +991,295 @@ function cleanup_closed_pr_multidevs() {
 	echo -e "${green}✅ Closed-PR sweep complete.${normal}"
 }
 
-# Clean up stale Pantheon multidev environments. 
-# This includes environments associated with closed PRs as well as old 
+# Call the GitHub API, retrying transient failures.
+#
+# Deployment bookkeeping used to be bobheadxi/deployments, which made one
+# unretried call per old deployment and surfaced any hiccup as the opaque
+# "invalid json response body" (issue #195). gh reports the HTTP status instead.
+# Prints the response body on success; the last error on stderr after giving up.
+function _gh_api_retry() {
+	local attempts=3 out i
+	for ((i = 1; i <= attempts; i++)); do
+		if out=$(gh api "$@" 2>&1); then
+			printf '%s' "${out}"
+			return 0
+		fi
+		if [ "${i}" -lt "${attempts}" ]; then
+			sleep $((${GITHUB_API_RETRY_DELAY:-2} * i))
+		fi
+	done
+	printf '%s\n' "${out}" >&2
+	return 1
+}
+
+# Create a GitHub deployment for the Pantheon environment and mark it in_progress.
+#
+# Reporting is best effort: it never fails the run. By the time a later step
+# finishes the deployment the code has already been pushed, and a GitHub API
+# blip must not turn a good deploy red. On failure no deployment_id is written,
+# so finish_github_deployment has nothing to update and skips itself.
+#
+# The payload is built with jq rather than interpolated into a JSON string, so a
+# branch name or site containing quotes cannot produce invalid JSON.
+#
+# Requires environment variables:
+#   GITHUB_REPOSITORY: owner/repo
+#   GITHUB_DEPLOYMENT_ENV: GitHub environment name
+#   CI_COMMIT_SHA: ref the deployment points at
+#   PANTHEON_SITE, PANTHEON_TARGET_ENV: recorded in the payload so cleanup can find it
+#   DEPLOYMENT_SOURCE_BRANCH: (optional) branch that owns the environment
+#   CI_BUILD_URL: (optional) workflow run URL, used as the status log_url
+#   GITHUB_OUTPUT: (optional) receives deployment_id
+function start_github_deployment() {
+	local body response id
+	body=$(mktemp)
+	jq -n \
+		--arg ref "${CI_COMMIT_SHA}" \
+		--arg env "${GITHUB_DEPLOYMENT_ENV}" \
+		--arg site "${PANTHEON_SITE}" \
+		--arg pantheon_env "${PANTHEON_TARGET_ENV}" \
+		--arg branch "${DEPLOYMENT_SOURCE_BRANCH}" \
+		'{ref: $ref, environment: $env, auto_merge: false, required_contexts: [],
+		  description: "Deploying to Pantheon",
+		  payload: {pantheon_site: $site, pantheon_env: $pantheon_env, source_branch: $branch}}' > "${body}"
+
+	# A file, not stdin: --input - is consumed by the first attempt.
+	if ! response=$(_gh_api_retry --method POST "repos/${GITHUB_REPOSITORY}/deployments" --input "${body}" 2>&1); then
+		rm -f "${body}"
+		echo "::warning::Could not create a GitHub deployment for ${GITHUB_DEPLOYMENT_ENV}: ${response}"
+		return 0
+	fi
+	rm -f "${body}"
+
+	id=$(printf '%s' "${response}" | jq -r '.id // empty')
+	if [ -z "${id}" ]; then
+		echo "::warning::GitHub did not return a deployment id for ${GITHUB_DEPLOYMENT_ENV}: ${response}"
+		return 0
+	fi
+
+	echo -e "${yellow}GitHub deployment ${normal}${bold}${id}${normal}${yellow} created for ${normal}${bold}${GITHUB_DEPLOYMENT_ENV}${normal}${yellow}.${normal}"
+	[ -n "${GITHUB_OUTPUT}" ] && echo "deployment_id=${id}" >> "${GITHUB_OUTPUT}"
+
+	if ! _gh_api_retry --method POST "repos/${GITHUB_REPOSITORY}/deployments/${id}/statuses" \
+		-f state=in_progress -f log_url="${CI_BUILD_URL}" -f description="Deployment in progress" > /dev/null 2>&1; then
+		echo "::warning::Could not mark GitHub deployment ${id} in_progress."
+	fi
+	return 0
+}
+
+# Record the outcome of a deployment started by start_github_deployment.
+#
+# A success status also makes GitHub mark the environment's earlier deployments
+# inactive on its own (auto_inactive), so there is no need to walk and update
+# them one by one. Best effort, like start_github_deployment.
+#
+# Requires environment variables:
+#   GITHUB_REPOSITORY: owner/repo
+#   GITHUB_DEPLOYMENT_ID: from start_github_deployment; if empty, nothing to do
+#   DEPLOYMENT_JOB_STATUS: success, failure or cancelled
+#   CI_BUILD_URL: (optional) workflow run URL
+#   DEPLOYMENT_ENV_URL: (optional) environment URL, recorded on success
+function finish_github_deployment() {
+	if [ -z "${GITHUB_DEPLOYMENT_ID}" ]; then
+		echo -e "${yellow}No GitHub deployment to update.${normal}"
+		return 0
+	fi
+
+	local state
+	case "${DEPLOYMENT_JOB_STATUS}" in
+		success) state="success" ;;
+		cancelled) state="inactive" ;;
+		*) state="failure" ;;
+	esac
+
+	local args=(-f "state=${state}" -f "log_url=${CI_BUILD_URL}" -f "description=Deployment ${DEPLOYMENT_JOB_STATUS:-finished}")
+	if [ "${state}" = "success" ] && [ -n "${DEPLOYMENT_ENV_URL}" ]; then
+		args+=(-f "environment_url=${DEPLOYMENT_ENV_URL}")
+	fi
+
+	local err
+	if err=$(_gh_api_retry --method POST "repos/${GITHUB_REPOSITORY}/deployments/${GITHUB_DEPLOYMENT_ID}/statuses" "${args[@]}" 2>&1 > /dev/null); then
+		echo -e "${green}✅ GitHub deployment ${GITHUB_DEPLOYMENT_ID} marked ${state}.${normal}"
+	else
+		echo "::warning::Could not mark GitHub deployment ${GITHUB_DEPLOYMENT_ID} ${state}: ${err}"
+	fi
+	return 0
+}
+
+# Trim an environment's old deployments so its history cannot grow without bound.
+#
+# Environments like dev are deployed to forever and never deleted, so nothing
+# else ever removes their deployments (issue #195 was a dev environment sitting
+# at 100+). Keeps the newest $keep, deletes older ones, and caps how many it
+# removes per run so a large backlog drains over several deploys instead of one
+# burst of writes that could trip GitHub's secondary rate limit.
+#
+# Only deployments carrying this action's payload (a pantheon_site) are
+# touched, and only those for PANTHEON_SITE when it is set, so deployments made
+# by other tools or for another site sharing the repo are left alone. Never
+# fails the run.
+#
+# Parameters:
+#   $1: GitHub environment name
+#   $2: (optional) how many recent deployments to keep; GITHUB_DEPLOYMENTS_KEEP or 20
+#   $3: (optional) most deployments to delete this run; defaults to 25
+# Requires environment variables:
+#   GITHUB_REPOSITORY: owner/repo
+#   PANTHEON_SITE: (optional) restricts deletion to this site's deployments
+#   GITHUB_DEPLOYMENT_ID: (optional) the deployment just made, never deleted
+#   GITHUB_PRUNE_DELAY: (optional) seconds between deletions, default 1
+function prune_github_deployments() {
+	local env_name="${1}"
+	local keep="${2:-${GITHUB_DEPLOYMENTS_KEEP:-20}}"
+	local max_delete="${3:-25}"
+
+	if [ -z "${env_name}" ] || [ -z "${GITHUB_REPOSITORY}" ]; then
+		return 0
+	fi
+
+	local listing
+	if ! listing=$(gh api --paginate "repos/${GITHUB_REPOSITORY}/deployments?environment=${env_name}&per_page=100" \
+		--jq '.[] | [.id, (.payload | if type == "object" then (.pantheon_site // "") else "" end)] | @tsv' 2>&1); then
+		echo "::warning::Could not list deployments for ${env_name}, skipping prune: ${listing}"
+		return 0
+	fi
+
+	# Newest first, as the API returns them. Keep ours only, newest $keep survive.
+	local candidates id site
+	candidates=$(
+		while IFS=$'\t' read -r id site; do
+			[ -n "${site}" ] || continue
+			if [ -n "${PANTHEON_SITE}" ] && [ "${site}" != "${PANTHEON_SITE}" ]; then
+				continue
+			fi
+			[ "${id}" = "${GITHUB_DEPLOYMENT_ID}" ] && continue
+			echo "${id}"
+		done <<< "${listing}" | tail -n +$((keep + 1)) | head -n "${max_delete}"
+	)
+
+	if [ -z "${candidates}" ]; then
+		return 0
+	fi
+
+	echo ""
+	echo -e "${yellow}Pruning ${normal}${bold}$(echo "${candidates}" | wc -l | tr -d ' ')${normal}${yellow} old deployment(s) from ${normal}${bold}${env_name}${normal}${yellow} (keeping the newest ${keep})...${normal}"
+
+	local failures=0
+	for id in ${candidates}; do
+		# GitHub refuses to delete an active deployment, so deactivate first.
+		if _gh_api_retry --method POST "repos/${GITHUB_REPOSITORY}/deployments/${id}/statuses" \
+			-f state=inactive -f description='Superseded; pruned.' > /dev/null 2>&1 &&
+			_gh_api_retry --method DELETE "repos/${GITHUB_REPOSITORY}/deployments/${id}" > /dev/null 2>&1; then
+			failures=0
+		else
+			echo -e "${yellow}  - Could not delete deployment ${id}.${normal}"
+			failures=$((failures + 1))
+			# Repeated failures mean rate limiting or lost access; stop hammering.
+			if [ "${failures}" -ge 3 ]; then
+				echo "::warning::Stopping the deployment prune after ${failures} consecutive failures."
+				break
+			fi
+		fi
+		sleep "${GITHUB_PRUNE_DELAY:-1}"
+	done
+
+	echo -e "${green}✅ Deployment prune complete.${normal}"
+	return 0
+}
+
+# Delete GitHub deployments for environments whose Pantheon multidev no longer
+# exists, closing the door on future backlogs like issue #172.
+#
+# Every other GitHub cleanup path in this file is multidev-driven:
+# delete_github_environment only ever runs as a side effect of this run deleting a
+# specific Pantheon multidev (see cleanup_closed_pr_multidevs and the age-based
+# block in cleanup()). That leaves a gap -- a multidev removed any other way
+# (manually, by an older version of this script, by build:env:delete:pr before
+# this file grew GitHub cleanup at all) leaves behind a GitHub environment and
+# deployments that nothing ever revisits, because nothing here ever checks GitHub
+# state against what Pantheon currently has. This closes that gap by walking
+# GitHub's environments directly instead of starting from Pantheon's.
+#
+# Parameters:
+#   $1: newline-separated list of Pantheon multidevs that currently exist
+#   $2: (optional) age threshold in seconds; deployments younger than this are
+#       left alone in case $1 was captured a moment before a concurrent run's
+#       multidev finished being created. Defaults to 14 days.
+# Requires environment variables:
+#   GITHUB_REPOSITORY: owner/repo used to query GitHub
+#   PANTHEON_SITE: (optional) restricts deletion to this site's deployments
+#   PANTHEON_TARGET_ENV: (optional) the environment being deployed to, never touched
+function cleanup_orphaned_github_deployments() {
+	local all_envs="${1}"
+	local age_threshold_seconds="${2:-1209600}" # 14 days
+
+	if [ -z "${GITHUB_REPOSITORY}" ]; then
+		echo -e "${yellow}Skipping orphaned-deployment sweep — GITHUB_REPOSITORY is not set.${normal}"
+		return 0
+	fi
+
+	echo ""
+	echo -e "${yellow}Checking for GitHub deployments whose Pantheon multidev no longer exists...${normal}"
+
+	# Only inspect environments this action could plausibly have created, so a
+	# transient failure elsewhere in the sweep can never reach something unrelated
+	# that happens to share the repo. Same patterns as the age-based block below.
+	local gh_envs
+	gh_envs=$(gh api --paginate "repos/${GITHUB_REPOSITORY}/environments" --jq '.environments[].name' 2>/dev/null \
+		| grep -E -- '(^pr-[0-9]+$|^wd-|-std$|-cont$|-git$|-term$|-adv$)' || true)
+
+	if [ -z "${gh_envs}" ]; then
+		echo -e "${green}✅ No candidate GitHub environments found.${normal}"
+		return 0
+	fi
+
+	local current_ts
+	current_ts=$(date +%s)
+
+	local gh_env payload payload_env payload_site created_ts age_seconds
+	for gh_env in ${gh_envs}; do
+		payload=$(gh api "repos/${GITHUB_REPOSITORY}/deployments?environment=${gh_env}&per_page=1" \
+			--jq '[.[0].payload.pantheon_env // "", .[0].payload.pantheon_site // "", (.[0].created_at // null | if . then fromdateiso8601 else 0 end)] | @tsv' 2>/dev/null || true)
+
+		[ -z "${payload}" ] && continue
+
+		payload_env=$(printf '%s' "${payload}" | cut -f1)
+		payload_site=$(printf '%s' "${payload}" | cut -f2)
+		created_ts=$(printf '%s' "${payload}" | cut -f3)
+
+		# No deployments, or none carrying our payload -- not one of ours.
+		[ -z "${payload_env}" ] && continue
+
+		# Belongs to a different Pantheon site sharing this repo.
+		if [ -n "${PANTHEON_SITE}" ] && [ -n "${payload_site}" ] && [ "${payload_site}" != "${PANTHEON_SITE}" ]; then
+			continue
+		fi
+
+		# Never touch the environment this run is deploying to.
+		if [ -n "${PANTHEON_TARGET_ENV}" ] && [ "${payload_env}" = "${PANTHEON_TARGET_ENV}" ]; then
+			continue
+		fi
+
+		# The multidev still exists in Pantheon -- not orphaned.
+		if echo "${all_envs}" | grep -qx -- "${payload_env}"; then
+			continue
+		fi
+
+		# Leave recent deployments alone -- see the age_threshold_seconds note above.
+		age_seconds=$((current_ts - created_ts))
+		if [ "${created_ts}" != "0" ] && [ "${age_seconds}" -lt "${age_threshold_seconds}" ]; then
+			continue
+		fi
+
+		echo -e "${yellow}  ${normal}${bold}${gh_env}${normal}${yellow} has no matching Pantheon multidev (was ${normal}${bold}${payload_env}${normal}${yellow}) -- orphaned.${normal}"
+		delete_one_github_environment "${gh_env}"
+	done
+
+	echo -e "${green}✅ Orphaned-deployment sweep complete.${normal}"
+}
+
+# Clean up stale Pantheon multidev environments.
+# This includes environments associated with closed PRs as well as old
 # environments matching a specified pattern.
 function cleanup() {
 	if [ -n "$SITE_ROOT" ]; then
@@ -1092,6 +1383,13 @@ function cleanup() {
 	CURRENT_TIMESTAMP=$(date +%s)
 	AGE_THRESHOLD_SECONDS=$((AGE_THRESHOLD_DAYS * 86400))
 	echo -e "${yellow}Age threshold: ${normal}${bold}${AGE_THRESHOLD_DAYS} days${normal}"
+
+	# Catch deployments left behind by multidevs that no longer exist in Pantheon,
+	# however they went away. See cleanup_orphaned_github_deployments() for why
+	# this can't just be folded into the age-based block below.
+	if [ -n "$GITHUB_REPOSITORY" ]; then
+		cleanup_orphaned_github_deployments "${ALL_ENVS}" "${AGE_THRESHOLD_SECONDS}"
+	fi
 
 	# List all environments, filter out the standard dev/test/live, find the ones
 	# that match our deletion patterns (both legacy and new), and exclude the current target env.

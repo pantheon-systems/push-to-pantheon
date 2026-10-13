@@ -40,3 +40,22 @@ teardown() {
     assert_success
     assert_output_contains "test"
 }
+
+@test "main: help lists and dispatch accepts every deployment bookkeeping command" {
+    # Stub gh: this is a fast test, so nothing here may reach the network.
+    gh() { return 0; }
+    export GITHUB_API_RETRY_DELAY=0
+    unset GITHUB_REPOSITORY
+
+    local cmd
+    for cmd in cleanup_orphaned_github_deployments start_github_deployment finish_github_deployment prune_github_deployments; do
+        run main help
+        assert_output_contains "- ${cmd}:"
+
+        # Past the allowlist, each command returns cleanly instead of printing
+        # "Invalid command".
+        run main "${cmd}"
+        assert_output_not_contains "Invalid command"
+    done
+    unset -f gh
+}

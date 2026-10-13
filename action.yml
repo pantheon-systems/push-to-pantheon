@@ -188,20 +188,21 @@ runs:
           echo "::notice::✅ All required permissions are properly configured"
 
       - name: Start deployment
-        if: ${{ env.PANTHEON_DEPLOY_SKIPPED != 'true' }}
-        uses: bobheadxi/deployments@v1
         id: deployment
-        with:
-          step: start
-          token: ${{ github.token }}
-          env: ${{ env.GITHUB_DEPLOYMENT_ENV }}
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
-          # pantheon_site and pantheon_env let cleanup find this environment again
-          # when deployment_environment has given it a different name.
-          # source_branch records which branch owns it, so the branch strategy can
-          # tell its own environment from one another branch truncated to the same
-          # name.
-          payload: '{"pantheon_site": "${{ inputs.site }}", "pantheon_env": "${{ env.PANTHEON_TARGET_ENV }}", "source_branch": "${{ github.head_ref || github.ref_name }}"}'
+        if: ${{ env.PANTHEON_DEPLOY_SKIPPED != 'true' }}
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          CI_COMMIT_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          CI_BUILD_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          PANTHEON_SITE: ${{ inputs.site }}
+          # The payload lets cleanup find this environment again when
+          # deployment_environment has given it a different name. The source
+          # branch records which branch owns it, so the branch strategy can tell
+          # its own environment from one another branch truncated to the same name.
+          DEPLOYMENT_SOURCE_BRANCH: ${{ github.head_ref || github.ref_name }}
+        run: ${GITHUB_ACTION_PATH}/scripts/main.sh start_github_deployment
 
       - name: Configure SSH key
         if: ${{ env.PANTHEON_DEPLOY_SKIPPED != 'true' }}
@@ -384,16 +385,22 @@ runs:
           ${GITHUB_ACTION_PATH}/scripts/main.sh push_to_pantheon
 
       - name: Update deployment status
-        uses: bobheadxi/deployments@v1
         if: ${{ always() && env.PANTHEON_DEPLOY_SKIPPED != 'true' }}
-        with:
-          step: finish
-          token: ${{ github.token }}
-          status: ${{ job.status }}
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
-          deployment_id: ${{ steps.deployment.outputs.deployment_id }}
-          env: ${{ env.GITHUB_DEPLOYMENT_ENV }}
-          env_url: https://${{ env.PANTHEON_TARGET_ENV }}-${{ inputs.site }}.pantheonsite.io
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_DEPLOYMENT_ID: ${{ steps.deployment.outputs.deployment_id }}
+          DEPLOYMENT_JOB_STATUS: ${{ job.status }}
+          DEPLOYMENT_ENV_URL: https://${{ env.PANTHEON_TARGET_ENV }}-${{ inputs.site }}.pantheonsite.io
+          CI_BUILD_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          PANTHEON_SITE: ${{ inputs.site }}
+        run: |
+          ${GITHUB_ACTION_PATH}/scripts/main.sh finish_github_deployment
+          # Only trim history after a good deploy, and only this environment's.
+          if [ "${DEPLOYMENT_JOB_STATUS}" = "success" ]; then
+            ${GITHUB_ACTION_PATH}/scripts/main.sh prune_github_deployments "${GITHUB_DEPLOYMENT_ENV}"
+          fi
       - name: Deleting old multidevs
         if: ${{ env.PANTHEON_DEPLOY_SKIPPED != 'true' && inputs.delete_old_environments == 'true' && steps.deploy_to_pantheon.outcome == 'success' }}
         shell: bash

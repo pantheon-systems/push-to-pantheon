@@ -26,6 +26,10 @@ As a publicly available GitHub Action, there is no gating mechanism preventing a
 - [Native GitHub workflows on Pantheon livestream recording](https://www.youtube.com/live/Wj9KoTqXwY0?si=1MQlHXDyjMVvWOyX)
 - [Terminus GitHub Action](https://github.com/pantheon-systems/terminus-github-actions)
 
+### Example Sites
+
+- Drupal with Integrated Composer
+
 ## Basic Usage
 
 This action provides a step that can be used as the only step within a job.

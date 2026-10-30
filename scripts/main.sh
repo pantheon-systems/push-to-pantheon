@@ -669,6 +669,11 @@ function push_to_pantheon() {
 	fi
 
 	# For all other pushes, use Build Tools.
+	# Build Tools creates multidevs itself and always clones the database and files.
+	if [ "${PANTHEON_CLONE_FILES}" == "false" ] || [ "${PANTHEON_CLONE_DATABASE}" == "false" ]; then
+		echo "::warning::clone_files and clone_database only apply when skip_build_tools is true or the live environment has not been initialized. Build Tools will clone the database and files for new multidevs."
+	fi
+
 	# If using relative_site_root, commit staged changes first so Build Tools
 	# reads the correct commit instead of old Pantheon repo history
 	if [ -n "$PANTHEON_REPO_DIR" ] && ! git diff --cached --quiet; then
@@ -1517,6 +1522,9 @@ function cleanup() {
 # Requires environment variables:
 #   PANTHEON_SITE: The Pantheon site name
 #   SOURCE_ENV: The source environment to clone from (default: live)
+# Optional environment variables:
+#   PANTHEON_CLONE_FILES: Set to "false" to create the multidev without files (--no-files)
+#   PANTHEON_CLONE_DATABASE: Set to "false" to create the multidev without a database (--no-db)
 function create_multidev() {
 	local MULTIDEV_NAME="${1}"
 
@@ -1532,6 +1540,18 @@ function create_multidev() {
 
 	local source_env="${SOURCE_ENV:-live}"
 
+	# Content to skip when the multidev is created. Both default to being cloned.
+	local create_flags=()
+	local skipped_content=""
+	if [ "${PANTHEON_CLONE_DATABASE}" == "false" ]; then
+		create_flags+=(--no-db)
+		skipped_content="database"
+	fi
+	if [ "${PANTHEON_CLONE_FILES}" == "false" ]; then
+		create_flags+=(--no-files)
+		skipped_content="${skipped_content:+${skipped_content} and }files"
+	fi
+
 	echo -e "${yellow}Checking if multidev ${normal}${bold}${MULTIDEV_NAME}${normal}${yellow} exists on site ${normal}${bold}${PANTHEON_SITE}${normal}${yellow}...${normal}"
 
 	# Check if multidev already exists
@@ -1539,7 +1559,10 @@ function create_multidev() {
 		echo -e "${green}✅ Multidev ${normal}${bold}${MULTIDEV_NAME}${normal}${green} already exists.${normal}"
 	else
 		echo -e "${yellow}Creating multidev ${normal}${bold}${MULTIDEV_NAME}${normal}${yellow} from ${normal}${bold}${source_env}${normal}${yellow}...${normal}"
-		if terminus multidev:create "${PANTHEON_SITE}.${source_env}" "${MULTIDEV_NAME}" --yes; then
+		if [ -n "${skipped_content}" ]; then
+			echo -e "${yellow}Not cloning from ${normal}${bold}${source_env}${normal}${yellow}: ${normal}${bold}${skipped_content}${normal}"
+		fi
+		if terminus multidev:create "${PANTHEON_SITE}.${source_env}" "${MULTIDEV_NAME}" "${create_flags[@]}" --yes; then
 			echo -e "${green}✅ Multidev ${normal}${bold}${MULTIDEV_NAME}${normal}${green} created successfully.${normal}"
 		elif terminus multidev:list "${PANTHEON_SITE}" --format=list | grep -q "^${MULTIDEV_NAME}$"; then
 			# Lost a race with something else creating the same environment. The only

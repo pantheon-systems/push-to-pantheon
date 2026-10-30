@@ -128,6 +128,7 @@ Tests are split into two concurrent jobs:
 2. **02-get_target_env.bats** - Environment logic
 3. **03-permissions.bats** - GitHub API permission validation
 4. **04-ssh_setup.bats** - SSH configuration
+5. **06d-create-content-flags.bats** - Multidev creation flags (stubbed Terminus)
 
 **Integration Tests** (Pantheon infrastructure required, run concurrently with `--jobs 4`):
 5. **05-build_tools.bats** - Terminus plugin detection
@@ -193,6 +194,10 @@ This structure ensures:
   - check_multidev_limit tests
   - No environment creation needed
   - Runs concurrently with 06a and 06b
+
+- **06d-create-content-flags.bats** - Tests clone_files / clone_database for create_multidev
+  - Stubs `terminus` to assert the `--no-files` / `--no-db` arguments
+  - No Pantheon infrastructure needed; runs in the Fast Tests job
 
 ### Complex Integration Tests (Phase 4)
 

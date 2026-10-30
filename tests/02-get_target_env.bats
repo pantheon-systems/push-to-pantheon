@@ -104,6 +104,45 @@ newline"
     [ "$output" = "test-env-1" ]
 }
 
+@test "get_target_env: lowercases an uppercase INPUT_TARGET_ENV" {
+    # Branches such as TEST-F are legal in Git and end up in target_env; the
+    # deploy used to fail on capitalisation alone.
+    export INPUT_TARGET_ENV="TEST-F-git"
+
+    run --separate-stderr get_target_env
+    assert_success
+    [ "$output" = "test-f-git" ]
+    [[ "$stderr" == *"lowercased to 'test-f-git'"* ]]
+}
+
+@test "get_target_env: does not mention lowercasing when INPUT_TARGET_ENV is already lowercase" {
+    export INPUT_TARGET_ENV="test-f-git"
+
+    run --separate-stderr get_target_env
+    assert_success
+    [ "$output" = "test-f-git" ]
+    [[ "$stderr" != *"lowercased"* ]]
+}
+
+@test "get_target_env: lowercasing INPUT_TARGET_ENV does not excuse its other faults" {
+    # Case is the only rule that is repaired. Underscores, length and reserved
+    # names must still be refused, whatever their capitalisation.
+    export INPUT_TARGET_ENV="My_Env"
+    run get_target_env
+    assert_failure
+    assert_output_contains "is not a valid Pantheon environment name"
+
+    export INPUT_TARGET_ENV="ABCDEFGHIJKL"
+    run get_target_env
+    assert_failure
+    assert_output_contains "is not a valid Pantheon environment name"
+
+    export INPUT_TARGET_ENV="DEBUG"
+    run get_target_env
+    assert_failure
+    assert_output_contains "is reserved by Pantheon"
+}
+
 @test "get_target_env: rejects INPUT_TARGET_ENV Pantheon would not accept" {
     # This value used to pass validation and then fail at Terminus: underscores
     # are not allowed and it is 12 characters, one over the limit.

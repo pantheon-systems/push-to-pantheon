@@ -342,7 +342,15 @@ function get_target_env() {
 			echo -e "${yellow}Branch '${branch_name}' adjusted to '${TARGET_ENV}' to satisfy Pantheon's environment naming rules.${normal}" >&2
 		fi
 	elif [ -n "${INPUT_TARGET_ENV}" ]; then
-		TARGET_ENV="${INPUT_TARGET_ENV}"
+		# Case is the one rule that can be fixed without guessing what the caller
+		# meant. Names are routinely built from branch names, and a branch such as
+		# "TEST-FORK" is perfectly legal in Git, so lowercase it rather than fail
+		# a deploy over capitalisation. Every other rule is still enforced below.
+		# tr rather than ${var,,} for the bash 3.2 that ships with macOS.
+		TARGET_ENV="$(printf '%s' "${INPUT_TARGET_ENV}" | tr '[:upper:]' '[:lower:]')"
+		if [ "${TARGET_ENV}" != "${INPUT_TARGET_ENV}" ]; then
+			echo -e "${yellow}target_env '${INPUT_TARGET_ENV}' lowercased to '${TARGET_ENV}'; Pantheon environment names must be lowercase.${normal}" >&2
+		fi
 	elif [ -n "${PR_NUM}" ]; then
 		TARGET_ENV="pr-${PR_NUM}"
 	else

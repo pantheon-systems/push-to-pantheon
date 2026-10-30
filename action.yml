@@ -42,6 +42,18 @@ inputs:
     default: false
     type: boolean
 
+  clone_files:
+    description: "When set to false, new Multidev environments are created without cloning the files directory from the source environment (passes --no-files to terminus multidev:create). Useful for sites that serve missing files on demand from another environment, for example with the Drupal Stage File Proxy module. Only applies when the action creates the Multidev itself, which happens when skip_build_tools is true or the live environment has not been initialized."
+    required: false
+    default: true
+    type: boolean
+
+  clone_database:
+    description: "When set to false, new Multidev environments are created without cloning the database from the source environment (passes --no-db to terminus multidev:create). Only applies when the action creates the Multidev itself, which happens when skip_build_tools is true or the live environment has not been initialized."
+    required: false
+    default: true
+    type: boolean
+
   delete_old_environments:
     description: "If set to true, Multidev environments associated with closed pull requests will be deleted after deployment completes. It is recommended to set this parameter to true for workflows that run after merges to the main branch."
     required: false
@@ -373,6 +385,8 @@ runs:
           GITHUB_TOKEN: ${{ github.token }}
           SKIP_BUILD_TOOLS: ${{ inputs.skip_build_tools }}
           LIVE_ENV_EXISTS: ${{ steps.check_live_env.outputs.live_env_exists }}
+          PANTHEON_CLONE_FILES: ${{ inputs.clone_files }}
+          PANTHEON_CLONE_DATABASE: ${{ inputs.clone_database }}
           PR_NUM: ${{ github.event.pull_request.number }}
           CI_COMMIT_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
           CI_BUILD_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}

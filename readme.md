@@ -230,6 +230,24 @@ If set to true, the database and files directory will be re-cloned from the sour
    type: boolean
 ```
 
+#### `clone_files`
+
+When set to false, new Multidev environments are created without cloning the files directory from the source environment (passes `--no-files` to `terminus multidev:create`). Useful for sites that serve missing files on demand from another environment, for example with the Drupal [Stage File Proxy](https://www.drupal.org/project/stage_file_proxy) module. Only applies when the action creates the Multidev itself, which happens when `skip_build_tools` is true or the live environment has not been initialized. Existing Multidevs are not affected.
+
+```yml
+   default: true
+   type: boolean
+```
+
+#### `clone_database`
+
+When set to false, new Multidev environments are created without cloning the database from the source environment (passes `--no-db` to `terminus multidev:create`). Same scope as `clone_files`: only applies when the action creates the Multidev itself.
+
+```yml
+   default: true
+   type: boolean
+```
+
 #### `git_user_name`
 
 The name to be used with the Git commit that will be pushed to Pantheon. This value is not used on newer 'eVCS' sites for which there is no Pantheon-provided Git repo.

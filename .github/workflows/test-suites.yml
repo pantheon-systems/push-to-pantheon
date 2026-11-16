@@ -50,12 +50,12 @@ jobs:
     steps:
       # Checkout base repository code (trusted)
       - name: Checkout repository
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       # Checkout PR code to subdirectory (untrusted) - only for pull_request_target
       - name: Checkout PR code
         if: github.event_name == 'pull_request_target'
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: ${{ github.event.pull_request.head.repo.full_name }}
           ref: ${{ github.event.pull_request.head.ref }}
@@ -108,12 +108,12 @@ jobs:
     steps:
       # Checkout base repository code (trusted)
       - name: Checkout repository
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       # Checkout PR code to subdirectory (untrusted) - only for pull_request_target
       - name: Checkout PR code
         if: github.event_name == 'pull_request_target'
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: ${{ github.event.pull_request.head.repo.full_name }}
           ref: ${{ github.event.pull_request.head.ref }}
@@ -168,12 +168,12 @@ jobs:
     steps:
       # Checkout base repository code (trusted)
       - name: Checkout repository
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       # Checkout PR code to subdirectory (untrusted) - only for pull_request_target
       - name: Checkout PR code
         if: github.event_name == 'pull_request_target'
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: ${{ github.event.pull_request.head.repo.full_name }}
           ref: ${{ github.event.pull_request.head.ref }}
@@ -230,19 +230,19 @@ jobs:
     steps:
       # Checkout base repository code (trusted)
       - name: Checkout repository
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       # Checkout PR code to subdirectory (untrusted) - only for pull_request_target
       - name: Checkout PR code
         if: github.event_name == 'pull_request_target'
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: ${{ github.event.pull_request.head.repo.full_name }}
           ref: ${{ github.event.pull_request.head.ref }}
           path: pr-code
 
       - name: Pre-install Terminus
-        uses: pantheon-systems/terminus-github-actions@v1
+        uses: pantheon-systems/terminus-github-actions@409451ede17f75acac08f42edc823fee6c435057 # v1.2.8
         with:
           pantheon-machine-token: ${{ secrets.PANTHEON_MACHINE_TOKEN }}
 
@@ -300,12 +300,12 @@ jobs:
     steps:
       # Checkout base repository code (trusted)
       - name: Checkout repository
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       # Checkout PR code to subdirectory (untrusted) - only for pull_request_target
       - name: Checkout PR code
         if: github.event_name == 'pull_request_target'
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: ${{ github.event.pull_request.head.repo.full_name }}
           ref: ${{ github.event.pull_request.head.ref }}
@@ -377,12 +377,12 @@ jobs:
     steps:
       # Checkout base repository code (trusted)
       - name: Checkout repository
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       # Checkout PR code to subdirectory (untrusted) - only for pull_request_target
       - name: Checkout PR code
         if: github.event_name == 'pull_request_target'
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: ${{ github.event.pull_request.head.repo.full_name }}
           ref: ${{ github.event.pull_request.head.ref }}

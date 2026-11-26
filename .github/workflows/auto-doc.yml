@@ -17,16 +17,19 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Run Auto-Doc
-        uses: tj-actions/auto-doc@b10ceedffd794ec29a8fa8700529f40c1b64a951 # v3.6.0
-        with:
-          output: 'readme.md'
+        # Uses the yq preinstalled on ubuntu-latest; no third-party action.
+        run: scripts/generate-readme-docs.sh action.yml readme.md
 
       - name: Verify changed files
-        uses: tj-actions/verify-changed-files@a1c6acee9df209257a246f2cc6ae8cb6581c1edf # v20.0.4
         id: verify-changed-files
-        with:
-            files: |
-              readme.md
+        # `git status --porcelain` (unlike `git diff`) also reports untracked,
+        # added, deleted and renamed files.
+        run: |
+          if [ -n "$(git status --porcelain -- readme.md)" ]; then
+            echo "files_changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "files_changed=false" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Create pull request
         if: steps.verify-changed-files.outputs.files_changed == 'true'

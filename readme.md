@@ -8,7 +8,58 @@ It is designed to be used in GitHub Actions workflows that are triggered by Pull
 
 When running workflow triggered by a pull request, this action will create a [Multidev environment](https://docs.pantheon.io/guides/multidev) and deploy code to it.
 
-![Deploying a PR to a Pantheon Multidev](.github/documentation/diagram--deploying-pr.png)
+```mermaid
+
+  flowchart LR
+
+
+             subgraph GitHub["GitHub"]
+               direction LR
+               GitHubRepo["GitHub Repo"]-->|"Branch with pull request<br>triggers a workflow"|GitHubAction["GitHub Action"]
+              end
+
+            subgraph Pantheon["Pantheon"]
+                PantheonEnv["Pantheon Multidev Environment"]
+            end
+
+     GitHubAction -->|"Action sends code to Pantheon"| PantheonEnv
+
+
+
+  Laptop["Developer's Computer"]-->|"Pushing Git branch"|GitHubRepo
+```
+
+
+```mermaid
+
+graph TD
+    block-beta
+    columns 3
+    a["github repo"]
+    b["github action"]
+    c["pantheon multidev"]
+    d
+
+    a --> b
+    b --> c
+
+    %% Adding styles for increased space between boxes
+    style a padding: 20px;
+    style b padding: 20px;
+    style c padding: 20px;
+    style d padding: 20px;
+
+    %% You can also try adjusting the spacing between nodes if needed:
+    %% These settings might work in some cases but are not part of a specific "block" feature.
+    %% style a margin: 20px;
+    %% style b margin: 20px;
+    %% style c margin: 20px;
+
+
+
+```
+
+
 
 When running on workflows triggered by merges/pushes to the `main` branch this action will deploy code to [the Pantheon `Dev` environment](https://docs.pantheon.io/pantheon-workflow).
 
